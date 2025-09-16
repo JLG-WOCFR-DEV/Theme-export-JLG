@@ -104,7 +104,15 @@ class TEJLG_Export {
      */
     private static function get_sanitized_content() {
         $content = get_the_content();
-        return mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+        if (function_exists('mb_convert_encoding')) {
+            return mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+        }
+
+        if (function_exists('wp_check_invalid_utf8')) {
+            return wp_check_invalid_utf8($content, true);
+        }
+
+        return (string) $content;
     }
 
     /**
