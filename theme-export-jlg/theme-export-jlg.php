@@ -18,7 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Définir les constantes utiles du plugin
-define( 'TEJLG_VERSION', '2.2.0' );
+$plugin_data = get_file_data( __FILE__, [ 'Version' => 'Version' ] );
+define( 'TEJLG_VERSION', ! empty( $plugin_data['Version'] ) ? $plugin_data['Version'] : '1.0.0' );
 define( 'TEJLG_PATH', plugin_dir_path( __FILE__ ) );
 define( 'TEJLG_URL', plugin_dir_url( __FILE__ ) );
 
