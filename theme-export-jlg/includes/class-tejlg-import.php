@@ -49,24 +49,67 @@ class TEJLG_Import {
         delete_transient($transient_id);
         
         $imported_count = 0;
+        $errors = [];
+
         foreach ($selected_indices as $index) {
             $index = intval($index);
-            if (isset($all_patterns[$index])) {
-                $pattern = $all_patterns[$index];
-                if (!WP_Block_Patterns_Registry::get_instance()->is_registered($pattern['slug'])) {
-                    register_block_pattern($pattern['slug'], [
-                        'title'   => $pattern['title'],
-                        'content' => $pattern['content'],
-                    ]);
-                    $imported_count++;
-                }
+            if (!isset($all_patterns[$index]) || !is_array($all_patterns[$index])) {
+                continue;
+            }
+
+            $pattern = $all_patterns[$index];
+
+            $slug = isset($pattern['slug']) ? sanitize_title($pattern['slug']) : '';
+            if ('' === $slug) {
+                $errors[] = sprintf('La composition à l\'index %d ne possède pas de slug valide.', $index);
+                continue;
+            }
+
+            $title = isset($pattern['title']) ? sanitize_text_field($pattern['title']) : '';
+            $content = isset($pattern['content']) ? wp_kses_post($pattern['content']) : '';
+
+            $existing_block = get_page_by_path($slug, OBJECT, 'wp_block');
+
+            if ($existing_block instanceof WP_Post) {
+                $post_data = [
+                    'ID'           => $existing_block->ID,
+                    'post_title'   => $title,
+                    'post_content' => $content,
+                    'post_name'    => $slug,
+                ];
+
+                $result = wp_update_post(wp_slash($post_data), true);
+            } else {
+                $post_data = [
+                    'post_title'   => $title,
+                    'post_name'    => $slug,
+                    'post_content' => $content,
+                    'post_status'  => 'publish',
+                    'post_type'    => 'wp_block',
+                    'post_author'  => get_current_user_id(),
+                ];
+
+                $result = wp_insert_post(wp_slash($post_data), true);
+            }
+
+            if (is_wp_error($result)) {
+                $errors[] = $result->get_error_message();
+                continue;
+            }
+
+            if ($result) {
+                $imported_count++;
             }
         }
-        
+
+        if (!empty($errors)) {
+            add_settings_error('tejlg_import_messages', 'patterns_import_errors', implode(' ', array_unique($errors)), 'error');
+        }
+
         if ($imported_count > 0) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', $imported_count . ' composition(s) ont été importées avec succès !', 'success');
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', $imported_count . ' composition(s) ont été enregistrées avec succès.', 'success');
         } else {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', 'Aucune nouvelle composition n\'a été importée (peut-être existaient-elles déjà).', 'info');
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', 'Aucune composition n\'a pu être enregistrée (elles existent peut-être déjà ou des erreurs sont survenues).', 'info');
         }
     }
 }
