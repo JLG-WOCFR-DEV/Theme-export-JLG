@@ -59,7 +59,14 @@ class TEJLG_Import {
 
             $pattern = $all_patterns[$index];
 
-            $slug = isset($pattern['slug']) ? sanitize_title($pattern['slug']) : '';
+            $raw_slug = isset($pattern['slug']) ? (string) $pattern['slug'] : '';
+            $raw_slug = trim($raw_slug);
+
+            if (0 === strpos($raw_slug, 'custom-patterns/')) {
+                $raw_slug = substr($raw_slug, strlen('custom-patterns/'));
+            }
+
+            $slug = sanitize_title($raw_slug);
             if ('' === $slug) {
                 $errors[] = sprintf('La composition à l\'index %d ne possède pas de slug valide.', $index);
                 continue;

@@ -53,9 +53,14 @@ class TEJLG_Export {
                 if ($is_portable) {
                     $content = self::clean_pattern_content($content);
                 }
+                $slug = get_post_field('post_name', get_the_ID());
+                if ('' === $slug) {
+                    $slug = sanitize_title(get_the_title());
+                }
+
                 $all_patterns[] = [
                     'title'   => get_the_title(),
-                    'slug'    => 'custom-patterns/' . sanitize_title(get_the_title()),
+                    'slug'    => $slug,
                     'content' => $content,
                 ];
             }
@@ -87,9 +92,14 @@ class TEJLG_Export {
                 if ($is_portable) {
                     $content = self::clean_pattern_content($content);
                 }
+                $slug = get_post_field('post_name', get_the_ID());
+                if ('' === $slug) {
+                    $slug = sanitize_title(get_the_title());
+                }
+
                 $selected_patterns[] = [
                     'title'   => get_the_title(),
-                    'slug'    => 'custom-patterns/' . sanitize_title(get_the_title()),
+                    'slug'    => $slug,
                     'content' => $content,
                 ];
             }
