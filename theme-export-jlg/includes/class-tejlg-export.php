@@ -123,7 +123,7 @@ class TEJLG_Export {
         $content = str_replace(get_home_url(), '', $content);
 
         // 2. Neutralise les IDs des médias pour éviter les dépendances
-        $content = preg_replace('/("id"\s*:\s*)\d+/', '$1' . '0', $content);
+        $content = preg_replace('/("id"\s*:\s*)\d+/', '${1}0', $content);
 
         // 3. Supprime les métadonnées potentiellement incompatibles
         $content = preg_replace('/,\s*"metadata"\s*:\s*\{[^{}]*?\}/s', '', $content);
