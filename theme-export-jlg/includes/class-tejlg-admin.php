@@ -278,8 +278,10 @@ class TEJLG_Admin {
                 </div>
                 <?php foreach ($patterns as $index => $pattern): ?>
                     <?php
-                    $pattern_content = isset($pattern['content']) ? $pattern['content'] : '';
+                    $pattern_content = isset($pattern['content']) ? (string) $pattern['content'] : '';
                     $sanitized_pattern_content = wp_kses_post($pattern_content);
+                    $rendered_pattern = do_blocks($sanitized_pattern_content);
+                    $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $rendered_pattern . '</body></html>';
                     ?>
                     <div class="pattern-item">
                         <div class="pattern-selector">
@@ -289,7 +291,7 @@ class TEJLG_Admin {
                             </label>
                         </div>
                         <div class="pattern-preview-wrapper">
-                            <iframe srcdoc="<?php echo esc_attr('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . do_blocks($sanitized_pattern_content) . '</body></html>'); ?>" class="pattern-preview-iframe" sandbox></iframe>
+                            <iframe srcdoc="<?php echo esc_attr($iframe_content); ?>" class="pattern-preview-iframe" sandbox="allow-same-origin"></iframe>
                         </div>
 
                         <div class="pattern-controls">
