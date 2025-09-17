@@ -279,7 +279,11 @@ class TEJLG_Admin {
                 <?php foreach ($patterns as $index => $pattern): ?>
                     <?php
                     $pattern_content = isset($pattern['content']) ? (string) $pattern['content'] : '';
-                    $rendered_pattern = do_blocks($pattern_content);
+                    $parsed_blocks = parse_blocks($pattern_content);
+                    $rendered_pattern = $this->render_blocks_preview($parsed_blocks);
+                    if ('' === $rendered_pattern) {
+                        $rendered_pattern = $pattern_content;
+                    }
                     $sanitized_rendered_pattern = wp_kses_post($rendered_pattern);
                     $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $sanitized_rendered_pattern . '</body></html>';
                     ?>
@@ -314,7 +318,78 @@ class TEJLG_Admin {
         </form>
         <?php
     }
-    
+
+    private function render_blocks_preview(array $blocks) {
+        $output = '';
+
+        foreach ($blocks as $block) {
+            $output .= $this->render_block_preview($block);
+        }
+
+        return $output;
+    }
+
+    private function render_block_preview(array $block) {
+        if (empty($block['blockName'])) {
+            return isset($block['innerHTML']) ? $block['innerHTML'] : '';
+        }
+
+        $block_name = $block['blockName'];
+        $block_type = WP_Block_Type_Registry::get_instance()->get_registered($block_name);
+
+        $is_dynamic = ('core/shortcode' === $block_name);
+
+        if ($block_type instanceof WP_Block_Type && !empty($block_type->render_callback)) {
+            $is_dynamic = true;
+        } elseif (!$block_type) {
+            $is_dynamic = true;
+        }
+
+        if ($is_dynamic) {
+            return $this->get_dynamic_block_placeholder($block_name);
+        }
+
+        $rendered_inner_blocks = [];
+        if (!empty($block['innerBlocks'])) {
+            foreach ($block['innerBlocks'] as $inner_block) {
+                $rendered_inner_blocks[] = $this->render_block_preview($inner_block);
+            }
+        }
+
+        if (!empty($block['innerContent'])) {
+            $content = '';
+            $inner_index = 0;
+
+            foreach ($block['innerContent'] as $chunk) {
+                if (null === $chunk) {
+                    $content .= isset($rendered_inner_blocks[$inner_index]) ? $rendered_inner_blocks[$inner_index] : '';
+                    $inner_index++;
+                } else {
+                    $content .= $chunk;
+                }
+            }
+
+            return $content;
+        }
+
+        if (isset($block['innerHTML'])) {
+            return $block['innerHTML'];
+        }
+
+        return '';
+    }
+
+    private function get_dynamic_block_placeholder($block_name) {
+        $block_label = $block_name ? $block_name : __('bloc inconnu', 'theme-export-jlg');
+        $placeholder_text = sprintf(
+            /* translators: %s: dynamic block name. */
+            esc_html__('Bloc dynamique "%s" non rendu dans cet aperçu.', 'theme-export-jlg'),
+            esc_html($block_label)
+        );
+
+        return '<div class="tejlg-block-placeholder"><p>' . $placeholder_text . '</p></div>';
+    }
+
     private function render_migration_guide_tab() {
         ?>
         <h2>Guide : Migrer ses personnalisations d'un thème bloc à un autre</h2>
