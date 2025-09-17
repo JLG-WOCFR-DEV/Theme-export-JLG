@@ -66,7 +66,41 @@ class TEJLG_Import {
             }
 
             $title = isset($pattern['title']) ? sanitize_text_field($pattern['title']) : '';
-            $content = isset($pattern['content']) ? wp_kses_post($pattern['content']) : '';
+            $content = '';
+
+            if (isset($pattern['content'])) {
+                $raw_content = (string) $pattern['content'];
+
+                if (current_user_can('unfiltered_html')) {
+                    $content = $raw_content;
+                } else {
+                    $block_comment_tokens = [];
+
+                    $tokenized_content = preg_replace_callback(
+                        '/<!--\s*(\/?.*?wp:[^>]*?)\s*-->/',
+                        function ($matches) use (&$block_comment_tokens) {
+                            $token = '[[TEJLG_WP_COMMENT_' . count($block_comment_tokens) . ']]';
+                            $block_comment_tokens[$token] = $matches[0];
+
+                            return $token;
+                        },
+                        $raw_content
+                    );
+
+                    $allowed_html       = wp_kses_allowed_html('post');
+                    $allowed_protocols  = wp_allowed_protocols();
+                    $sanitized_content  = wp_kses($tokenized_content, $allowed_html, $allowed_protocols);
+
+                    if (!empty($block_comment_tokens)) {
+                        $sanitized_content = strtr($sanitized_content, $block_comment_tokens);
+                    }
+
+                    // Preserve Gutenberg block comments for editors lacking the `unfiltered_html` capability
+                    // while still sanitizing the surrounding markup with wp_kses(). Without this, block
+                    // structures would be flattened into static HTML, making imported patterns unusable.
+                    $content = $sanitized_content;
+                }
+            }
 
             $existing_block = get_page_by_path($slug, OBJECT, 'wp_block');
 
