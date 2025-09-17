@@ -26,7 +26,10 @@ class TEJLG_Theme_Tools {
             return;
         }
 
-        wp_mkdir_p( $child_dir );
+        if ( ! wp_mkdir_p( $child_dir ) ) {
+            add_settings_error('tejlg_admin_messages', 'child_theme_error', 'Erreur : Impossible de créer le dossier du thème enfant. Vérifiez les permissions du serveur.', 'error');
+            return;
+        }
 
         $sanitized_child_name   = sanitize_text_field( $child_name );
         $sanitized_theme_uri    = esc_url_raw( $parent_theme->get( 'ThemeURI' ) );
@@ -73,8 +76,20 @@ add_action( \'wp_enqueue_scripts\', \'%1$s_enqueue_styles\' );
         $css_content = wp_check_invalid_utf8( $css_content, true );
         $php_content = wp_check_invalid_utf8( $php_content, true );
 
-        file_put_contents( $child_dir . '/style.css', $css_content );
-        file_put_contents( $child_dir . '/functions.php', $php_content );
+        $style_file     = $child_dir . '/style.css';
+        $functions_file = $child_dir . '/functions.php';
+
+        if ( false === file_put_contents( $style_file, $css_content ) ) {
+            self::remove_child_theme_directory( $child_dir );
+            add_settings_error('tejlg_admin_messages', 'child_theme_error', 'Erreur : Impossible de créer le fichier style.css du thème enfant.', 'error');
+            return;
+        }
+
+        if ( false === file_put_contents( $functions_file, $php_content ) ) {
+            self::remove_child_theme_directory( $child_dir );
+            add_settings_error('tejlg_admin_messages', 'child_theme_error', 'Erreur : Impossible de créer le fichier functions.php du thème enfant.', 'error');
+            return;
+        }
 
         $themes_page_url = admin_url('themes.php');
         add_settings_error(
@@ -87,5 +102,23 @@ add_action( \'wp_enqueue_scripts\', \'%1$s_enqueue_styles\' );
             ),
             'success'
         );
+    }
+
+    private static function remove_child_theme_directory( $child_dir ) {
+        $files = array( $child_dir . '/style.css', $child_dir . '/functions.php' );
+
+        foreach ( $files as $file ) {
+            if ( file_exists( $file ) ) {
+                unlink( $file );
+            }
+        }
+
+        if ( is_dir( $child_dir ) ) {
+            $dir_files = scandir( $child_dir );
+
+            if ( is_array( $dir_files ) && count( $dir_files ) <= 2 ) {
+                rmdir( $child_dir );
+            }
+        }
     }
 }
