@@ -10,8 +10,8 @@ class TEJLG_Import {
         @unlink($file['tmp_name']);
 
         $message_type = is_wp_error($result) || !$result ? 'error' : 'success';
-        $message_text = is_wp_error($result) ? $result->get_error_message() : 'Le thème a été installé avec succès !';
-        
+        $message_text = is_wp_error($result) ? $result->get_error_message() : esc_html__('Le thème a été installé avec succès !', 'theme-export-jlg');
+
         add_settings_error('tejlg_import_messages', 'theme_import_status', $message_text, $message_type);
     }
 
@@ -22,12 +22,12 @@ class TEJLG_Import {
         $patterns = json_decode($json_content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($patterns)) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', 'Erreur : Le fichier n\'est pas un fichier JSON valide.', 'error');
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Erreur : Le fichier n\'est pas un fichier JSON valide.', 'theme-export-jlg'), 'error');
             return;
         }
-        
+
         if (empty($patterns)) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', 'Information : Le fichier ne contient aucune composition.', 'info');
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Information : Le fichier ne contient aucune composition.', 'theme-export-jlg'), 'info');
             return;
         }
 
@@ -42,12 +42,12 @@ class TEJLG_Import {
         $all_patterns = get_transient($transient_id);
 
         if (false === $all_patterns) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', 'Erreur : La session d\'importation a expiré. Veuillez réessayer.', 'error');
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Erreur : La session d\'importation a expiré. Veuillez réessayer.', 'theme-export-jlg'), 'error');
             return;
         }
 
         if (!is_array($selected_indices)) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', 'Erreur : La sélection des compositions est invalide.', 'error');
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Erreur : La sélection des compositions est invalide.', 'theme-export-jlg'), 'error');
             return;
         }
 
@@ -73,7 +73,7 @@ class TEJLG_Import {
 
             $slug = sanitize_title($raw_slug);
             if ('' === $slug) {
-                $errors[] = sprintf('La composition à l\'index %d ne possède pas de slug valide.', $index);
+                $errors[] = sprintf(__('La composition à l\'index %d ne possède pas de slug valide.', 'theme-export-jlg'), $index);
                 continue;
             }
 
@@ -81,37 +81,7 @@ class TEJLG_Import {
             $content = '';
 
             if (isset($pattern['content'])) {
-                $raw_content = (string) $pattern['content'];
-
-                if (current_user_can('unfiltered_html')) {
-                    $content = $raw_content;
-                } else {
-                    $block_comment_tokens = [];
-
-                    $tokenized_content = preg_replace_callback(
-                        '/<!--\s*(\/?.*?wp:[^>]*?)\s*-->/',
-                        function ($matches) use (&$block_comment_tokens) {
-                            $token = '[[TEJLG_WP_COMMENT_' . count($block_comment_tokens) . ']]';
-                            $block_comment_tokens[$token] = $matches[0];
-
-                            return $token;
-                        },
-                        $raw_content
-                    );
-
-                    $allowed_html       = wp_kses_allowed_html('post');
-                    $allowed_protocols  = wp_allowed_protocols();
-                    $sanitized_content  = wp_kses($tokenized_content, $allowed_html, $allowed_protocols);
-
-                    if (!empty($block_comment_tokens)) {
-                        $sanitized_content = strtr($sanitized_content, $block_comment_tokens);
-                    }
-
-                    // Preserve Gutenberg block comments for editors lacking the `unfiltered_html` capability
-                    // while still sanitizing the surrounding markup with wp_kses(). Without this, block
-                    // structures would be flattened into static HTML, making imported patterns unusable.
-                    $content = $sanitized_content;
-                }
+                $content = self::sanitize_pattern_content_for_current_user((string) $pattern['content']);
             }
 
             $existing_block = get_page_by_path($slug, OBJECT, 'wp_block');
@@ -149,13 +119,50 @@ class TEJLG_Import {
         }
 
         if (!empty($errors)) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_errors', implode(' ', array_unique($errors)), 'error');
+            add_settings_error('tejlg_import_messages', 'patterns_import_errors', esc_html(implode(' ', array_unique($errors))), 'error');
         }
 
         if ($imported_count > 0) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', $imported_count . ' composition(s) ont été enregistrées avec succès.', 'success');
+            $success_message = sprintf(
+                _n('%d composition a été enregistrée avec succès.', '%d compositions ont été enregistrées avec succès.', $imported_count, 'theme-export-jlg'),
+                $imported_count
+            );
+
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html($success_message), 'success');
         } else {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', 'Aucune composition n\'a pu être enregistrée (elles existent peut-être déjà ou des erreurs sont survenues).', 'info');
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Aucune composition n\'a pu être enregistrée (elles existent peut-être déjà ou des erreurs sont survenues).', 'theme-export-jlg'), 'info');
         }
+    }
+
+    /**
+     * Sanitize pattern content for users without the unfiltered_html capability while preserving block structure.
+     */
+    private static function sanitize_pattern_content_for_current_user($raw_content) {
+        if (current_user_can('unfiltered_html')) {
+            return $raw_content;
+        }
+
+        $block_comment_tokens = [];
+
+        $tokenized_content = preg_replace_callback(
+            '/<!--\s*(\/?.*?wp:[^>]*?)\s*-->/',
+            function ($matches) use (&$block_comment_tokens) {
+                $token = '[[TEJLG_WP_COMMENT_' . count($block_comment_tokens) . ']]';
+                $block_comment_tokens[$token] = $matches[0];
+
+                return $token;
+            },
+            $raw_content
+        );
+
+        $allowed_html      = wp_kses_allowed_html('post');
+        $allowed_protocols = wp_allowed_protocols();
+        $sanitized_content = wp_kses($tokenized_content, $allowed_html, $allowed_protocols);
+
+        if (!empty($block_comment_tokens)) {
+            $sanitized_content = strtr($sanitized_content, $block_comment_tokens);
+        }
+
+        return $sanitized_content;
     }
 }

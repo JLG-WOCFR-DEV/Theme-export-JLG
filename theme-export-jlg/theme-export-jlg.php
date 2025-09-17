@@ -35,5 +35,10 @@ require_once TEJLG_PATH . 'includes/class-tejlg-theme-tools.php';
 function tejlg_run_plugin() {
     new TEJLG_Admin();
 }
-// Lancer le plugin
-tejlg_run_plugin();
+
+function tejlg_load_textdomain() {
+    load_plugin_textdomain( 'theme-export-jlg', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+}
+
+add_action( 'plugins_loaded', 'tejlg_load_textdomain' );
+add_action( 'plugins_loaded', 'tejlg_run_plugin' );
