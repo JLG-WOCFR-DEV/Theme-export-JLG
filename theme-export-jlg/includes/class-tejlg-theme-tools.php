@@ -28,6 +28,13 @@ class TEJLG_Theme_Tools {
 
         wp_mkdir_p( $child_dir );
 
+        $sanitized_child_name   = sanitize_text_field( $child_name );
+        $sanitized_theme_uri    = esc_url_raw( $parent_theme->get( 'ThemeURI' ) );
+        $sanitized_parent_name  = sanitize_text_field( $parent_theme->get( 'Name' ) );
+        $sanitized_author_name  = sanitize_text_field( $parent_theme->get( 'Author' ) );
+        $sanitized_author_uri   = esc_url_raw( $parent_theme->get( 'AuthorURI' ) );
+        $sanitized_template     = sanitize_text_field( $parent_theme->get_stylesheet() );
+
         $css_content = sprintf(
 '/*
 Theme Name: %1$s
@@ -39,15 +46,16 @@ Template: %6$s
 Version: 1.0.0
 */
 ',
-            esc_html( $child_name ),
-            esc_url( $parent_theme->get('ThemeURI') ),
-            esc_html( $parent_theme->get('Name') ),
-            esc_html( $parent_theme->get('Author') ),
-            esc_url( $parent_theme->get('AuthorURI') ),
-            esc_html( $parent_theme->get_stylesheet() )
+            $sanitized_child_name,
+            $sanitized_theme_uri,
+            $sanitized_parent_name,
+            $sanitized_author_name,
+            $sanitized_author_uri,
+            $sanitized_template
         );
 
-        $function_name_prefix = str_replace( '-', '_', $child_slug );
+        $function_name_prefix   = str_replace( '-', '_', $child_slug );
+        $sanitized_stylesheet   = sanitize_key( $parent_theme->get_stylesheet() );
         $php_content = sprintf(
 '<?php
 /**
@@ -59,8 +67,11 @@ function %1$s_enqueue_styles() {
 add_action( \'wp_enqueue_scripts\', \'%1$s_enqueue_styles\' );
 ',
             $function_name_prefix,
-            $parent_theme->get_stylesheet()
+            $sanitized_stylesheet
         );
+
+        $css_content = wp_check_invalid_utf8( $css_content, true );
+        $php_content = wp_check_invalid_utf8( $php_content, true );
 
         file_put_contents( $child_dir . '/style.css', $css_content );
         file_put_contents( $child_dir . '/functions.php', $php_content );
