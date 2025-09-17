@@ -8,7 +8,15 @@ class TEJLG_Admin {
     }
 
     public function add_menu_page() {
-        add_menu_page('Theme Export - JLG', 'Theme Export', 'manage_options', 'theme-export-jlg', [ $this, 'render_admin_page' ], 'dashicons-download', 80);
+        add_menu_page(
+            __('Theme Export - JLG', 'theme-export-jlg'),
+            __('Theme Export', 'theme-export-jlg'),
+            'manage_options',
+            'theme-export-jlg',
+            [ $this, 'render_admin_page' ],
+            'dashicons-download',
+            80
+        );
     }
 
     public function enqueue_assets($hook) {
@@ -70,10 +78,10 @@ class TEJLG_Admin {
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
             <h2 class="nav-tab-wrapper">
-                <a href="?page=theme-export-jlg&tab=export" class="nav-tab <?php echo $active_tab == 'export' ? 'nav-tab-active' : ''; ?>">Exporter & Outils</a>
-                <a href="?page=theme-export-jlg&tab=import" class="nav-tab <?php echo $active_tab == 'import' ? 'nav-tab-active' : ''; ?>">Importer</a>
-                <a href="?page=theme-export-jlg&tab=migration_guide" class="nav-tab <?php echo $active_tab == 'migration_guide' ? 'nav-tab-active' : ''; ?>">Guide de Migration</a>
-                <a href="?page=theme-export-jlg&tab=debug" class="nav-tab <?php echo $active_tab == 'debug' ? 'nav-tab-active' : ''; ?>">Débogage</a>
+                <a href="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'export'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab == 'export' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Exporter & Outils', 'theme-export-jlg'); ?></a>
+                <a href="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab == 'import' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Importer', 'theme-export-jlg'); ?></a>
+                <a href="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'migration_guide'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab == 'migration_guide' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Guide de Migration', 'theme-export-jlg'); ?></a>
+                <a href="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'debug'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab == 'debug' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Débogage', 'theme-export-jlg'); ?></a>
             </h2>
             <?php
             switch ($active_tab) {
@@ -98,39 +106,39 @@ class TEJLG_Admin {
     private function render_export_default_page() {
         ?>
         <?php settings_errors('tejlg_admin_messages'); ?>
-        
-        <h2>Actions sur le Thème Actif</h2>
+
+        <h2><?php esc_html_e('Actions sur le Thème Actif', 'theme-export-jlg'); ?></h2>
         <div class="tejlg-cards-container">
             <div class="tejlg-card">
-                <h3>Exporter le Thème Actif (.zip)</h3>
-                <p>Crée une archive <code>.zip</code> de votre thème. Idéal pour les sauvegardes ou les migrations.</p>
+                <h3><?php esc_html_e('Exporter le Thème Actif (.zip)', 'theme-export-jlg'); ?></h3>
+                <p><?php echo wp_kses_post(__('Crée une archive <code>.zip</code> de votre thème. Idéal pour les sauvegardes ou les migrations.', 'theme-export-jlg')); ?></p>
                 <form method="post" action="">
                     <?php wp_nonce_field('tejlg_export_action', 'tejlg_nonce'); ?>
-                    <p><button type="submit" name="tejlg_export_theme" class="button button-primary">Exporter le Thème Actif</button></p>
+                    <p><button type="submit" name="tejlg_export_theme" class="button button-primary"><?php esc_html_e('Exporter le Thème Actif', 'theme-export-jlg'); ?></button></p>
                 </form>
             </div>
             <div class="tejlg-card">
-                <h3>Exporter les Compositions (.json)</h3>
-                <p>Générez un fichier <code>.json</code> contenant vos compositions.</p>
+                <h3><?php esc_html_e('Exporter les Compositions (.json)', 'theme-export-jlg'); ?></h3>
+                <p><?php echo wp_kses_post(__('Générez un fichier <code>.json</code> contenant vos compositions.', 'theme-export-jlg')); ?></p>
                 <form method="post" action="">
                     <?php wp_nonce_field('tejlg_export_action', 'tejlg_nonce'); ?>
-                    <p><label><input type="checkbox" name="export_portable" value="1"> <strong>Export portable</strong> (compatibilité maximale)</label></p>
-                    <p><button type="submit" name="tejlg_export_patterns" class="button button-primary">Exporter TOUTES les compositions</button></p>
+                    <p><label><input type="checkbox" name="export_portable" value="1"> <strong><?php esc_html_e('Export portable', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(compatibilité maximale)', 'theme-export-jlg'); ?></label></p>
+                    <p><button type="submit" name="tejlg_export_patterns" class="button button-primary"><?php esc_html_e('Exporter TOUTES les compositions', 'theme-export-jlg'); ?></button></p>
                 </form>
                 <p>
-                    <a href="?page=theme-export-jlg&tab=export&action=select_patterns" class="button">Exporter une sélection...</a>
+                    <a href="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'export', 'action' => 'select_patterns'], admin_url('admin.php'))); ?>" class="button"><?php esc_html_e('Exporter une sélection...', 'theme-export-jlg'); ?></a>
                 </p>
             </div>
              <div class="tejlg-card">
-                <h3>Créer un Thème Enfant</h3>
-                <p>Générez un thème enfant pour le thème actif. Indispensable pour ajouter du code personnalisé.</p>
-                <form method="post" action="?page=theme-export-jlg&tab=export">
+                <h3><?php esc_html_e('Créer un Thème Enfant', 'theme-export-jlg'); ?></h3>
+                <p><?php esc_html_e('Générez un thème enfant pour le thème actif. Indispensable pour ajouter du code personnalisé.', 'theme-export-jlg'); ?></p>
+                <form method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'export'], admin_url('admin.php'))); ?>">
                     <?php wp_nonce_field('tejlg_create_child_action', 'tejlg_create_child_nonce'); ?>
                     <p>
-                        <label for="child_theme_name">Nom du thème enfant :</label>
-                        <input type="text" name="child_theme_name" id="child_theme_name" class="regular-text" placeholder="<?php echo esc_attr(wp_get_theme()->get('Name') . ' Enfant'); ?>" required>
+                        <label for="child_theme_name"><?php esc_html_e('Nom du thème enfant :', 'theme-export-jlg'); ?></label>
+                        <input type="text" name="child_theme_name" id="child_theme_name" class="regular-text" placeholder="<?php echo esc_attr(wp_get_theme()->get('Name') . ' ' . __('Enfant', 'theme-export-jlg')); ?>" required>
                     </p>
-                    <p><button type="submit" name="tejlg_create_child" class="button button-primary">Créer le Thème Enfant</button></p>
+                    <p><button type="submit" name="tejlg_create_child" class="button button-primary"><?php esc_html_e('Créer le Thème Enfant', 'theme-export-jlg'); ?></button></p>
                 </form>
             </div>
         </div>
@@ -146,34 +154,34 @@ class TEJLG_Admin {
             'order' => 'ASC',
         ]);
         ?>
-        <p><a href="?page=theme-export-jlg&tab=export">&larr; Retour aux outils principaux</a></p>
-        <h2>Exporter une sélection de compositions</h2>
-        <p>Cochez les compositions que vous souhaitez inclure dans votre fichier d'exportation <code>.json</code>.</p>
-        
+        <p><a href="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'export'], admin_url('admin.php'))); ?>">&larr; <?php esc_html_e('Retour aux outils principaux', 'theme-export-jlg'); ?></a></p>
+        <h2><?php esc_html_e('Exporter une sélection de compositions', 'theme-export-jlg'); ?></h2>
+        <p><?php echo wp_kses_post(__('Cochez les compositions que vous souhaitez inclure dans votre fichier d\'exportation <code>.json</code>.', 'theme-export-jlg')); ?></p>
+
         <?php if (!$patterns_query->have_posts()): ?>
-            <p>Aucune composition personnalisée n'a été trouvée.</p>
+            <p><?php esc_html_e('Aucune composition personnalisée n\'a été trouvée.', 'theme-export-jlg'); ?></p>
         <?php else: ?>
             <form method="post" action="">
                 <?php wp_nonce_field('tejlg_export_selected_action', 'tejlg_export_selected_nonce'); ?>
-                
+
                 <div class="pattern-selection-list">
-                    <p class="select-all-wrapper"><label><input type="checkbox" id="select-all-export-patterns"> <strong>Tout sélectionner</strong></label></p>
+                    <p class="select-all-wrapper"><label><input type="checkbox" id="select-all-export-patterns"> <strong><?php esc_html_e('Tout sélectionner', 'theme-export-jlg'); ?></strong></label></p>
                     <ul>
                         <?php while ($patterns_query->have_posts()): $patterns_query->the_post(); ?>
                             <li>
                                 <label>
                                     <input type="checkbox" name="selected_patterns[]" value="<?php echo esc_attr(get_the_ID()); ?>">
-                                    <?php the_title(); ?>
+                                    <?php echo esc_html(get_the_title()); ?>
                                 </label>
                             </li>
                         <?php endwhile; ?>
                     </ul>
                 </div>
                 <?php wp_reset_postdata(); ?>
-                
-                <p><label><input type="checkbox" name="export_portable" value="1" checked> <strong>Générer un export "portable"</strong> (Recommandé pour migrer vers un autre site)</label></p>
-                
-                <p><button type="submit" name="tejlg_export_selected_patterns" class="button button-primary button-hero">Exporter la sélection</button></p>
+
+                <p><label><input type="checkbox" name="export_portable" value="1" checked> <strong><?php esc_html_e('Générer un export "portable"', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(Recommandé pour migrer vers un autre site)', 'theme-export-jlg'); ?></label></p>
+
+                <p><button type="submit" name="tejlg_export_selected_patterns" class="button button-primary button-hero"><?php esc_html_e('Exporter la sélection', 'theme-export-jlg'); ?></button></p>
             </form>
         <?php endif; ?>
         <?php
@@ -186,24 +194,24 @@ class TEJLG_Admin {
             $this->render_patterns_preview_page(sanitize_key($_GET['transient_id']));
         } else {
             ?>
-            <h2>Tutoriel : Que pouvez-vous importer ?</h2>
+            <h2><?php esc_html_e('Tutoriel : Que pouvez-vous importer ?', 'theme-export-jlg'); ?></h2>
             <div class="tejlg-cards-container">
                 <div class="tejlg-card">
-                    <h3>Importer un Thème (.zip)</h3>
-                    <p>Téléversez une archive <code>.zip</code> d'un thème. Le plugin l'installera. <strong>Attention :</strong> Un thème existant sera remplacé.</p>
-                    <form id="tejlg-import-theme-form" method="post" action="?page=theme-export-jlg&tab=import" enctype="multipart/form-data">
+                    <h3><?php esc_html_e('Importer un Thème (.zip)', 'theme-export-jlg'); ?></h3>
+                    <p><?php echo wp_kses_post(__('Téléversez une archive <code>.zip</code> d\'un thème. Le plugin l\'installera. <strong>Attention :</strong> Un thème existant sera remplacé.', 'theme-export-jlg')); ?></p>
+                    <form id="tejlg-import-theme-form" method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tejlg_import_theme_action', 'tejlg_import_theme_nonce'); ?>
-                        <p><label for="theme_zip">Fichier du thème (.zip) :</label><br><input type="file" id="theme_zip" name="theme_zip" accept=".zip" required></p>
-                        <p><button type="submit" name="tejlg_import_theme" class="button button-primary">Importer le Thème</button></p>
+                        <p><label for="theme_zip"><?php esc_html_e('Fichier du thème (.zip) :', 'theme-export-jlg'); ?></label><br><input type="file" id="theme_zip" name="theme_zip" accept=".zip" required></p>
+                        <p><button type="submit" name="tejlg_import_theme" class="button button-primary"><?php esc_html_e('Importer le Thème', 'theme-export-jlg'); ?></button></p>
                     </form>
                 </div>
                 <div class="tejlg-card">
-                    <h3>Importer des Compositions (.json)</h3>
-                    <p>Téléversez un fichier <code>.json</code> (généré par l'export). Vous pourrez choisir quelles compositions importer à l'étape suivante.</p>
-                     <form method="post" action="?page=theme-export-jlg&tab=import" enctype="multipart/form-data">
+                    <h3><?php esc_html_e('Importer des Compositions (.json)', 'theme-export-jlg'); ?></h3>
+                    <p><?php echo wp_kses_post(__('Téléversez un fichier <code>.json</code> (généré par l\'export). Vous pourrez choisir quelles compositions importer à l\'étape suivante.', 'theme-export-jlg')); ?></p>
+                     <form method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tejlg_import_patterns_step1_action', 'tejlg_import_patterns_step1_nonce'); ?>
-                        <p><label for="patterns_json">Fichier des compositions (.json, .txt) :</label><br><input type="file" id="patterns_json" name="patterns_json" accept=".json,.txt" required></p>
-                        <p><button type="submit" name="tejlg_import_patterns_step1" class="button button-primary">Analyser et prévisualiser</button></p>
+                        <p><label for="patterns_json"><?php esc_html_e('Fichier des compositions (.json, .txt) :', 'theme-export-jlg'); ?></label><br><input type="file" id="patterns_json" name="patterns_json" accept=".json,.txt" required></p>
+                        <p><button type="submit" name="tejlg_import_patterns_step1" class="button button-primary"><?php esc_html_e('Analyser et prévisualiser', 'theme-export-jlg'); ?></button></p>
                     </form>
                 </div>
             </div>
@@ -212,42 +220,83 @@ class TEJLG_Admin {
     }
 
     private function render_debug_tab() {
-        $theme = wp_get_theme();
+        $zip_status = class_exists('ZipArchive')
+            ? sprintf('<span style="color:green;">%s</span>', esc_html__('Oui', 'theme-export-jlg'))
+            : sprintf('<span style="color:red;">%s</span>', esc_html__('Non (Export de thème impossible)', 'theme-export-jlg'));
+
+        $mbstring_status = extension_loaded('mbstring')
+            ? sprintf('<span style="color:green;">%s</span>', esc_html__('Activée', 'theme-export-jlg'))
+            : sprintf('<span style="color:red; font-weight: bold;">%s</span>', esc_html__('Manquante (CRITIQUE pour la fiabilité des exports JSON)', 'theme-export-jlg'));
         ?>
-        <h2>Outils de Débogage</h2>
-        <p>Ces informations peuvent vous aider à diagnostiquer des problèmes liés à votre configuration ou à vos données.</p>
+        <h2><?php esc_html_e('Outils de Débogage', 'theme-export-jlg'); ?></h2>
+        <p><?php esc_html_e('Ces informations peuvent vous aider à diagnostiquer des problèmes liés à votre configuration ou à vos données.', 'theme-export-jlg'); ?></p>
         <div id="debug-accordion">
             <div class="accordion-section">
-                <h3 class="accordion-section-title">Informations Système & WordPress</h3>
+                <h3 class="accordion-section-title"><?php esc_html_e('Informations Système & WordPress', 'theme-export-jlg'); ?></h3>
                 <div class="accordion-section-content">
                     <table class="widefat striped">
                         <tbody>
-                            <tr><td>Version de WordPress</td><td><?php echo esc_html(get_bloginfo('version')); ?></td></tr>
-                            <tr><td>Version de PHP</td><td><?php echo esc_html(PHP_VERSION); ?></td></tr>
-                            <tr><td>Classe <code>ZipArchive</code> disponible</td><td><?php echo class_exists('ZipArchive') ? '<span style="color:green;">Oui</span>' : '<span style="color:red;">Non (Export de thème impossible)</span>'; ?></td></tr>
                             <tr>
-                                <td>Extension PHP <code>mbstring</code></td>
-                                <td><?php echo extension_loaded('mbstring') ? '<span style="color:green;">Activée</span>' : '<span style="color:red; font-weight: bold;">Manquante (CRITIQUE pour la fiabilité des exports JSON)</span>'; ?></td>
+                                <td><?php esc_html_e('Version de WordPress', 'theme-export-jlg'); ?></td>
+                                <td><?php echo esc_html(get_bloginfo('version')); ?></td>
                             </tr>
-                            <tr><td>Limite de mémoire WP</td><td><?php echo esc_html(WP_MEMORY_LIMIT); ?></td></tr>
-                            <tr><td>Taille max. d'upload</td><td><?php echo esc_html(ini_get('upload_max_filesize')); ?></td></tr>
+                            <tr>
+                                <td><?php esc_html_e('Version de PHP', 'theme-export-jlg'); ?></td>
+                                <td><?php echo esc_html(PHP_VERSION); ?></td>
+                            </tr>
+                            <tr>
+                                <td><?php echo wp_kses_post(__('Classe <code>ZipArchive</code> disponible', 'theme-export-jlg')); ?></td>
+                                <td><?php echo wp_kses_post($zip_status); ?></td>
+                            </tr>
+                            <tr>
+                                <td><?php echo wp_kses_post(__('Extension PHP <code>mbstring</code>', 'theme-export-jlg')); ?></td>
+                                <td><?php echo wp_kses_post($mbstring_status); ?></td>
+                            </tr>
+                            <tr>
+                                <td><?php esc_html_e('Limite de mémoire WP', 'theme-export-jlg'); ?></td>
+                                <td><?php echo esc_html(WP_MEMORY_LIMIT); ?></td>
+                            </tr>
+                            <tr>
+                                <td><?php esc_html_e('Taille max. d\'upload', 'theme-export-jlg'); ?></td>
+                                <td><?php echo esc_html(ini_get('upload_max_filesize')); ?></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
             <div class="accordion-section">
-                <h3 class="accordion-section-title">Compositions personnalisées enregistrées</h3>
+                <h3 class="accordion-section-title"><?php esc_html_e('Compositions personnalisées enregistrées', 'theme-export-jlg'); ?></h3>
                 <div class="accordion-section-content">
                     <?php
                     $patterns = WP_Block_Patterns_Registry::get_instance()->get_all_registered();
-                    $custom_patterns = array_filter($patterns, function($p) { return !(isset($p['source']) && $p['source'] === 'core'); });
+                    $custom_patterns = array_filter(
+                        $patterns,
+                        function ($pattern) {
+                            return ! (isset($pattern['source']) && $pattern['source'] === 'core');
+                        }
+                    );
+
                     if (empty($custom_patterns)) {
-                        echo '<p>Aucune composition personnalisée n\'a été trouvée.</p>';
+                        echo '<p>' . esc_html__('Aucune composition personnalisée n\'a été trouvée.', 'theme-export-jlg') . '</p>';
                     } else {
-                        echo '<p>'. count($custom_patterns) .' composition(s) personnalisée(s) trouvée(s) :</p>';
+                        $count = count($custom_patterns);
+                        printf(
+                            '<p>%s</p>',
+                            esc_html(
+                                sprintf(
+                                    _n('%d composition personnalisée trouvée :', '%d compositions personnalisées trouvées :', $count, 'theme-export-jlg'),
+                                    $count
+                                )
+                            )
+                        );
                         echo '<ul>';
-                        foreach ($custom_patterns as $p) {
-                            printf('<li><strong>%s</strong> (Slug: <code>%s</code>)</li>', esc_html($p['title']), esc_html($p['name']));
+                        foreach ($custom_patterns as $pattern) {
+                            printf(
+                                '<li><strong>%1$s</strong> (%2$s <code>%3$s</code>)</li>',
+                                esc_html($pattern['title']),
+                                esc_html__('Slug :', 'theme-export-jlg'),
+                                esc_html($pattern['name'])
+                            );
                         }
                         echo '</ul>';
                     }
@@ -261,20 +310,20 @@ class TEJLG_Admin {
     private function render_patterns_preview_page($transient_id) {
         $patterns = get_transient($transient_id);
         if (false === $patterns) {
-            echo '<div class="error"><p>La session d\'importation a expiré ou est invalide. Veuillez téléverser à nouveau votre fichier.</p></div>';
+            echo '<div class="error"><p>' . esc_html__('La session d\'importation a expiré ou est invalide. Veuillez téléverser à nouveau votre fichier.', 'theme-export-jlg') . '</p></div>';
             return;
         }
 
         $global_styles = wp_get_global_stylesheet();
         ?>
-        <h2>Étape 2 : Choisir les compositions à importer</h2>
-        <p>Cochez les compositions à importer. Vous pouvez prévisualiser le rendu et inspecter le code du bloc (le code CSS du thème est masqué par défaut).</p>
-        <form method="post" action="?page=theme-export-jlg&tab=import">
+        <h2><?php esc_html_e('Étape 2 : Choisir les compositions à importer', 'theme-export-jlg'); ?></h2>
+        <p><?php esc_html_e('Cochez les compositions à importer. Vous pouvez prévisualiser le rendu et inspecter le code du bloc (le code CSS du thème est masqué par défaut).', 'theme-export-jlg'); ?></p>
+        <form method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>">
             <?php wp_nonce_field('tejlg_import_patterns_step2_action', 'tejlg_import_patterns_step2_nonce'); ?>
             <input type="hidden" name="transient_id" value="<?php echo esc_attr($transient_id); ?>">
             <div id="patterns-preview-list">
                 <div style="margin-bottom:15px;">
-                     <label><input type="checkbox" id="select-all-patterns" checked> <strong>Tout sélectionner</strong></label>
+                     <label><input type="checkbox" id="select-all-patterns" checked> <strong><?php esc_html_e('Tout sélectionner', 'theme-export-jlg'); ?></strong></label>
                 </div>
                 <?php foreach ($patterns as $index => $pattern): ?>
                     <?php
@@ -299,14 +348,14 @@ class TEJLG_Admin {
                         </div>
 
                         <div class="pattern-controls">
-                            <button type="button" class="button-link toggle-code-view">Afficher le code du bloc</button>
+                            <button type="button" class="button-link toggle-code-view"><?php esc_html_e('Afficher le code du bloc', 'theme-export-jlg'); ?></button>
                         </div>
 
                         <div class="pattern-code-view" style="display: none;">
                             <pre><code><?php echo esc_html($pattern['content']); ?></code></pre>
 
                             <details class="css-accordion">
-                                <summary>Afficher le CSS global du thème</summary>
+                                <summary><?php esc_html_e('Afficher le CSS global du thème', 'theme-export-jlg'); ?></summary>
                                 <pre><code><?php echo esc_html($global_styles); ?></code></pre>
                             </details>
                         </div>
@@ -314,7 +363,7 @@ class TEJLG_Admin {
                     </div>
                 <?php endforeach; ?>
             </div>
-            <p><button type="submit" name="tejlg_import_patterns_step2" class="button button-primary button-hero">Importer la sélection</button></p>
+            <p><button type="submit" name="tejlg_import_patterns_step2" class="button button-primary button-hero"><?php esc_html_e('Importer la sélection', 'theme-export-jlg'); ?></button></p>
         </form>
         <?php
     }
@@ -392,42 +441,42 @@ class TEJLG_Admin {
 
     private function render_migration_guide_tab() {
         ?>
-        <h2>Guide : Migrer ses personnalisations d'un thème bloc à un autre</h2>
-        <p>Ce guide explique comment transférer vos compositions et vos modifications de l'Éditeur de Site (comme de <strong>Twenty Twenty-Four</strong> à <strong>Twenty Twenty-Five</strong>) en utilisant ce plugin.</p>
+        <h2><?php esc_html_e('Guide : Migrer ses personnalisations d\'un thème bloc à un autre', 'theme-export-jlg'); ?></h2>
+        <p><?php echo wp_kses_post(__('Ce guide explique comment transférer vos compositions et vos modifications de l\'Éditeur de Site (comme de <strong>Twenty Twenty-Four</strong> à <strong>Twenty Twenty-Five</strong>) en utilisant ce plugin.', 'theme-export-jlg')); ?></p>
         <hr>
-        <h3>Le Concept Clé : Le fichier <code>theme.json</code></h3>
-        <p>Un "mode de compatibilité" automatique entre thèmes blocs est presque impossible car chaque thème est un <strong>système de design</strong> unique, défini par son fichier <code>theme.json</code>. Ce fichier contrôle tout :</p>
+        <h3><?php echo wp_kses_post(__('Le Concept Clé : Le fichier <code>theme.json</code>', 'theme-export-jlg')); ?></h3>
+        <p><?php echo wp_kses_post(__('Un "mode de compatibilité" automatique entre thèmes blocs est presque impossible car chaque thème est un <strong>système de design</strong> unique, défini par son fichier <code>theme.json</code>. Ce fichier contrôle tout :', 'theme-export-jlg')); ?></p>
         <ul>
-            <li>🎨 <strong>La palette de couleurs</strong> (les couleurs "Primaire", "Secondaire", etc. sont différentes).</li>
-            <li>✒️ <strong>La typographie</strong> (familles de polices, tailles, graisses).</li>
-            <li>📏 <strong>Les espacements</strong> (marges, paddings, etc.).</li>
+            <li><?php echo wp_kses_post(__('🎨 <strong>La palette de couleurs</strong> (les couleurs "Primaire", "Secondaire", etc. sont différentes).', 'theme-export-jlg')); ?></li>
+            <li><?php echo wp_kses_post(__('✒️ <strong>La typographie</strong> (familles de polices, tailles, graisses).', 'theme-export-jlg')); ?></li>
+            <li><?php echo wp_kses_post(__('📏 <strong>Les espacements</strong> (marges, paddings, etc.).', 'theme-export-jlg')); ?></li>
         </ul>
-        <p>Lorsque vous activez un nouveau thème, vos blocs s'adaptent volontairement à ce nouveau système de design. C'est le comportement attendu.</p>
+        <p><?php esc_html_e('Lorsque vous activez un nouveau thème, vos blocs s\'adaptent volontairement à ce nouveau système de design. C\'est le comportement attendu.', 'theme-export-jlg'); ?></p>
         <hr>
-        <h3>La Stratégie de Migration en 3 Étapes</h3>
+        <h3><?php esc_html_e('La Stratégie de Migration en 3 Étapes', 'theme-export-jlg'); ?></h3>
         <div class="tejlg-cards-container">
             <div class="tejlg-card">
-                <h4>Étape 1 : Exporter TOUT depuis l'ancien thème</h4>
+                <h4><?php esc_html_e('Étape 1 : Exporter TOUT depuis l\'ancien thème', 'theme-export-jlg'); ?></h4>
                 <ol>
-                    <li><strong>Exporter les Compositions :</strong> Dans l'onglet <strong>Exporter & Outils</strong>, cliquez sur "Exporter les Compositions" pour obtenir votre fichier <code>.json</code>.</li>
-                    <li><strong>Exporter les Modèles de l'Éditeur :</strong> Dans <code>Apparence > Éditeur</code>, ouvrez le panneau de navigation, cliquez sur les trois points (⋮) et choisissez <strong>Outils > Exporter</strong> pour obtenir un <code>.zip</code>.</li>
+                    <li><?php echo wp_kses_post(__('<strong>Exporter les Compositions :</strong> Dans l\'onglet <strong>Exporter & Outils</strong>, cliquez sur "Exporter les Compositions" pour obtenir votre fichier <code>.json</code>.', 'theme-export-jlg')); ?></li>
+                    <li><?php echo wp_kses_post(__('<strong>Exporter les Modèles de l\'Éditeur :</strong> Dans <code>Apparence > Éditeur</code>, ouvrez le panneau de navigation, cliquez sur les trois points (⋮) et choisissez <strong>Outils > Exporter</strong> pour obtenir un <code>.zip</code>.', 'theme-export-jlg')); ?></li>
                 </ol>
                 <div style="text-align: center; margin-top: 10px; padding: 10px; border: 1px solid #ccc; background-color: #f9f9f9; border-radius: 4px;">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="48" height="48" fill="currentColor" aria-hidden="true" focusable="false">
                         <path d="M4 18.5h16V20H4v-1.5zM12 3c-1.1 0-2 .9-2 2v8.29l-2.12-2.12c-.39-.39-1.02-.39-1.41 0s-.39 1.02 0 1.41l3.83 3.83c.39.39 1.02.39 1.41 0l3.83-3.83c.39-.39.39-1.02 0-1.41s-1.02-.39-1.41 0L14 13.29V5c0-1.1-.9-2-2-2z"></path>
                     </svg>
-                    <p style="font-size: 0.9em; color: #555;">Icône des outils d'exportation de l'Éditeur de Site WordPress (trois points verticaux puis "Outils > Exporter").</p>
+                    <p style="font-size: 0.9em; color: #555;"><?php esc_html_e('Icône des outils d\'exportation de l\'Éditeur de Site WordPress (trois points verticaux puis "Outils > Exporter").', 'theme-export-jlg'); ?></p>
                 </div>
             </div>
             <div class="tejlg-card">
-                <h4>Étape 2 : Activer le nouveau thème</h4>
-                <p>Allez dans <code>Apparence > Thèmes</code> et activez votre nouveau thème. L'apparence de votre site va radicalement changer, c'est normal.</p>
+                <h4><?php esc_html_e('Étape 2 : Activer le nouveau thème', 'theme-export-jlg'); ?></h4>
+                <p><?php echo wp_kses_post(__('Allez dans <code>Apparence > Thèmes</code> et activez votre nouveau thème. L\'apparence de votre site va radicalement changer, c\'est normal.', 'theme-export-jlg')); ?></p>
             </div>
             <div class="tejlg-card">
-                <h4>Étape 3 : Importer et Adapter</h4>
+                <h4><?php esc_html_e('Étape 3 : Importer et Adapter', 'theme-export-jlg'); ?></h4>
                 <ol>
-                    <li><strong>Importer les Compositions :</strong> Dans l'onglet <strong>Importer</strong>, téléversez votre fichier <code>.json</code>. L'aperçu vous montrera vos compositions avec le style du NOUVEAU thème. Importez votre sélection.</li>
-                    <li><strong>Adapter les Modèles :</strong> Utilisez le <code>.zip</code> de l'étape 1 comme référence pour recréer la structure de vos anciens modèles dans l'Éditeur de Site du nouveau thème.</li>
+                    <li><?php echo wp_kses_post(__('<strong>Importer les Compositions :</strong> Dans l\'onglet <strong>Importer</strong>, téléversez votre fichier <code>.json</code>. L\'aperçu vous montrera vos compositions avec le style du NOUVEAU thème. Importez votre sélection.', 'theme-export-jlg')); ?></li>
+                    <li><?php echo wp_kses_post(__('<strong>Adapter les Modèles :</strong> Utilisez le <code>.zip</code> de l\'étape 1 comme référence pour recréer la structure de vos anciens modèles dans l\'Éditeur de Site du nouveau thème.', 'theme-export-jlg')); ?></li>
                 </ol>
             </div>
         </div>

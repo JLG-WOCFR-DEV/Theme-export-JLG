@@ -4,30 +4,30 @@ class TEJLG_Theme_Tools {
     public static function create_child_theme( $child_name ) {
         $parent_theme = wp_get_theme();
         if ( $parent_theme->parent() ) {
-            add_settings_error('tejlg_admin_messages', 'child_theme_error', 'Erreur : Le thème actif est déjà un thème enfant. Vous ne pouvez pas créer un enfant d\'un enfant.', 'error');
+            add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Le thème actif est déjà un thème enfant. Vous ne pouvez pas créer un enfant d\'un enfant.', 'theme-export-jlg'), 'error');
             return;
         }
 
         if ( empty( $child_name ) ) {
-            add_settings_error('tejlg_admin_messages', 'child_theme_error', 'Erreur : Le nom du thème enfant ne peut pas être vide.', 'error');
+            add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Le nom du thème enfant ne peut pas être vide.', 'theme-export-jlg'), 'error');
             return;
         }
 
         $theme_root = get_theme_root();
         if ( ! is_writable( $theme_root ) ) {
-            add_settings_error('tejlg_admin_messages', 'child_theme_error', 'Erreur : Le dossier des thèmes (wp-content/themes) n\'est pas accessible en écriture par le serveur.', 'error');
+            add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Le dossier des thèmes (wp-content/themes) n\'est pas accessible en écriture par le serveur.', 'theme-export-jlg'), 'error');
             return;
         }
 
         $child_slug = sanitize_title( $child_name );
         $child_dir = $theme_root . '/' . $child_slug;
         if ( file_exists( $child_dir ) ) {
-            add_settings_error('tejlg_admin_messages', 'child_theme_error', 'Erreur : Un thème avec le même nom de dossier existe déjà.', 'error');
+            add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Un thème avec le même nom de dossier existe déjà.', 'theme-export-jlg'), 'error');
             return;
         }
 
         if ( ! wp_mkdir_p( $child_dir ) ) {
-            add_settings_error('tejlg_admin_messages', 'child_theme_error', 'Erreur : Impossible de créer le dossier du thème enfant. Vérifiez les permissions du serveur.', 'error');
+            add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Impossible de créer le dossier du thème enfant. Vérifiez les permissions du serveur.', 'theme-export-jlg'), 'error');
             return;
         }
 
@@ -38,24 +38,21 @@ class TEJLG_Theme_Tools {
         $sanitized_author_uri   = esc_url_raw( $parent_theme->get( 'AuthorURI' ) );
         $sanitized_template     = sanitize_text_field( $parent_theme->get_stylesheet() );
 
-        $css_content = sprintf(
-'/*
-Theme Name: %1$s
-Theme URI: %2$s
-Description: Thème enfant pour %3$s
-Author: %4$s
-Author URI: %5$s
-Template: %6$s
-Version: 1.0.0
-*/
-',
-            $sanitized_child_name,
-            $sanitized_theme_uri,
-            $sanitized_parent_name,
-            $sanitized_author_name,
-            $sanitized_author_uri,
-            $sanitized_template
-        );
+        $child_description = sprintf(__('Thème enfant pour %s', 'theme-export-jlg'), $sanitized_parent_name);
+        $css_lines = [
+            '/*',
+            sprintf('Theme Name: %s', $sanitized_child_name),
+            sprintf('Theme URI: %s', $sanitized_theme_uri),
+            sprintf('Description: %s', $child_description),
+            sprintf('Author: %s', $sanitized_author_name),
+            sprintf('Author URI: %s', $sanitized_author_uri),
+            sprintf('Template: %s', $sanitized_template),
+            sprintf('Version: %s', TEJLG_VERSION),
+            '*/',
+            '',
+        ];
+
+        $css_content = implode("\n", $css_lines);
 
         $function_name_prefix   = str_replace( '-', '_', $child_slug );
         $sanitized_stylesheet   = sanitize_key( $parent_theme->get_stylesheet() );
@@ -81,25 +78,27 @@ add_action( \'wp_enqueue_scripts\', \'%1$s_enqueue_styles\' );
 
         if ( false === file_put_contents( $style_file, $css_content ) ) {
             self::remove_child_theme_directory( $child_dir );
-            add_settings_error('tejlg_admin_messages', 'child_theme_error', 'Erreur : Impossible de créer le fichier style.css du thème enfant.', 'error');
+            add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Impossible de créer le fichier style.css du thème enfant.', 'theme-export-jlg'), 'error');
             return;
         }
 
         if ( false === file_put_contents( $functions_file, $php_content ) ) {
             self::remove_child_theme_directory( $child_dir );
-            add_settings_error('tejlg_admin_messages', 'child_theme_error', 'Erreur : Impossible de créer le fichier functions.php du thème enfant.', 'error');
+            add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Impossible de créer le fichier functions.php du thème enfant.', 'theme-export-jlg'), 'error');
             return;
         }
 
         $themes_page_url = admin_url('themes.php');
+        $success_message = sprintf(
+            /* translators: 1: Child theme name, 2: URL to the themes admin page. */
+            __("Le thème enfant \"%1$s\" a été créé avec succès ! Vous pouvez maintenant <a href=\"%2$s\">l'activer depuis la page des thèmes</a>.", 'theme-export-jlg'),
+            esc_html($child_name),
+            esc_url($themes_page_url)
+        );
         add_settings_error(
-            'tejlg_admin_messages', 
-            'child_theme_success', 
-            sprintf(
-                'Le thème enfant "%s" a été créé avec succès ! Vous pouvez maintenant <a href="%s">l\'activer depuis la page des thèmes</a>.',
-                esc_html($child_name),
-                $themes_page_url
-            ),
+            'tejlg_admin_messages',
+            'child_theme_success',
+            wp_kses_post($success_message),
             'success'
         );
     }
