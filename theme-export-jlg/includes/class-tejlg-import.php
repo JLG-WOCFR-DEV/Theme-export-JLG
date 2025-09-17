@@ -46,8 +46,13 @@ class TEJLG_Import {
             return;
         }
 
+        if (!is_array($selected_indices)) {
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', 'Erreur : La sélection des compositions est invalide.', 'error');
+            return;
+        }
+
         delete_transient($transient_id);
-        
+
         $imported_count = 0;
         $errors = [];
 

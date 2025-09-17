@@ -51,7 +51,7 @@ class TEJLG_Admin {
 
         // Import Compositions (Étape 2)
         if (isset($_POST['tejlg_import_patterns_step2_nonce']) && wp_verify_nonce($_POST['tejlg_import_patterns_step2_nonce'], 'tejlg_import_patterns_step2_action')) {
-            if (isset($_POST['transient_id']) && isset($_POST['selected_patterns'])) {
+            if (isset($_POST['transient_id']) && isset($_POST['selected_patterns']) && is_array($_POST['selected_patterns'])) {
                 TEJLG_Import::handle_patterns_import_step2(sanitize_key($_POST['transient_id']), $_POST['selected_patterns']);
             }
         }
