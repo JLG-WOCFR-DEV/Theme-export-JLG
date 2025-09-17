@@ -279,9 +279,9 @@ class TEJLG_Admin {
                 <?php foreach ($patterns as $index => $pattern): ?>
                     <?php
                     $pattern_content = isset($pattern['content']) ? (string) $pattern['content'] : '';
-                    $sanitized_pattern_content = wp_kses_post($pattern_content);
-                    $rendered_pattern = do_blocks($sanitized_pattern_content);
-                    $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $rendered_pattern . '</body></html>';
+                    $rendered_pattern = do_blocks($pattern_content);
+                    $sanitized_rendered_pattern = wp_kses_post($rendered_pattern);
+                    $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $sanitized_rendered_pattern . '</body></html>';
                     ?>
                     <div class="pattern-item">
                         <div class="pattern-selector">
