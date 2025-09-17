@@ -277,6 +277,10 @@ class TEJLG_Admin {
                      <label><input type="checkbox" id="select-all-patterns" checked> <strong>Tout sélectionner</strong></label>
                 </div>
                 <?php foreach ($patterns as $index => $pattern): ?>
+                    <?php
+                    $pattern_content = isset($pattern['content']) ? $pattern['content'] : '';
+                    $sanitized_pattern_content = wp_kses_post($pattern_content);
+                    ?>
                     <div class="pattern-item">
                         <div class="pattern-selector">
                             <label>
@@ -285,16 +289,16 @@ class TEJLG_Admin {
                             </label>
                         </div>
                         <div class="pattern-preview-wrapper">
-                            <iframe srcdoc="<?php echo esc_attr('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . do_blocks($pattern['content']) . '</body></html>'); ?>" class="pattern-preview-iframe"></iframe>
+                            <iframe srcdoc="<?php echo esc_attr('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . do_blocks($sanitized_pattern_content) . '</body></html>'); ?>" class="pattern-preview-iframe" sandbox></iframe>
                         </div>
-                        
+
                         <div class="pattern-controls">
                             <button type="button" class="button-link toggle-code-view">Afficher le code du bloc</button>
                         </div>
 
                         <div class="pattern-code-view" style="display: none;">
                             <pre><code><?php echo esc_html($pattern['content']); ?></code></pre>
-                            
+
                             <details class="css-accordion">
                                 <summary>Afficher le CSS global du thème</summary>
                                 <pre><code><?php echo esc_html($global_styles); ?></code></pre>
