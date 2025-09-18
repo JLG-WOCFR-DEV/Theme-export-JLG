@@ -21,8 +21,9 @@ $transient_prefix = 'tejlg_';
 
 // Préparer les motifs de recherche pour les transients. WordPress stocke les transients
 // sous deux entrées dans la table wp_options : une pour la donnée et une pour son délai d'expiration.
-$transient_pattern = '_transient_' . $transient_prefix . '%';
-$timeout_pattern = '_transient_timeout_' . $transient_prefix . '%';
+$escaped_transient_prefix = $wpdb->esc_like( $transient_prefix );
+$transient_pattern        = '_transient_' . $escaped_transient_prefix . '%';
+$timeout_pattern          = '_transient_timeout_' . $escaped_transient_prefix . '%';
 
 // Exécuter une requête SQL directe pour supprimer toutes les options qui correspondent à nos motifs.
 // C'est la méthode la plus efficace pour supprimer des transients par lot.
