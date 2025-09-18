@@ -100,7 +100,7 @@ class TEJLG_Export {
      * Récupère le contenu et garantit qu'il est en UTF-8 valide.
      */
     private static function get_sanitized_content() {
-        $content = get_the_content();
+        $content = get_post_field('post_content', get_the_ID());
         if (function_exists('mb_convert_encoding')) {
             return mb_convert_encoding($content, 'UTF-8', 'UTF-8');
         }
