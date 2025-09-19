@@ -45,6 +45,8 @@ class TEJLG_Admin {
         
         // Import Thème
         if (isset($_POST['tejlg_import_theme_nonce']) && wp_verify_nonce($_POST['tejlg_import_theme_nonce'], 'tejlg_import_theme_action')) {
+            $theme_file = isset($_FILES['theme_zip']) ? $_FILES['theme_zip'] : [ 'error' => UPLOAD_ERR_NO_FILE ];
+
             if (!current_user_can('install_themes')) {
                 add_settings_error(
                     'tejlg_import_messages',
@@ -52,15 +54,39 @@ class TEJLG_Admin {
                     esc_html__('Vous n\'avez pas l\'autorisation d\'installer des thèmes sur ce site.', 'theme-export-jlg'),
                     'error'
                 );
-            } elseif (isset($_FILES['theme_zip']) && $_FILES['theme_zip']['error'] === UPLOAD_ERR_OK) {
-                TEJLG_Import::import_theme($_FILES['theme_zip']);
+            } elseif ((int) $theme_file['error'] === UPLOAD_ERR_OK) {
+                TEJLG_Import::import_theme($theme_file);
+            } else {
+                if (!empty($theme_file['tmp_name']) && is_string($theme_file['tmp_name']) && file_exists($theme_file['tmp_name'])) {
+                    @unlink($theme_file['tmp_name']);
+                }
+
+                add_settings_error(
+                    'tejlg_import_messages',
+                    'theme_import_upload_error_' . (int) $theme_file['error'],
+                    $this->get_upload_error_message((int) $theme_file['error'], esc_html__('du thème', 'theme-export-jlg')),
+                    'error'
+                );
             }
         }
 
         // Import Compositions (Étape 1)
         if (isset($_POST['tejlg_import_patterns_step1_nonce']) && wp_verify_nonce($_POST['tejlg_import_patterns_step1_nonce'], 'tejlg_import_patterns_step1_action')) {
-            if (isset($_FILES['patterns_json']) && $_FILES['patterns_json']['error'] === UPLOAD_ERR_OK) {
-                TEJLG_Import::handle_patterns_upload_step1($_FILES['patterns_json']);
+            $patterns_file = isset($_FILES['patterns_json']) ? $_FILES['patterns_json'] : [ 'error' => UPLOAD_ERR_NO_FILE ];
+
+            if ((int) $patterns_file['error'] === UPLOAD_ERR_OK) {
+                TEJLG_Import::handle_patterns_upload_step1($patterns_file);
+            } else {
+                if (!empty($patterns_file['tmp_name']) && is_string($patterns_file['tmp_name']) && file_exists($patterns_file['tmp_name'])) {
+                    @unlink($patterns_file['tmp_name']);
+                }
+
+                add_settings_error(
+                    'tejlg_import_messages',
+                    'patterns_import_upload_error_' . (int) $patterns_file['error'],
+                    $this->get_upload_error_message((int) $patterns_file['error'], esc_html__('des compositions', 'theme-export-jlg')),
+                    'error'
+                );
             }
         }
 
@@ -444,6 +470,40 @@ class TEJLG_Admin {
         );
 
         return '<div class="tejlg-block-placeholder"><p>' . $placeholder_text . '</p></div>';
+    }
+
+    private function get_upload_error_message($error_code, $file_label) {
+        switch ($error_code) {
+            case UPLOAD_ERR_INI_SIZE:
+            case UPLOAD_ERR_FORM_SIZE:
+                return sprintf(
+                    esc_html__('Le fichier %1$s dépasse la taille maximale autorisée (%2$s).', 'theme-export-jlg'),
+                    $file_label,
+                    esc_html(ini_get('upload_max_filesize'))
+                );
+            case UPLOAD_ERR_PARTIAL:
+                return sprintf(
+                    esc_html__('Le fichier %s n\'a été que partiellement téléversé. Veuillez réessayer.', 'theme-export-jlg'),
+                    $file_label
+                );
+            case UPLOAD_ERR_NO_FILE:
+                return sprintf(
+                    esc_html__('Aucun fichier %s n\'a été téléversé. Veuillez sélectionner un fichier avant de recommencer.', 'theme-export-jlg'),
+                    $file_label
+                );
+            case UPLOAD_ERR_NO_TMP_DIR:
+                return esc_html__('Le dossier temporaire du serveur est manquant. Contactez votre hébergeur.', 'theme-export-jlg');
+            case UPLOAD_ERR_CANT_WRITE:
+                return esc_html__('Impossible d\'écrire le fichier sur le disque. Vérifiez les permissions de votre serveur.', 'theme-export-jlg');
+            case UPLOAD_ERR_EXTENSION:
+                return esc_html__('Une extension PHP a interrompu le téléversement. Vérifiez la configuration de votre serveur.', 'theme-export-jlg');
+            default:
+                return sprintf(
+                    esc_html__('Une erreur inconnue est survenue lors du téléversement du fichier %1$s (code %2$d).', 'theme-export-jlg'),
+                    $file_label,
+                    $error_code
+                );
+        }
     }
 
     private function render_migration_guide_tab() {
