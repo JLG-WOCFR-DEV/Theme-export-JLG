@@ -45,7 +45,14 @@ class TEJLG_Admin {
         
         // Import Thème
         if (isset($_POST['tejlg_import_theme_nonce']) && wp_verify_nonce($_POST['tejlg_import_theme_nonce'], 'tejlg_import_theme_action')) {
-            if (isset($_FILES['theme_zip']) && $_FILES['theme_zip']['error'] === UPLOAD_ERR_OK) {
+            if (!current_user_can('install_themes')) {
+                add_settings_error(
+                    'tejlg_import_messages',
+                    'theme_import_cap_missing',
+                    esc_html__('Erreur : vous n\'avez pas les permissions nécessaires pour installer des thèmes.', 'theme-export-jlg'),
+                    'error'
+                );
+            } elseif (isset($_FILES['theme_zip']) && $_FILES['theme_zip']['error'] === UPLOAD_ERR_OK) {
                 TEJLG_Import::import_theme($_FILES['theme_zip']);
             }
         }
@@ -198,7 +205,7 @@ class TEJLG_Admin {
             <div class="tejlg-cards-container">
                 <div class="tejlg-card">
                     <h3><?php esc_html_e('Importer un Thème (.zip)', 'theme-export-jlg'); ?></h3>
-                    <p><?php echo wp_kses_post(__('Téléversez une archive <code>.zip</code> d\'un thème. Le plugin l\'installera. <strong>Attention :</strong> Un thème existant sera remplacé.', 'theme-export-jlg')); ?></p>
+                    <p><?php echo wp_kses_post(__('Téléversez une archive <code>.zip</code> d\'un thème. Le plugin l\'installera (capacité WordPress « Installer des thèmes » requise). <strong>Attention :</strong> Un thème existant sera remplacé.', 'theme-export-jlg')); ?></p>
                     <form id="tejlg-import-theme-form" method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tejlg_import_theme_action', 'tejlg_import_theme_nonce'); ?>
                         <p><label for="theme_zip"><?php esc_html_e('Fichier du thème (.zip) :', 'theme-export-jlg'); ?></label><br><input type="file" id="theme_zip" name="theme_zip" accept=".zip" required></p>
