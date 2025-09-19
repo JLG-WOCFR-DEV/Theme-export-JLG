@@ -41,12 +41,31 @@ class TEJLG_Import {
             return;
         }
 
-        if (empty($patterns)) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Information : Le fichier ne contient aucune composition.', 'theme-export-jlg'), 'info');
-            return;
-        }
+        $patterns = array_values(
+            array_filter(
+                $patterns,
+                static function ($pattern) {
+                    return is_array($pattern)
+                        && array_key_exists('title', $pattern)
+                        && array_key_exists('content', $pattern);
+                }
+            )
+        );
 
-        $transient_id = 'tejlg_' . md5(uniqid());
+        $transient_id = 'tejlg_' . md5(uniqid('', true));
+
+        if (empty($patterns)) {
+            delete_transient($transient_id);
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html__('Erreur : Aucune composition valide (titre + contenu) n\'a été trouvée dans le fichier fourni.', 'theme-export-jlg'),
+                'error'
+            );
+
+            wp_safe_redirect(admin_url('admin.php?page=theme-export-jlg&tab=import'));
+            exit;
+        }
         set_transient($transient_id, $patterns, 15 * MINUTE_IN_SECONDS);
 
         wp_redirect(admin_url('admin.php?page=theme-export-jlg&tab=import&action=preview_patterns&transient_id=' . $transient_id));
