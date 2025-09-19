@@ -41,7 +41,7 @@ msgid "Theme Export"
 msgstr ""
 
 #: includes/class-tejlg-admin.php:32
-#: includes/class-tejlg-admin.php:477
+#: includes/class-tejlg-admin.php:478
 msgid "Afficher le code du bloc"
 msgstr ""
 
@@ -49,7 +49,8 @@ msgstr ""
 msgid "Masquer le code du bloc"
 msgstr ""
 
-#: includes/class-tejlg-admin.php:34
+#. translators: Warning shown before importing a theme zip file.
+#: includes/class-tejlg-admin.php:35
 msgid ""
 "⚠️ ATTENTION ⚠️\n"
 "\n"

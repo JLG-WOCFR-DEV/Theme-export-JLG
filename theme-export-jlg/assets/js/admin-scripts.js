@@ -1,9 +1,12 @@
 document.addEventListener('DOMContentLoaded', function() {
 
-    const localization = window.tejlgAdminL10n || {};
-    const showBlockCodeText = typeof localization.showBlockCode === 'string' ? localization.showBlockCode : '';
-    const hideBlockCodeText = typeof localization.hideBlockCode === 'string' ? localization.hideBlockCode : '';
-    const themeImportConfirmMessage = typeof localization.themeImportConfirm === 'string' ? localization.themeImportConfirm : '';
+    const {
+        showBlockCode: showBlockCodeText = '',
+        hideBlockCode: hideBlockCodeText = '',
+        themeImportConfirm: themeImportConfirmMessage = '',
+    } = (typeof window.tejlgAdminL10n === 'object' && window.tejlgAdminL10n !== null)
+        ? window.tejlgAdminL10n
+        : {};
 
     // Gérer la case "Tout sélectionner" pour l'import
     const selectAllCheckbox = document.getElementById('select-all-patterns');
@@ -58,9 +61,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Gérer la confirmation d'importation de thème
     const themeImportForm = document.getElementById('tejlg-import-theme-form');
-    if (themeImportForm) {
+    if (themeImportForm && themeImportConfirmMessage) {
         themeImportForm.addEventListener('submit', function(event) {
-            if (!confirm(themeImportConfirmMessage)) {
+            if (!window.confirm(themeImportConfirmMessage)) {
                 event.preventDefault();
             }
         });
