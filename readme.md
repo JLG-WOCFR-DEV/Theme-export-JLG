@@ -5,6 +5,7 @@ Theme Export - JLG est un plugin WordPress pour administrateurs de sites blocs q
 
 ## Prérequis
 - Disposer d’un compte administrateur (capacité `manage_options`) : toutes les actions critiques sont protégées par cette vérification.【F:theme-export-jlg/includes/class-tejlg-admin.php†L22-L64】
+- Posséder la capacité `install_themes` pour utiliser l’assistant d’import de thèmes ; sans elle, le fichier téléversé est ignoré et une erreur s’affiche dans l’interface.【F:theme-export-jlg/includes/class-tejlg-admin.php†L46-L61】【F:theme-export-jlg/includes/class-tejlg-import.php†L4-L30】
 - Utiliser un site WordPress reposant sur l’éditeur de blocs et les compositions (`wp_block`), que le plugin parcourt pour les exports et les imports sélectifs.【F:theme-export-jlg/includes/class-tejlg-admin.php†L141-L177】【F:theme-export-jlg/includes/class-tejlg-import.php†L41-L70】
 - Activer l’extension PHP **ZipArchive** pour générer les archives du thème et vérifier sa disponibilité dans l’onglet Débogage.【F:theme-export-jlg/includes/class-tejlg-export.php†L7-L37】【F:theme-export-jlg/includes/class-tejlg-admin.php†L214-L236】
 - Activer l’extension PHP **mbstring** pour garantir l’encodage UTF‑8 des compositions exportées et suivre l’avertissement fourni dans l’onglet Débogage.【F:theme-export-jlg/includes/class-tejlg-export.php†L105-L125】【F:theme-export-jlg/includes/class-tejlg-admin.php†L227-L233】

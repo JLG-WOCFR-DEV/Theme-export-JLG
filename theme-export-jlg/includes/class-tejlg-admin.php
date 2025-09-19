@@ -46,10 +46,14 @@ class TEJLG_Admin {
         // Import Thème
         if (isset($_POST['tejlg_import_theme_nonce']) && wp_verify_nonce($_POST['tejlg_import_theme_nonce'], 'tejlg_import_theme_action')) {
             if (!current_user_can('install_themes')) {
+                if (isset($_FILES['theme_zip']['tmp_name'])) {
+                    @unlink($_FILES['theme_zip']['tmp_name']);
+                }
+
                 add_settings_error(
                     'tejlg_import_messages',
                     'theme_import_cap_missing',
-                    esc_html__('Erreur : vous n\'avez pas les permissions nécessaires pour installer des thèmes.', 'theme-export-jlg'),
+                    esc_html__('Erreur : vous n\'avez pas les permissions nécessaires pour installer des thèmes (capacité « Installer des thèmes »).', 'theme-export-jlg'),
                     'error'
                 );
             } elseif (isset($_FILES['theme_zip']) && $_FILES['theme_zip']['error'] === UPLOAD_ERR_OK) {
