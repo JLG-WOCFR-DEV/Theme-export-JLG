@@ -1,5 +1,10 @@
 document.addEventListener('DOMContentLoaded', function() {
 
+    const localization = window.tejlgAdminL10n || {};
+    const showBlockCodeText = typeof localization.showBlockCode === 'string' ? localization.showBlockCode : '';
+    const hideBlockCodeText = typeof localization.hideBlockCode === 'string' ? localization.hideBlockCode : '';
+    const themeImportConfirmMessage = typeof localization.themeImportConfirm === 'string' ? localization.themeImportConfirm : '';
+
     // Gérer la case "Tout sélectionner" pour l'import
     const selectAllCheckbox = document.getElementById('select-all-patterns');
     if (selectAllCheckbox) {
@@ -37,10 +42,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     const isVisible = codeView.style.display !== 'none';
                     if (isVisible) {
                         codeView.style.display = 'none';
-                        button.textContent = 'Afficher le code du bloc';
+                        if (showBlockCodeText) {
+                            button.textContent = showBlockCodeText;
+                        }
                     } else {
                         codeView.style.display = 'block';
-                        button.textContent = 'Masquer le code du bloc';
+                        if (hideBlockCodeText) {
+                            button.textContent = hideBlockCodeText;
+                        }
                     }
                 }
             }
@@ -51,8 +60,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const themeImportForm = document.getElementById('tejlg-import-theme-form');
     if (themeImportForm) {
         themeImportForm.addEventListener('submit', function(event) {
-            const message = "⚠️ ATTENTION ⚠️\n\nSi un thème avec le même nom de dossier existe déjà, il sera DÉFINITIVEMENT écrasé.\n\nÊtes-vous sûr de vouloir continuer ?";
-            if (!confirm(message)) {
+            if (!confirm(themeImportConfirmMessage)) {
                 event.preventDefault();
             }
         });
