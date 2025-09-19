@@ -68,7 +68,7 @@ class TEJLG_Import {
         }
         set_transient($transient_id, $patterns, 15 * MINUTE_IN_SECONDS);
 
-        wp_redirect(admin_url('admin.php?page=theme-export-jlg&tab=import&action=preview_patterns&transient_id=' . $transient_id));
+        wp_safe_redirect(admin_url('admin.php?page=theme-export-jlg&tab=import&action=preview_patterns&transient_id=' . $transient_id));
         exit;
     }
 
