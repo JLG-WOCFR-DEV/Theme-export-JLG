@@ -49,7 +49,7 @@ class TEJLG_Admin {
                 add_settings_error(
                     'tejlg_import_messages',
                     'theme_import_cap_missing',
-                    esc_html__('Erreur : vous n\'avez pas les permissions nécessaires pour installer des thèmes.', 'theme-export-jlg'),
+                    esc_html__('Vous n\'avez pas l\'autorisation d\'installer des thèmes sur ce site.', 'theme-export-jlg'),
                     'error'
                 );
             } elseif (isset($_FILES['theme_zip']) && $_FILES['theme_zip']['error'] === UPLOAD_ERR_OK) {
