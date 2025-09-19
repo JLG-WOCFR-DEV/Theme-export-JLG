@@ -321,7 +321,98 @@ class TEJLG_Admin {
             return;
         }
 
+        if (!is_array($patterns)) {
+            $patterns = [];
+        }
+
         $global_styles = wp_get_global_stylesheet();
+        if (!is_string($global_styles)) {
+            $global_styles = '';
+        }
+
+        $invalid_patterns = [];
+        $prepared_patterns = [];
+        $has_renderable_pattern = false;
+
+        foreach ($patterns as $index => $pattern) {
+            if (!is_array($pattern) || !array_key_exists('title', $pattern) || !array_key_exists('content', $pattern)) {
+                $invalid_patterns[] = (int) $index;
+                continue;
+            }
+
+            $raw_title = $pattern['title'];
+            if (!is_scalar($raw_title)) {
+                $raw_title = '';
+            }
+            $title = trim((string) $raw_title);
+            if ('' === $title) {
+                $title = sprintf(__('Composition sans titre #%d', 'theme-export-jlg'), ((int) $index) + 1);
+            }
+
+            $raw_content = $pattern['content'];
+            if (!is_scalar($raw_content)) {
+                $raw_content = '';
+            }
+            $pattern_content = (string) $raw_content;
+
+            $parsed_blocks = '' !== $pattern_content ? parse_blocks($pattern_content) : [];
+            $rendered_pattern = '';
+
+            if (!empty($parsed_blocks)) {
+                $rendered_pattern = $this->render_blocks_preview($parsed_blocks);
+            }
+
+            if ('' === $rendered_pattern) {
+                $rendered_pattern = $pattern_content;
+            }
+
+            $sanitized_rendered_pattern = wp_kses_post($rendered_pattern);
+            if ('' !== trim($sanitized_rendered_pattern) || '' !== trim($pattern_content)) {
+                $has_renderable_pattern = true;
+            }
+
+            $prepared_patterns[] = [
+                'index'   => (int) $index,
+                'title'   => $title,
+                'content' => $pattern_content,
+                'rendered' => $sanitized_rendered_pattern,
+            ];
+        }
+
+        if (!empty($invalid_patterns)) {
+            sort($invalid_patterns, SORT_NUMERIC);
+
+            $display_indexes = array_map(
+                static function ($index) {
+                    return sprintf('#%d', ((int) $index) + 1);
+                },
+                $invalid_patterns
+            );
+
+            $invalid_count = count($display_indexes);
+            if (1 === $invalid_count) {
+                $warning_message = sprintf(
+                    __('Une entrée a été ignorée car elle ne possède pas de titre et un contenu valides (%s).', 'theme-export-jlg'),
+                    implode(', ', $display_indexes)
+                );
+            } else {
+                $warning_message = sprintf(
+                    __('%d entrées ont été ignorées car elles ne possèdent pas de titre et un contenu valides (%s).', 'theme-export-jlg'),
+                    $invalid_count,
+                    implode(', ', $display_indexes)
+                );
+            }
+
+            echo '<div class="notice notice-warning"><p>' . esc_html($warning_message) . '</p></div>';
+        }
+
+        if (empty($prepared_patterns) || !$has_renderable_pattern) {
+            delete_transient($transient_id);
+            echo '<div class="error"><p>' . esc_html__('Erreur : Aucune composition valide n\'a pu être prévisualisée. Veuillez vérifier le fichier importé.', 'theme-export-jlg') . '</p></div>';
+            echo '<p><a href="' . esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))) . '">&larr; ' . esc_html__('Retour au formulaire d\'import', 'theme-export-jlg') . '</a></p>';
+            return;
+        }
+
         ?>
         <h2><?php esc_html_e('Étape 2 : Choisir les compositions à importer', 'theme-export-jlg'); ?></h2>
         <p><?php esc_html_e('Cochez les compositions à importer. Vous pouvez prévisualiser le rendu et inspecter le code du bloc (le code CSS du thème est masqué par défaut).', 'theme-export-jlg'); ?></p>
@@ -332,22 +423,15 @@ class TEJLG_Admin {
                 <div style="margin-bottom:15px;">
                      <label><input type="checkbox" id="select-all-patterns" checked> <strong><?php esc_html_e('Tout sélectionner', 'theme-export-jlg'); ?></strong></label>
                 </div>
-                <?php foreach ($patterns as $index => $pattern): ?>
+                <?php foreach ($prepared_patterns as $pattern_data): ?>
                     <?php
-                    $pattern_content = isset($pattern['content']) ? (string) $pattern['content'] : '';
-                    $parsed_blocks = parse_blocks($pattern_content);
-                    $rendered_pattern = $this->render_blocks_preview($parsed_blocks);
-                    if ('' === $rendered_pattern) {
-                        $rendered_pattern = $pattern_content;
-                    }
-                    $sanitized_rendered_pattern = wp_kses_post($rendered_pattern);
-                    $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $sanitized_rendered_pattern . '</body></html>';
+                    $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $pattern_data['rendered'] . '</body></html>';
                     ?>
                     <div class="pattern-item">
                         <div class="pattern-selector">
                             <label>
-                                <input type="checkbox" name="selected_patterns[]" value="<?php echo esc_attr($index); ?>" checked>
-                                <strong><?php echo esc_html($pattern['title']); ?></strong>
+                                <input type="checkbox" name="selected_patterns[]" value="<?php echo esc_attr($pattern_data['index']); ?>" checked>
+                                <strong><?php echo esc_html($pattern_data['title']); ?></strong>
                             </label>
                         </div>
                         <div class="pattern-preview-wrapper">
@@ -359,7 +443,7 @@ class TEJLG_Admin {
                         </div>
 
                         <div class="pattern-code-view" style="display: none;">
-                            <pre><code><?php echo esc_html($pattern['content']); ?></code></pre>
+                            <pre><code><?php echo esc_html($pattern_data['content']); ?></code></pre>
 
                             <details class="css-accordion">
                                 <summary><?php esc_html_e('Afficher le CSS global du thème', 'theme-export-jlg'); ?></summary>
