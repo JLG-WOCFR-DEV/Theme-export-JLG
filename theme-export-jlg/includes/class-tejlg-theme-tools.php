@@ -54,7 +54,13 @@ class TEJLG_Theme_Tools {
 
         $css_content = implode("\n", $css_lines);
 
-        $function_name_prefix   = str_replace( '-', '_', $child_slug );
+        $function_name_prefix   = preg_replace( '/[^A-Za-z0-9_]/', '_', $child_slug );
+        if ( '' === $function_name_prefix ) {
+            $function_name_prefix = 'tejlg_child_theme';
+        }
+        if ( ! preg_match( '/^[A-Za-z_]/', $function_name_prefix ) ) {
+            $function_name_prefix = 'tejlg_' . $function_name_prefix;
+        }
         $sanitized_stylesheet   = sanitize_key( $parent_theme->get_stylesheet() );
         $php_content = sprintf(
 '<?php
