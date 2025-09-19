@@ -133,10 +133,16 @@ class TEJLG_Export {
      * Gère la création et le téléchargement du fichier JSON.
      */
     private static function download_json( $data, $filename = 'exported-patterns.json' ) {
-        $json_data = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        $json_options = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE;
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $json_error_message = json_last_error_msg();
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $json_options |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+
+        $json_data = wp_json_encode($data, $json_options);
+
+        if (false === $json_data || (function_exists('json_last_error') && json_last_error() !== JSON_ERROR_NONE)) {
+            $json_error_message = function_exists('json_last_error_msg') ? json_last_error_msg() : __('Erreur JSON inconnue.', 'theme-export-jlg');
 
             wp_die(
                 esc_html(
