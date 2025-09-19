@@ -1,12 +1,20 @@
 document.addEventListener('DOMContentLoaded', function() {
 
-    const {
-        showBlockCode: showBlockCodeText = '',
-        hideBlockCode: hideBlockCodeText = '',
-        themeImportConfirm: themeImportConfirmMessage = '',
-    } = (typeof window.tejlgAdminL10n === 'object' && window.tejlgAdminL10n !== null)
+    const localization = (typeof window.tejlgAdminL10n === 'object' && window.tejlgAdminL10n !== null)
         ? window.tejlgAdminL10n
         : {};
+
+    const showBlockCodeText = typeof localization.showBlockCode === 'string'
+        ? localization.showBlockCode
+        : '';
+
+    const hideBlockCodeText = typeof localization.hideBlockCode === 'string'
+        ? localization.hideBlockCode
+        : '';
+
+    const themeImportConfirmMessage = typeof localization.themeImportConfirm === 'string'
+        ? localization.themeImportConfirm
+        : '';
 
     // Gérer la case "Tout sélectionner" pour l'import
     const selectAllCheckbox = document.getElementById('select-all-patterns');
