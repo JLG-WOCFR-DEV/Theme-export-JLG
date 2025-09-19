@@ -2,6 +2,17 @@
 class TEJLG_Import {
 
     public static function import_theme($file) {
+        if (!current_user_can('install_themes')) {
+            add_settings_error(
+                'tejlg_import_messages',
+                'theme_import_permissions',
+                esc_html__('Vous n’avez pas l’autorisation d’installer des thèmes sur ce site.', 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
         require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
         require_once ABSPATH . 'wp-admin/includes/file.php';
 
