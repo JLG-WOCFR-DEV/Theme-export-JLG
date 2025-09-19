@@ -25,6 +25,15 @@ class TEJLG_Admin {
         }
         wp_enqueue_style('tejlg-admin-styles', TEJLG_URL . 'assets/css/admin-styles.css', [], TEJLG_VERSION);
         wp_enqueue_script('tejlg-admin-scripts', TEJLG_URL . 'assets/js/admin-scripts.js', [], TEJLG_VERSION, true);
+        wp_localize_script(
+            'tejlg-admin-scripts',
+            'tejlgAdminL10n',
+            [
+                'showBlockCode'      => esc_html__('Afficher le code du bloc', 'theme-export-jlg'),
+                'hideBlockCode'      => esc_html__('Masquer le code du bloc', 'theme-export-jlg'),
+                'themeImportConfirm' => __("⚠️ ATTENTION ⚠️\n\nSi un thème avec le même nom de dossier existe déjà, il sera DÉFINITIVEMENT écrasé.\n\nÊtes-vous sûr de vouloir continuer ?", 'theme-export-jlg'),
+            ]
+        );
     }
 
     public function handle_form_requests() {

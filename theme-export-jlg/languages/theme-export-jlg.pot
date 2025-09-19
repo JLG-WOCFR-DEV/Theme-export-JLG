@@ -1,0 +1,528 @@
+# Copyright (C) 2025 Le Gousse Jérôme
+# This file is distributed under the GPL v2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Theme Export - JLG 3.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/theme-export-jlg\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2025-09-19T19:40:12+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: theme-export-jlg\n"
+
+#. Plugin Name of the plugin
+#: theme-export-jlg.php
+#: includes/class-tejlg-admin.php:12
+msgid "Theme Export - JLG"
+msgstr ""
+
+#. Plugin URI of the plugin
+#. Author URI of the plugin
+#: theme-export-jlg.php
+msgid "https://#"
+msgstr ""
+
+#. Description of the plugin
+#: theme-export-jlg.php
+msgid "Exporte, importe et gère les thèmes et compositions, avec un outil de création de thème enfant et un export portable."
+msgstr ""
+
+#. Author of the plugin
+#: theme-export-jlg.php
+msgid "Le Gousse Jérôme"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:13
+msgid "Theme Export"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:32
+#: includes/class-tejlg-admin.php:477
+msgid "Afficher le code du bloc"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:33
+msgid "Masquer le code du bloc"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:34
+msgid ""
+"⚠️ ATTENTION ⚠️\n"
+"\n"
+"Si un thème avec le même nom de dossier existe déjà, il sera DÉFINITIVEMENT écrasé.\n"
+"\n"
+"Êtes-vous sûr de vouloir continuer ?"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:63
+#: includes/class-tejlg-import.php:13
+msgid "Vous n'avez pas l'autorisation d'installer des thèmes sur ce site."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:76
+msgid "du thème"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:96
+msgid "des compositions"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:123
+msgid "Exporter & Outils"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:124
+msgid "Importer"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:125
+msgid "Guide de Migration"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:126
+msgid "Débogage"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:152
+msgid "Actions sur le Thème Actif"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:155
+msgid "Exporter le Thème Actif (.zip)"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:156
+msgid "Crée une archive <code>.zip</code> de votre thème. Idéal pour les sauvegardes ou les migrations."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:159
+msgid "Exporter le Thème Actif"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:163
+msgid "Exporter les Compositions (.json)"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:164
+msgid "Générez un fichier <code>.json</code> contenant vos compositions."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:167
+msgid "Export portable"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:167
+msgid "(compatibilité maximale)"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:168
+msgid "Exporter TOUTES les compositions"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:171
+msgid "Exporter une sélection..."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:175
+msgid "Créer un Thème Enfant"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:176
+msgid "Générez un thème enfant pour le thème actif. Indispensable pour ajouter du code personnalisé."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:180
+msgid "Nom du thème enfant :"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:181
+msgid "Enfant"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:183
+msgid "Créer le Thème Enfant"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:199
+msgid "Retour aux outils principaux"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:200
+msgid "Exporter une sélection de compositions"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:201
+msgid "Cochez les compositions que vous souhaitez inclure dans votre fichier d'exportation <code>.json</code>."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:204
+#: includes/class-tejlg-admin.php:322
+msgid "Aucune composition personnalisée n'a été trouvée."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:210
+#: includes/class-tejlg-admin.php:459
+msgid "Tout sélectionner"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:224
+msgid "Générer un export \"portable\""
+msgstr ""
+
+#: includes/class-tejlg-admin.php:224
+msgid "(Recommandé pour migrer vers un autre site)"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:226
+msgid "Exporter la sélection"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:239
+msgid "Tutoriel : Que pouvez-vous importer ?"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:242
+msgid "Importer un Thème (.zip)"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:243
+msgid "Téléversez une archive <code>.zip</code> d'un thème. Le plugin l'installera (capacité WordPress « Installer des thèmes » requise). <strong>Attention :</strong> Un thème existant sera remplacé."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:246
+msgid "Fichier du thème (.zip) :"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:247
+msgid "Importer le Thème"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:251
+msgid "Importer des Compositions (.json)"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:252
+msgid "Téléversez un fichier <code>.json</code> (généré par l'export). Vous pourrez choisir quelles compositions importer à l'étape suivante."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:255
+msgid "Fichier des compositions (.json, .txt) :"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:256
+msgid "Analyser et prévisualiser"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:266
+msgid "Oui"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:267
+msgid "Non (Export de thème impossible)"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:270
+msgid "Activée"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:271
+msgid "Manquante (CRITIQUE pour la fiabilité des exports JSON)"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:273
+msgid "Outils de Débogage"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:274
+msgid "Ces informations peuvent vous aider à diagnostiquer des problèmes liés à votre configuration ou à vos données."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:277
+msgid "Informations Système & WordPress"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:282
+msgid "Version de WordPress"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:286
+msgid "Version de PHP"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:290
+msgid "Classe <code>ZipArchive</code> disponible"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:294
+msgid "Extension PHP <code>mbstring</code>"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:298
+msgid "Limite de mémoire WP"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:302
+msgid "Taille max. d'upload"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:310
+msgid "Compositions personnalisées enregistrées"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:329
+#, php-format
+msgid "%d composition personnalisée trouvée :"
+msgid_plural "%d compositions personnalisées trouvées :"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/class-tejlg-admin.php:339
+msgid "Slug :"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:355
+msgid "La session d'importation a expiré ou est invalide. Veuillez téléverser à nouveau votre fichier."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:384
+#, php-format
+msgid "Composition sans titre #%d"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:430
+#, php-format
+msgid "Une entrée a été ignorée car elle ne possède pas de titre et un contenu valides (%s)."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:435
+#, php-format
+msgid "%d entrées ont été ignorées car elles ne possèdent pas de titre et un contenu valides (%s)."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:446
+msgid "Erreur : Aucune composition valide n'a pu être prévisualisée. Veuillez vérifier le fichier importé."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:447
+msgid "Retour au formulaire d'import"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:452
+msgid "Étape 2 : Choisir les compositions à importer"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:453
+msgid "Cochez les compositions à importer. Vous pouvez prévisualiser le rendu et inspecter le code du bloc (le code CSS du thème est masqué par défaut)."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:484
+msgid "Afficher le CSS global du thème"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:492
+msgid "Importer la sélection"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:558
+msgid "bloc inconnu"
+msgstr ""
+
+#. translators: %s: dynamic block name.
+#: includes/class-tejlg-admin.php:561
+#, php-format
+msgid "Bloc dynamique \"%s\" non rendu dans cet aperçu."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:573
+#, php-format
+msgid "Le fichier %1$s dépasse la taille maximale autorisée (%2$s)."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:579
+#, php-format
+msgid "Le fichier %s n'a été que partiellement téléversé. Veuillez réessayer."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:584
+#, php-format
+msgid "Aucun fichier %s n'a été téléversé. Veuillez sélectionner un fichier avant de recommencer."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:588
+msgid "Le dossier temporaire du serveur est manquant. Contactez votre hébergeur."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:590
+msgid "Impossible d'écrire le fichier sur le disque. Vérifiez les permissions de votre serveur."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:592
+msgid "Une extension PHP a interrompu le téléversement. Vérifiez la configuration de votre serveur."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:595
+#, php-format
+msgid "Une erreur inconnue est survenue lors du téléversement du fichier %1$s (code %2$d)."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:604
+msgid "Guide : Migrer ses personnalisations d'un thème bloc à un autre"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:605
+msgid "Ce guide explique comment transférer vos compositions et vos modifications de l'Éditeur de Site (comme de <strong>Twenty Twenty-Four</strong> à <strong>Twenty Twenty-Five</strong>) en utilisant ce plugin."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:607
+msgid "Le Concept Clé : Le fichier <code>theme.json</code>"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:608
+msgid "Un \"mode de compatibilité\" automatique entre thèmes blocs est presque impossible car chaque thème est un <strong>système de design</strong> unique, défini par son fichier <code>theme.json</code>. Ce fichier contrôle tout :"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:610
+msgid "🎨 <strong>La palette de couleurs</strong> (les couleurs \"Primaire\", \"Secondaire\", etc. sont différentes)."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:611
+msgid "✒️ <strong>La typographie</strong> (familles de polices, tailles, graisses)."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:612
+msgid "📏 <strong>Les espacements</strong> (marges, paddings, etc.)."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:614
+msgid "Lorsque vous activez un nouveau thème, vos blocs s'adaptent volontairement à ce nouveau système de design. C'est le comportement attendu."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:616
+msgid "La Stratégie de Migration en 3 Étapes"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:619
+msgid "Étape 1 : Exporter TOUT depuis l'ancien thème"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:621
+msgid "<strong>Exporter les Compositions :</strong> Dans l'onglet <strong>Exporter & Outils</strong>, cliquez sur \"Exporter les Compositions\" pour obtenir votre fichier <code>.json</code>."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:622
+msgid "<strong>Exporter les Modèles de l'Éditeur :</strong> Dans <code>Apparence > Éditeur</code>, ouvrez le panneau de navigation, cliquez sur les trois points (⋮) et choisissez <strong>Outils > Exporter</strong> pour obtenir un <code>.zip</code>."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:628
+msgid "Icône des outils d'exportation de l'Éditeur de Site WordPress (trois points verticaux puis \"Outils > Exporter\")."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:632
+msgid "Étape 2 : Activer le nouveau thème"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:633
+msgid "Allez dans <code>Apparence > Thèmes</code> et activez votre nouveau thème. L'apparence de votre site va radicalement changer, c'est normal."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:636
+msgid "Étape 3 : Importer et Adapter"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:638
+msgid "<strong>Importer les Compositions :</strong> Dans l'onglet <strong>Importer</strong>, téléversez votre fichier <code>.json</code>. L'aperçu vous montrera vos compositions avec le style du NOUVEAU thème. Importez votre sélection."
+msgstr ""
+
+#: includes/class-tejlg-admin.php:639
+msgid "<strong>Adapter les Modèles :</strong> Utilisez le <code>.zip</code> de l'étape 1 comme référence pour recréer la structure de vos anciens modèles dans l'Éditeur de Site du nouveau thème."
+msgstr ""
+
+#: includes/class-tejlg-export.php:9
+msgid "La classe ZipArchive n'est pas disponible."
+msgstr ""
+
+#: includes/class-tejlg-export.php:24
+msgid "Impossible de créer l'archive ZIP."
+msgstr ""
+
+#: includes/class-tejlg-export.php:145
+msgid "Erreur JSON inconnue."
+msgstr ""
+
+#: includes/class-tejlg-export.php:150
+#, php-format
+msgid "Une erreur critique est survenue lors de la création du fichier JSON : %s. Cela peut être dû à des caractères invalides dans une de vos compositions."
+msgstr ""
+
+#: includes/class-tejlg-import.php:28
+msgid "Le thème a été installé avec succès !"
+msgstr ""
+
+#: includes/class-tejlg-import.php:40
+msgid "Erreur : Le fichier n'est pas un fichier JSON valide."
+msgstr ""
+
+#: includes/class-tejlg-import.php:62
+msgid "Erreur : Aucune composition valide (titre + contenu) n'a été trouvée dans le fichier fourni."
+msgstr ""
+
+#: includes/class-tejlg-import.php:79
+msgid "Erreur : La session d'importation a expiré. Veuillez réessayer."
+msgstr ""
+
+#: includes/class-tejlg-import.php:84
+msgid "Erreur : La sélection des compositions est invalide."
+msgstr ""
+
+#: includes/class-tejlg-import.php:110
+#, php-format
+msgid "La composition à l'index %d ne possède pas de slug valide."
+msgstr ""
+
+#: includes/class-tejlg-import.php:161
+#, php-format
+msgid "%d composition a été enregistrée avec succès."
+msgid_plural "%d compositions ont été enregistrées avec succès."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/class-tejlg-import.php:167
+msgid "Aucune composition n'a pu être enregistrée (elles existent peut-être déjà ou des erreurs sont survenues)."
+msgstr ""
+
+#: includes/class-tejlg-theme-tools.php:7
+msgid "Erreur : Le thème actif est déjà un thème enfant. Vous ne pouvez pas créer un enfant d'un enfant."
+msgstr ""
+
+#: includes/class-tejlg-theme-tools.php:12
+msgid "Erreur : Le nom du thème enfant ne peut pas être vide."
+msgstr ""
+
+#: includes/class-tejlg-theme-tools.php:18
+msgid "Erreur : Le dossier des thèmes (wp-content/themes) n'est pas accessible en écriture par le serveur."
+msgstr ""
+
+#: includes/class-tejlg-theme-tools.php:25
+msgid "Erreur : Un thème avec le même nom de dossier existe déjà."
+msgstr ""
+
+#: includes/class-tejlg-theme-tools.php:30
+msgid "Erreur : Impossible de créer le dossier du thème enfant. Vérifiez les permissions du serveur."
+msgstr ""
+
+#: includes/class-tejlg-theme-tools.php:41
+#, php-format
+msgid "Thème enfant pour %s"
+msgstr ""
+
+#: includes/class-tejlg-theme-tools.php:87
+msgid "Erreur : Impossible de créer le fichier style.css du thème enfant."
+msgstr ""
+
+#: includes/class-tejlg-theme-tools.php:93
+msgid "Erreur : Impossible de créer le fichier functions.php du thème enfant."
+msgstr ""
