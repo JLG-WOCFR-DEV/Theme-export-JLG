@@ -13,11 +13,13 @@ class TEJLG_Export {
         $theme_dir_path = $theme->get_stylesheet_directory();
         $theme_slug = $theme->get_stylesheet();
         $zip_file_name = $theme_slug . '.zip';
-        $zip_file_path = sys_get_temp_dir() . '/' . $zip_file_name;
+        $zip_file_path = wp_tempnam($zip_file_name);
 
-        if (file_exists($zip_file_path)) {
-            unlink($zip_file_path);
+        if (!$zip_file_path) {
+            wp_die(esc_html__('Impossible de créer le fichier temporaire pour l\'archive ZIP.', 'theme-export-jlg'));
         }
+
+        unlink($zip_file_path);
 
         $zip = new ZipArchive();
         if ($zip->open($zip_file_path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
