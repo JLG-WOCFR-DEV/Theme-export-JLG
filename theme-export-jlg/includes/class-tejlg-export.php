@@ -116,17 +116,55 @@ class TEJLG_Export {
      * Nettoie le contenu d'une composition pour la rendre portable.
      */
     private static function clean_pattern_content($content) {
+        $blocks = function_exists('parse_blocks') ? parse_blocks($content) : [];
+
+        if (!empty($blocks)) {
+            $blocks = array_map([__CLASS__, 'clean_block_recursive'], $blocks);
+            $content = implode('', array_map('serialize_block', $blocks));
+        }
+
         // 1. Remplace les URLs absolues du site par des URLs relatives
         $content = str_replace(get_home_url(), '', $content);
 
         // 2. Neutralise les IDs des médias pour éviter les dépendances
         $content = preg_replace('/("id"\s*:\s*)\d+/', '${1}0', $content);
 
-        // 3. Supprime les métadonnées potentiellement incompatibles
-        $content = preg_replace('/,\s*"metadata"\s*:\s*\{[^{}]*?\}/s', '', $content);
-        $content = preg_replace('/"metadata"\s*:\s*\{[^{}]*?\},\s*/s', '', $content);
-
         return $content;
+    }
+
+    /**
+     * Supprime récursivement les métadonnées des blocs.
+     */
+    private static function clean_block_recursive($block) {
+        if (isset($block['attrs'])) {
+            $block['attrs'] = self::clean_metadata_recursive($block['attrs']);
+        }
+
+        if (!empty($block['innerBlocks'])) {
+            $block['innerBlocks'] = array_map([__CLASS__, 'clean_block_recursive'], $block['innerBlocks']);
+        }
+
+        return $block;
+    }
+
+    /**
+     * Parcourt récursivement une structure de données pour supprimer la clé "metadata".
+     */
+    private static function clean_metadata_recursive($data) {
+        if (!is_array($data)) {
+            return $data;
+        }
+
+        foreach ($data as $key => $value) {
+            if ('metadata' === $key) {
+                unset($data[$key]);
+                continue;
+            }
+
+            $data[$key] = self::clean_metadata_recursive($value);
+        }
+
+        return $data;
     }
 
     /**
