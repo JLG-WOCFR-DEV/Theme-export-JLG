@@ -156,24 +156,25 @@ class TEJLG_Import {
                 }
             }
 
+            $post_data = [
+                'post_title'   => $title,
+                'post_content' => $content,
+                'post_name'    => $slug,
+            ];
+
             if ($existing_block instanceof WP_Post) {
-                $post_data = [
-                    'ID'           => $existing_block->ID,
-                    'post_title'   => $title,
-                    'post_content' => $content,
-                    'post_name'    => $slug,
-                ];
+                $post_data['ID'] = $existing_block->ID;
 
                 $result = wp_update_post(wp_slash($post_data), true);
             } else {
-                $post_data = [
-                    'post_title'   => $title,
-                    'post_name'    => $slug,
-                    'post_content' => $content,
-                    'post_status'  => 'publish',
-                    'post_type'    => 'wp_block',
-                    'post_author'  => get_current_user_id(),
-                ];
+                $post_data = array_merge(
+                    $post_data,
+                    [
+                        'post_status' => 'publish',
+                        'post_type'   => 'wp_block',
+                        'post_author' => get_current_user_id(),
+                    ]
+                );
 
                 $result = wp_insert_post(wp_slash($post_data), true);
             }
