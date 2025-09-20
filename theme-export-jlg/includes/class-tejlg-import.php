@@ -73,7 +73,16 @@ class TEJLG_Import {
                 'error'
             );
 
-            wp_safe_redirect(admin_url('admin.php?page=theme-export-jlg&tab=import'));
+            $errors = get_settings_errors('tejlg_import_messages');
+            set_transient('settings_errors', $errors, 30);
+
+            $redirect_url = add_query_arg(
+                'settings-updated',
+                'false',
+                admin_url('admin.php?page=theme-export-jlg&tab=import')
+            );
+
+            wp_safe_redirect($redirect_url);
             exit;
         }
         set_transient($transient_id, $patterns, 15 * MINUTE_IN_SECONDS);
