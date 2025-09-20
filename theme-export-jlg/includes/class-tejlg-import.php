@@ -107,6 +107,8 @@ class TEJLG_Import {
                 $raw_slug = substr($raw_slug, strlen('custom-patterns/'));
             }
 
+            $original_slug = $raw_slug;
+
             $slug = sanitize_title($raw_slug);
             if ('' === $slug) {
                 $errors[] = sprintf(__('La composition à l\'index %d ne possède pas de slug valide.', 'theme-export-jlg'), $index);
@@ -120,21 +122,44 @@ class TEJLG_Import {
                 $content = self::sanitize_pattern_content_for_current_user((string) $pattern['content']);
             }
 
-            $existing_block = get_page_by_path($slug, OBJECT, 'wp_block');
+            $candidate_slugs = array_values(
+                array_filter(
+                    array_unique([
+                        $slug,
+                        $original_slug,
+                        'custom-patterns/' . $slug,
+                    ]),
+                    static function ($value) {
+                        return '' !== $value;
+                    }
+                )
+            );
+
+            $existing_block = null;
+
+            foreach ($candidate_slugs as $candidate_slug) {
+                $existing_block = get_page_by_path($candidate_slug, OBJECT, 'wp_block');
+
+                if ($existing_block instanceof WP_Post) {
+                    break;
+                }
+            }
 
             if ($existing_block instanceof WP_Post) {
                 $post_data = [
                     'ID'           => $existing_block->ID,
                     'post_title'   => $title,
                     'post_content' => $content,
-                    'post_name'    => $slug,
+                    'post_name'    => $existing_block->post_name,
                 ];
 
                 $result = wp_update_post(wp_slash($post_data), true);
             } else {
+                $stored_slug = 'custom-patterns/' . $slug;
+
                 $post_data = [
                     'post_title'   => $title,
-                    'post_name'    => $slug,
+                    'post_name'    => $stored_slug,
                     'post_content' => $content,
                     'post_status'  => 'publish',
                     'post_type'    => 'wp_block',
