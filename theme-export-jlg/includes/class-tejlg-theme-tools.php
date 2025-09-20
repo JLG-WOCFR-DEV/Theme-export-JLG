@@ -68,7 +68,9 @@ class TEJLG_Theme_Tools {
  * Enqueue scripts and styles.
  */
 function %1$s_enqueue_styles() {
-    wp_enqueue_style( \'%2$s-parent-style\', get_template_directory_uri() . \'/style.css\' );
+    $theme_version = wp_get_theme()->get( \'Version\' );
+    wp_enqueue_style( \'%2$s-parent-style\', get_template_directory_uri() . \'/style.css\', array(), $theme_version );
+    wp_enqueue_style( \'%2$s-child-style\', get_stylesheet_uri(), array( \'%2$s-parent-style\' ), $theme_version );
 }
 add_action( \'wp_enqueue_scripts\', \'%1$s_enqueue_styles\' );
 ',
