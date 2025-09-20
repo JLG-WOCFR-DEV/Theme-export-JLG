@@ -132,13 +132,15 @@ class TEJLG_Import {
                 $content = self::sanitize_pattern_content_for_current_user((string) $pattern['content']);
             }
 
+            $candidate_slugs = array_unique([
+                $slug,
+                $original_slug,
+                '' !== $slug ? 'custom-patterns/' . $slug : '',
+            ]);
+
             $candidate_slugs = array_values(
                 array_filter(
-                    array_unique([
-                        $slug,
-                        $original_slug,
-                        'custom-patterns/' . $slug,
-                    ]),
+                    $candidate_slugs,
                     static function ($value) {
                         return '' !== $value;
                     }
@@ -155,6 +157,7 @@ class TEJLG_Import {
                 }
             }
 
+            // Always store the sanitized slug without the legacy "custom-patterns/" prefix.
             $post_data = [
                 'post_title'   => $title,
                 'post_content' => $content,
