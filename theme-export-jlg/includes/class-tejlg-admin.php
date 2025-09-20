@@ -29,10 +29,10 @@ class TEJLG_Admin {
             'tejlg-admin-scripts',
             'tejlgAdminL10n',
             [
-                'showBlockCode' => esc_html__('Afficher le code du bloc', 'theme-export-jlg'),
-                'hideBlockCode' => esc_html__('Masquer le code du bloc', 'theme-export-jlg'),
+                'showBlockCode' => __('Afficher le code du bloc', 'theme-export-jlg'),
+                'hideBlockCode' => __('Masquer le code du bloc', 'theme-export-jlg'),
                 /* translators: Warning shown before importing a theme zip file. */
-                'themeImportConfirm' => esc_html__("⚠️ ATTENTION ⚠️\n\nSi un thème avec le même nom de dossier existe déjà, il sera DÉFINITIVEMENT écrasé.\n\nÊtes-vous sûr de vouloir continuer ?", 'theme-export-jlg'),
+                'themeImportConfirm' => __("⚠️ ATTENTION ⚠️\n\nSi un thème avec le même nom de dossier existe déjà, il sera DÉFINITIVEMENT écrasé.\n\nÊtes-vous sûr de vouloir continuer ?", 'theme-export-jlg'),
             ]
         );
     }
