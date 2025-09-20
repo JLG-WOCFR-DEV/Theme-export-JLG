@@ -150,16 +150,14 @@ class TEJLG_Import {
                     'ID'           => $existing_block->ID,
                     'post_title'   => $title,
                     'post_content' => $content,
-                    'post_name'    => $existing_block->post_name,
+                    'post_name'    => $slug,
                 ];
 
                 $result = wp_update_post(wp_slash($post_data), true);
             } else {
-                $stored_slug = 'custom-patterns/' . $slug;
-
                 $post_data = [
                     'post_title'   => $title,
-                    'post_name'    => $stored_slug,
+                    'post_name'    => $slug,
                     'post_content' => $content,
                     'post_status'  => 'publish',
                     'post_type'    => 'wp_block',
