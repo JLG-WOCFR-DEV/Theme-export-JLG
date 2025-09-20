@@ -165,14 +165,9 @@ class TEJLG_Import {
 
                 $result = wp_update_post(wp_slash($post_data), true);
             } else {
-                $post_data = array_merge(
-                    $post_data,
-                    [
-                        'post_status' => 'publish',
-                        'post_type'   => 'wp_block',
-                        'post_author' => get_current_user_id(),
-                    ]
-                );
+                $post_data['post_status'] = 'publish';
+                $post_data['post_type']   = 'wp_block';
+                $post_data['post_author'] = get_current_user_id();
 
                 $result = wp_insert_post(wp_slash($post_data), true);
             }
