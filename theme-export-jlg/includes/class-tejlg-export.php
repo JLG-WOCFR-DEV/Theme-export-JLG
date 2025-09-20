@@ -124,7 +124,34 @@ class TEJLG_Export {
         }
 
         // 1. Remplace les URLs absolues du site par des URLs relatives
-        $content = str_replace(get_home_url(), '', $content);
+        $home_url = get_home_url();
+        $home_parts = wp_parse_url($home_url);
+
+        if (!empty($home_parts['host'])) {
+            $host_pattern = preg_quote($home_parts['host'], '#');
+            $port_pattern = '';
+
+            if (!empty($home_parts['port'])) {
+                $port_pattern = '(?::' . preg_quote((string) $home_parts['port'], '#') . ')?';
+            } else {
+                $port_pattern = '(?::\d+)?';
+            }
+
+            $pattern = '#https?:\/\/' . $host_pattern . $port_pattern . '(?=[\/\?#]|$)([\/\?#][^\s"\'>]*)?#i';
+            $relative_content = preg_replace_callback(
+                $pattern,
+                static function ($matches) {
+                    $relative = wp_make_link_relative($matches[0]);
+
+                    return '' !== $relative ? $relative : '/';
+                },
+                $content
+            );
+
+            if (null !== $relative_content) {
+                $content = $relative_content;
+            }
+        }
 
         // 2. Neutralise les IDs des médias pour éviter les dépendances
         $content = preg_replace('/("id"\s*:\s*)\d+/', '${1}0', $content);
