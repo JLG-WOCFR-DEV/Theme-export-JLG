@@ -110,7 +110,7 @@ class TEJLG_Admin {
         // Création du thème enfant
         if (isset($_POST['tejlg_create_child_nonce']) && wp_verify_nonce($_POST['tejlg_create_child_nonce'], 'tejlg_create_child_action')) {
             if (isset($_POST['child_theme_name'])) {
-                TEJLG_Theme_Tools::create_child_theme(sanitize_text_field($_POST['child_theme_name']));
+                TEJLG_Theme_Tools::create_child_theme(sanitize_text_field(wp_unslash($_POST['child_theme_name'])));
             }
         }
     }

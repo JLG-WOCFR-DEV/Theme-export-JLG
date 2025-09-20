@@ -2,13 +2,19 @@
 class TEJLG_Theme_Tools {
 
     public static function create_child_theme( $child_name ) {
+        if ( is_string( $child_name ) ) {
+            $child_name = wp_unslash( $child_name );
+        }
+
+        $sanitized_child_name = is_string( $child_name ) ? sanitize_text_field( $child_name ) : '';
+
         $parent_theme = wp_get_theme();
         if ( $parent_theme->parent() ) {
             add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Le thème actif est déjà un thème enfant. Vous ne pouvez pas créer un enfant d\'un enfant.', 'theme-export-jlg'), 'error');
             return;
         }
 
-        if ( empty( $child_name ) ) {
+        if ( '' === $sanitized_child_name ) {
             add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Le nom du thème enfant ne peut pas être vide.', 'theme-export-jlg'), 'error');
             return;
         }
@@ -19,7 +25,7 @@ class TEJLG_Theme_Tools {
             return;
         }
 
-        $child_slug = sanitize_title( $child_name );
+        $child_slug = sanitize_title( $sanitized_child_name );
         $child_dir = $theme_root . '/' . $child_slug;
         if ( file_exists( $child_dir ) ) {
             add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Un thème avec le même nom de dossier existe déjà.', 'theme-export-jlg'), 'error');
@@ -31,7 +37,6 @@ class TEJLG_Theme_Tools {
             return;
         }
 
-        $sanitized_child_name   = sanitize_text_field( $child_name );
         $sanitized_theme_uri    = esc_url_raw( $parent_theme->get( 'ThemeURI' ) );
         $sanitized_parent_name  = sanitize_text_field( $parent_theme->get( 'Name' ) );
         $sanitized_author_name  = sanitize_text_field( $parent_theme->get( 'Author' ) );
@@ -100,7 +105,7 @@ add_action( \'wp_enqueue_scripts\', \'%1$s_enqueue_styles\' );
         $success_message = sprintf(
             /* translators: 1: Child theme name, 2: URL to the themes admin page. */
             __("Le thème enfant \"%1$s\" a été créé avec succès ! Vous pouvez maintenant <a href=\"%2$s\">l'activer depuis la page des thèmes</a>.", 'theme-export-jlg'),
-            esc_html($child_name),
+            esc_html($sanitized_child_name),
             esc_url($themes_page_url)
         );
         add_settings_error(
