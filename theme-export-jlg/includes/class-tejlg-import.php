@@ -25,7 +25,6 @@ class TEJLG_Import {
         @unlink($file['tmp_name']);
 
         $message_type = 'error';
-        $message_text = esc_html__('L\'installation du thème a échoué.', 'theme-export-jlg');
 
         if (is_wp_error($result)) {
             $message_text = $result->get_error_message();
@@ -34,6 +33,8 @@ class TEJLG_Import {
         } elseif (true === $result) {
             $message_type = 'success';
             $message_text = esc_html__('Le thème a été installé avec succès !', 'theme-export-jlg');
+        } else {
+            $message_text = esc_html__('L\'installation du thème a échoué.', 'theme-export-jlg');
         }
 
         add_settings_error('tejlg_import_messages', 'theme_import_status', $message_text, $message_type);
