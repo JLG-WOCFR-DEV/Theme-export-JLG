@@ -521,10 +521,6 @@ class TEJLG_Admin {
             $is_dynamic = true;
         }
 
-        if ($is_dynamic) {
-            return $this->get_dynamic_block_placeholder($block_name);
-        }
-
         $rendered_inner_blocks = [];
         if (!empty($block['innerBlocks'])) {
             foreach ($block['innerBlocks'] as $inner_block) {
@@ -545,11 +541,23 @@ class TEJLG_Admin {
                 }
             }
 
-            return $content;
+            if ('' !== trim($content) || !empty($rendered_inner_blocks)) {
+                return $content;
+            }
         }
 
         if (isset($block['innerHTML'])) {
-            return $block['innerHTML'];
+            if ('' !== trim($block['innerHTML'])) {
+                return $block['innerHTML'];
+            }
+        }
+
+        if (!empty($rendered_inner_blocks)) {
+            return implode('', $rendered_inner_blocks);
+        }
+
+        if ($is_dynamic) {
+            return $this->get_dynamic_block_placeholder($block_name);
         }
 
         return '';
