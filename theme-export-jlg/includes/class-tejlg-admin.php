@@ -103,7 +103,19 @@ class TEJLG_Admin {
         // Import Compositions (Étape 2)
         if (isset($_POST['tejlg_import_patterns_step2_nonce']) && wp_verify_nonce($_POST['tejlg_import_patterns_step2_nonce'], 'tejlg_import_patterns_step2_action')) {
             if (isset($_POST['transient_id']) && isset($_POST['selected_patterns']) && is_array($_POST['selected_patterns'])) {
-                TEJLG_Import::handle_patterns_import_step2(sanitize_key($_POST['transient_id']), $_POST['selected_patterns']);
+                $transient_id = sanitize_key($_POST['transient_id']);
+
+                if (0 !== strpos($transient_id, 'tejlg_')) {
+                    add_settings_error(
+                        'tejlg_import_messages',
+                        'patterns_import_status',
+                        esc_html__("Erreur : L'identifiant de session est invalide. Veuillez réessayer.", 'theme-export-jlg'),
+                        'error'
+                    );
+                    return;
+                }
+
+                TEJLG_Import::handle_patterns_import_step2($transient_id, $_POST['selected_patterns']);
             }
         }
 
@@ -351,6 +363,13 @@ class TEJLG_Admin {
     }
 
     private function render_patterns_preview_page($transient_id) {
+        $transient_id = (string) $transient_id;
+
+        if ('' === $transient_id || 0 !== strpos($transient_id, 'tejlg_')) {
+            echo '<div class="error"><p>' . esc_html__("Erreur : L'identifiant de session est invalide. Veuillez téléverser à nouveau votre fichier.", 'theme-export-jlg') . '</p></div>';
+            return;
+        }
+
         $patterns = get_transient($transient_id);
         if (false === $patterns) {
             echo '<div class="error"><p>' . esc_html__('La session d\'importation a expiré ou est invalide. Veuillez téléverser à nouveau votre fichier.', 'theme-export-jlg') . '</p></div>';

@@ -132,6 +132,19 @@ class TEJLG_Import {
     }
 
     public static function handle_patterns_import_step2($transient_id, $selected_indices) {
+        $transient_id = (string) $transient_id;
+
+        if ('' === $transient_id || 0 !== strpos($transient_id, 'tejlg_')) {
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html__("Erreur : L'identifiant de session est invalide. Veuillez réessayer.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
         $all_patterns = get_transient($transient_id);
 
         if (false === $all_patterns) {
