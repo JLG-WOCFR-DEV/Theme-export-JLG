@@ -102,21 +102,46 @@ class TEJLG_Admin {
 
         // Import Compositions (Étape 2)
         if (isset($_POST['tejlg_import_patterns_step2_nonce']) && wp_verify_nonce($_POST['tejlg_import_patterns_step2_nonce'], 'tejlg_import_patterns_step2_action')) {
-            if (isset($_POST['transient_id']) && isset($_POST['selected_patterns']) && is_array($_POST['selected_patterns'])) {
-                $transient_id = sanitize_key($_POST['transient_id']);
+            $transient_id = isset($_POST['transient_id']) ? sanitize_key($_POST['transient_id']) : '';
 
-                if (0 !== strpos($transient_id, 'tejlg_')) {
-                    add_settings_error(
-                        'tejlg_import_messages',
-                        'patterns_import_status',
-                        esc_html__("Erreur : L'identifiant de session est invalide. Veuillez réessayer.", 'theme-export-jlg'),
-                        'error'
-                    );
-                    return;
-                }
-
-                TEJLG_Import::handle_patterns_import_step2($transient_id, $_POST['selected_patterns']);
+            if ('' === $transient_id || 0 !== strpos($transient_id, 'tejlg_')) {
+                add_settings_error(
+                    'tejlg_import_messages',
+                    'patterns_import_status',
+                    esc_html__("Erreur : L'identifiant de session est invalide. Veuillez réessayer.", 'theme-export-jlg'),
+                    'error'
+                );
+                return;
             }
+
+            if (isset($_POST['selected_patterns']) && is_array($_POST['selected_patterns']) && !empty($_POST['selected_patterns'])) {
+                TEJLG_Import::handle_patterns_import_step2($transient_id, $_POST['selected_patterns']);
+                return;
+            }
+
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_no_selection',
+                esc_html__("Erreur : Veuillez sélectionner au moins une composition avant de lancer l'import.", 'theme-export-jlg'),
+                'error'
+            );
+
+            $errors = get_settings_errors('tejlg_import_messages');
+            set_transient('settings_errors', $errors, 30);
+
+            $redirect_url = add_query_arg(
+                [
+                    'page'            => 'theme-export-jlg',
+                    'tab'             => 'import',
+                    'action'          => 'preview_patterns',
+                    'transient_id'    => $transient_id,
+                    'settings-updated' => 'false',
+                ],
+                admin_url('admin.php')
+            );
+
+            wp_safe_redirect($redirect_url);
+            exit;
         }
 
         // Création du thème enfant
