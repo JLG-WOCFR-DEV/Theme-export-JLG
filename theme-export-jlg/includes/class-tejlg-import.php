@@ -80,6 +80,19 @@ class TEJLG_Import {
 
     public static function handle_patterns_upload_step1($file) {
         $json_content = file_get_contents($file['tmp_name']);
+
+        if (false === $json_content) {
+            @unlink($file['tmp_name']);
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html__("Erreur : Impossible de lire le fichier téléchargé.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
         @unlink($file['tmp_name']);
 
         $patterns = json_decode($json_content, true);
