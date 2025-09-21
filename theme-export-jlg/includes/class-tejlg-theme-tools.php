@@ -67,20 +67,23 @@ class TEJLG_Theme_Tools {
             $function_name_prefix = 'tejlg_' . $function_name_prefix;
         }
         $sanitized_stylesheet   = sanitize_key( $parent_theme->get_stylesheet() );
-        $php_content = sprintf(
-'<?php
+        $php_template = <<<'PHP'
+<?php
 /**
  * Enqueue scripts and styles.
  */
 function %1$s_enqueue_styles() {
     $child_theme = wp_get_theme();
-    $parent_version = $child_theme->parent() ? $child_theme->parent()->get( \'Version\' ) : $child_theme->get( \'Version\' );
-    $child_version = $child_theme->get( \'Version\' );
-    wp_enqueue_style( \'%2$s-parent-style\', get_template_directory_uri() . \'/style.css\', array(), $parent_version );
-    wp_enqueue_style( \'%2$s-child-style\', get_stylesheet_uri(), array( \'%2$s-parent-style\' ), $child_version );
+    $parent_version = $child_theme->parent() ? $child_theme->parent()->get( 'Version' ) : $child_theme->get( 'Version' );
+    $child_version = $child_theme->get( 'Version' );
+    wp_enqueue_style( '%2$s-parent-style', get_template_directory_uri() . '/style.css', array(), $parent_version );
+    wp_enqueue_style( '%2$s-child-style', get_stylesheet_uri(), array( '%2$s-parent-style' ), $child_version );
 }
-add_action( \'wp_enqueue_scripts\', \'%1$s_enqueue_styles\' );
-',
+add_action( 'wp_enqueue_scripts', '%1$s_enqueue_styles' );
+PHP;
+
+        $php_content = sprintf(
+            $php_template,
             $function_name_prefix,
             $sanitized_stylesheet
         );
