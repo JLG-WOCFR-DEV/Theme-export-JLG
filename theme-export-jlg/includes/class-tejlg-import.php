@@ -238,6 +238,29 @@ class TEJLG_Import {
             ];
 
             if ($existing_block instanceof WP_Post) {
+                $post_status = isset($existing_block->post_status) ? $existing_block->post_status : get_post_status($existing_block);
+
+                if ('publish' !== $post_status) {
+                    if ('trash' === $post_status) {
+                        $untrash_result = wp_untrash_post($existing_block->ID);
+
+                        if (is_wp_error($untrash_result)) {
+                            $errors[] = $untrash_result->get_error_message();
+                            continue;
+                        }
+
+                        if (false === $untrash_result) {
+                            $errors[] = sprintf(__('Impossible de restaurer la composition "%s".', 'theme-export-jlg'), $title);
+                            continue;
+                        }
+
+                        $existing_block = get_post($existing_block->ID);
+                        $post_status    = isset($existing_block->post_status) ? $existing_block->post_status : get_post_status($existing_block);
+                    }
+
+                    $post_data['post_status'] = 'publish';
+                }
+
                 $post_data['ID'] = $existing_block->ID;
 
                 $result = wp_update_post(wp_slash($post_data), true);
