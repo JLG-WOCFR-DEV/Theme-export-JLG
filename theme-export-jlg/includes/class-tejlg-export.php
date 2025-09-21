@@ -128,6 +128,15 @@ class TEJLG_Export {
         // 1. Remplace les URLs absolues du site par des URLs relatives
         $home_url = get_home_url();
         $home_parts = wp_parse_url($home_url);
+        $home_path  = '';
+
+        if (!empty($home_parts['path'])) {
+            $trimmed_path = trim($home_parts['path'], '/');
+
+            if ('' !== $trimmed_path) {
+                $home_path = '/' . $trimmed_path;
+            }
+        }
 
         if (!empty($home_parts['host'])) {
             $host_pattern = preg_quote($home_parts['host'], '#');
@@ -142,8 +151,16 @@ class TEJLG_Export {
             $pattern = '#https?:\/\/' . $host_pattern . $port_pattern . '(?=[\/\?#]|$)([\/\?#][^\s"\'>]*)?#i';
             $relative_content = preg_replace_callback(
                 $pattern,
-                static function ($matches) {
+                static function ($matches) use ($home_path) {
                     $relative = wp_make_link_relative($matches[0]);
+
+                    if ('' !== $home_path && 0 === strpos($relative, $home_path)) {
+                        $relative = substr($relative, strlen($home_path));
+
+                        if ($relative === '' || '/' !== $relative[0]) {
+                            $relative = '/' . ltrim($relative, '/');
+                        }
+                    }
 
                     return '' !== $relative ? $relative : '/';
                 },
