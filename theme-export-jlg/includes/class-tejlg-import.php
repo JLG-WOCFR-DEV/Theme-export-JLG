@@ -20,9 +20,47 @@ class TEJLG_Import {
         require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
         require_once ABSPATH . 'wp-admin/includes/file.php';
 
-        $upgrader = new Theme_Upgrader(new WP_Ajax_Upgrader_Skin());
-        $result = $upgrader->install($file['tmp_name'], ['overwrite_package' => true]);
-        @unlink($file['tmp_name']);
+        $package_param = 'tejlg_package';
+        $file_upload   = new File_Upload_Upgrader('theme_zip', $package_param);
+
+        $page_url   = admin_url('admin.php?page=theme-export-jlg&tab=import');
+        $theme_root = get_theme_root();
+
+        if ($file_upload->id) {
+            $page_url = add_query_arg($package_param, (int) $file_upload->id, $page_url);
+        }
+
+        $filesystem_credentials = request_filesystem_credentials(
+            $page_url,
+            '',
+            false,
+            $theme_root,
+            [$package_param]
+        );
+
+        if (false === $filesystem_credentials) {
+            return;
+        }
+
+        if (!WP_Filesystem($filesystem_credentials, $theme_root)) {
+            request_filesystem_credentials($page_url, '', true, $theme_root, [$package_param]);
+
+            return;
+        }
+
+        $skin_args = [
+            'type'  => 'upload',
+            'title' => esc_html__('Installation du thème', 'theme-export-jlg'),
+            'url'   => $page_url,
+            'nonce' => 'tejlg-import-theme',
+        ];
+
+        $upgrader = new Theme_Upgrader(new TEJLG_Silent_Theme_Installer_Skin($skin_args));
+        $result = $upgrader->install($file_upload->package, ['overwrite_package' => true]);
+
+        if ($file_upload instanceof File_Upload_Upgrader) {
+            $file_upload->cleanup();
+        }
 
         $message_type = 'error';
 
@@ -241,5 +279,25 @@ class TEJLG_Import {
         }
 
         return $sanitized_content;
+    }
+}
+
+if (!class_exists('TEJLG_Silent_Theme_Installer_Skin')) {
+    if (!class_exists('Theme_Installer_Skin')) {
+        require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+    }
+
+    class TEJLG_Silent_Theme_Installer_Skin extends Theme_Installer_Skin {
+        public function header() {
+            $this->done_header = true;
+        }
+
+        public function footer() {}
+
+        public function before() {}
+
+        public function after() {}
+
+        public function feedback($string, ...$args) {}
     }
 }
