@@ -323,37 +323,41 @@ class TEJLG_Admin {
                 <h3 class="accordion-section-title"><?php esc_html_e('Compositions personnalisées enregistrées', 'theme-export-jlg'); ?></h3>
                 <div class="accordion-section-content">
                     <?php
-                    $patterns = WP_Block_Patterns_Registry::get_instance()->get_all_registered();
-                    $custom_patterns = array_filter(
-                        $patterns,
-                        function ($pattern) {
-                            return ! (isset($pattern['source']) && $pattern['source'] === 'core');
-                        }
-                    );
-
-                    if (empty($custom_patterns)) {
-                        echo '<p>' . esc_html__('Aucune composition personnalisée n\'a été trouvée.', 'theme-export-jlg') . '</p>';
-                    } else {
-                        $count = count($custom_patterns);
-                        printf(
-                            '<p>%s</p>',
-                            esc_html(
-                                sprintf(
-                                    _n('%d composition personnalisée trouvée :', '%d compositions personnalisées trouvées :', $count, 'theme-export-jlg'),
-                                    $count
-                                )
-                            )
+                    if (class_exists('WP_Block_Patterns_Registry')) {
+                        $patterns = WP_Block_Patterns_Registry::get_instance()->get_all_registered();
+                        $custom_patterns = array_filter(
+                            $patterns,
+                            function ($pattern) {
+                                return ! (isset($pattern['source']) && $pattern['source'] === 'core');
+                            }
                         );
-                        echo '<ul>';
-                        foreach ($custom_patterns as $pattern) {
+
+                        if (empty($custom_patterns)) {
+                            echo '<p>' . esc_html__('Aucune composition personnalisée n\'a été trouvée.', 'theme-export-jlg') . '</p>';
+                        } else {
+                            $count = count($custom_patterns);
                             printf(
-                                '<li><strong>%1$s</strong> (%2$s <code>%3$s</code>)</li>',
-                                esc_html($pattern['title']),
-                                esc_html__('Slug :', 'theme-export-jlg'),
-                                esc_html($pattern['name'])
+                                '<p>%s</p>',
+                                esc_html(
+                                    sprintf(
+                                        _n('%d composition personnalisée trouvée :', '%d compositions personnalisées trouvées :', $count, 'theme-export-jlg'),
+                                        $count
+                                    )
+                                )
                             );
+                            echo '<ul>';
+                            foreach ($custom_patterns as $pattern) {
+                                printf(
+                                    '<li><strong>%1$s</strong> (%2$s <code>%3$s</code>)</li>',
+                                    esc_html($pattern['title']),
+                                    esc_html__('Slug :', 'theme-export-jlg'),
+                                    esc_html($pattern['name'])
+                                );
+                            }
+                            echo '</ul>';
                         }
-                        echo '</ul>';
+                    } else {
+                        echo '<p>' . esc_html__('Cette version de WordPress ne prend pas en charge les compositions personnalisées enregistrées via le registre. Mettez à jour WordPress pour afficher cette liste.', 'theme-export-jlg') . '</p>';
                     }
                     ?>
                 </div>
@@ -380,7 +384,7 @@ class TEJLG_Admin {
             $patterns = [];
         }
 
-        $global_styles = wp_get_global_stylesheet();
+        $global_styles = function_exists('wp_get_global_stylesheet') ? wp_get_global_stylesheet() : '';
         if (!is_string($global_styles)) {
             $global_styles = '';
         }
