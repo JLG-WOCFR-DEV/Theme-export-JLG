@@ -2,6 +2,22 @@
 class TEJLG_Theme_Tools {
 
     public static function create_child_theme( $child_name ) {
+        if (
+            ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS ) ||
+            ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT )
+        ) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'child_theme_error',
+                esc_html__(
+                    "Erreur : Les modifications de fichiers sont désactivées sur ce site.",
+                    'theme-export-jlg'
+                ),
+                'error'
+            );
+            return;
+        }
+
         if ( is_string( $child_name ) ) {
             $child_name = wp_unslash( $child_name );
         }
@@ -20,19 +36,59 @@ class TEJLG_Theme_Tools {
         }
 
         $theme_root = get_theme_root();
-        if ( ! is_writable( $theme_root ) ) {
+
+        if ( ! function_exists( 'request_filesystem_credentials' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+        }
+
+        if ( ! class_exists( 'WP_Upgrader' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+        }
+
+        $filesystem_url  = admin_url( 'themes.php' );
+        $filesystem_creds = request_filesystem_credentials( $filesystem_url, '', false, $theme_root );
+
+        if ( false === $filesystem_creds ) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'child_theme_error',
+                esc_html__(
+                    'Erreur : Les identifiants du système de fichiers sont requis pour créer le thème enfant.',
+                    'theme-export-jlg'
+                ),
+                'error'
+            );
+            return;
+        }
+
+        if ( ! WP_Filesystem( $filesystem_creds, $theme_root ) ) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'child_theme_error',
+                esc_html__(
+                    "Erreur : Impossible d'initialiser le système de fichiers WordPress avec les identifiants fournis.",
+                    'theme-export-jlg'
+                ),
+                'error'
+            );
+            return;
+        }
+
+        global $wp_filesystem;
+
+        if ( ! $wp_filesystem || ! $wp_filesystem->is_writable( $theme_root ) ) {
             add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Le dossier des thèmes (wp-content/themes) n\'est pas accessible en écriture par le serveur.', 'theme-export-jlg'), 'error');
             return;
         }
 
         $child_slug = sanitize_title( $sanitized_child_name );
         $child_dir = $theme_root . '/' . $child_slug;
-        if ( file_exists( $child_dir ) ) {
+        if ( $wp_filesystem->exists( $child_dir ) ) {
             add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Un thème avec le même nom de dossier existe déjà.', 'theme-export-jlg'), 'error');
             return;
         }
 
-        if ( ! wp_mkdir_p( $child_dir ) ) {
+        if ( ! $wp_filesystem->mkdir( $child_dir, FS_CHMOD_DIR ) ) {
             add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Impossible de créer le dossier du thème enfant. Vérifiez les permissions du serveur.', 'theme-export-jlg'), 'error');
             return;
         }
@@ -94,13 +150,13 @@ PHP;
         $style_file     = $child_dir . '/style.css';
         $functions_file = $child_dir . '/functions.php';
 
-        if ( false === file_put_contents( $style_file, $css_content ) ) {
+        if ( ! $wp_filesystem->put_contents( $style_file, $css_content, FS_CHMOD_FILE ) ) {
             self::remove_child_theme_directory( $child_dir );
             add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Impossible de créer le fichier style.css du thème enfant.', 'theme-export-jlg'), 'error');
             return;
         }
 
-        if ( false === file_put_contents( $functions_file, $php_content ) ) {
+        if ( ! $wp_filesystem->put_contents( $functions_file, $php_content, FS_CHMOD_FILE ) ) {
             self::remove_child_theme_directory( $child_dir );
             add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Impossible de créer le fichier functions.php du thème enfant.', 'theme-export-jlg'), 'error');
             return;
@@ -122,19 +178,25 @@ PHP;
     }
 
     private static function remove_child_theme_directory( $child_dir ) {
+        global $wp_filesystem;
+
+        if ( ! $wp_filesystem ) {
+            return;
+        }
+
         $files = array( $child_dir . '/style.css', $child_dir . '/functions.php' );
 
         foreach ( $files as $file ) {
-            if ( file_exists( $file ) ) {
-                unlink( $file );
+            if ( $wp_filesystem->exists( $file ) ) {
+                $wp_filesystem->delete( $file );
             }
         }
 
-        if ( is_dir( $child_dir ) ) {
-            $dir_files = scandir( $child_dir );
+        if ( $wp_filesystem->is_dir( $child_dir ) ) {
+            $dir_files = $wp_filesystem->dirlist( $child_dir );
 
-            if ( is_array( $dir_files ) && count( $dir_files ) <= 2 ) {
-                rmdir( $child_dir );
+            if ( is_array( $dir_files ) && empty( $dir_files ) ) {
+                $wp_filesystem->delete( $child_dir, true );
             }
         }
     }
