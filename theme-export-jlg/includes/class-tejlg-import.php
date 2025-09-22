@@ -222,11 +222,33 @@ class TEJLG_Import {
 
             $existing_block = null;
 
-            foreach ($candidate_slugs as $candidate_slug) {
-                $existing_block = get_page_by_path($candidate_slug, OBJECT, 'wp_block');
+            if (!empty($candidate_slugs)) {
+                global $wpdb;
 
-                if ($existing_block instanceof WP_Post) {
-                    break;
+                $allowed_statuses = ['publish', 'draft', 'pending', 'future', 'private', 'trash'];
+
+                $slug_placeholders      = implode(', ', array_fill(0, count($candidate_slugs), '%s'));
+                $status_placeholders    = implode(', ', array_fill(0, count($allowed_statuses), '%s'));
+                $order_slug_placeholders = $slug_placeholders;
+
+                $sql = "SELECT ID FROM {$wpdb->posts}
+                    WHERE post_type = %s
+                        AND post_name IN ($slug_placeholders)
+                        AND post_status IN ($status_placeholders)
+                    ORDER BY FIELD(post_name, $order_slug_placeholders)
+                    LIMIT 1";
+
+                $prepare_args = array_merge(
+                    ['wp_block'],
+                    $candidate_slugs,
+                    $allowed_statuses,
+                    $candidate_slugs
+                );
+
+                $existing_block_id = $wpdb->get_var($wpdb->prepare($sql, $prepare_args));
+
+                if (!empty($existing_block_id)) {
+                    $existing_block = get_post((int) $existing_block_id);
                 }
             }
 
