@@ -48,8 +48,15 @@ class TEJLG_Admin {
 
         // Export SÉLECTIF des compositions
         if (isset($_POST['tejlg_export_selected_nonce']) && wp_verify_nonce($_POST['tejlg_export_selected_nonce'], 'tejlg_export_selected_action')) {
-            if (isset($_POST['selected_patterns']) && is_array($_POST['selected_patterns'])) {
+            if (isset($_POST['selected_patterns']) && is_array($_POST['selected_patterns']) && !empty($_POST['selected_patterns'])) {
                 TEJLG_Export::export_selected_patterns_json($_POST['selected_patterns']);
+            } else {
+                add_settings_error(
+                    'tejlg_admin_messages',
+                    'patterns_export_no_selection',
+                    esc_html__("Erreur : Veuillez sélectionner au moins une composition avant de lancer l'export.", 'theme-export-jlg'),
+                    'error'
+                );
             }
         }
         
@@ -226,6 +233,8 @@ class TEJLG_Admin {
     }
 
     private function render_pattern_selection_page() {
+        settings_errors('tejlg_admin_messages');
+
         $patterns_query = new WP_Query([
             'post_type' => 'wp_block',
             'posts_per_page' => -1,
