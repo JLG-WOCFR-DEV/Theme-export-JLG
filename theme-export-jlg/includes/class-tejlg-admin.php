@@ -258,9 +258,13 @@ class TEJLG_Admin {
 
                 <div class="pattern-selection-list">
                     <p class="select-all-wrapper"><label><input type="checkbox" id="select-all-export-patterns"> <strong><?php esc_html_e('Tout sélectionner', 'theme-export-jlg'); ?></strong></label></p>
-                    <ul>
+                    <p class="pattern-selection-search">
+                        <label class="screen-reader-text" for="pattern-search"><?php esc_html_e('Rechercher une composition', 'theme-export-jlg'); ?></label>
+                        <input type="search" id="pattern-search" placeholder="<?php echo esc_attr__('Rechercher…', 'theme-export-jlg'); ?>">
+                    </p>
+                    <ul class="pattern-selection-items" aria-live="polite">
                         <?php while ($patterns_query->have_posts()): $patterns_query->the_post(); ?>
-                            <li>
+                            <li class="pattern-selection-item" data-label="<?php echo esc_attr(get_the_title()); ?>">
                                 <label>
                                     <input type="checkbox" name="selected_patterns[]" value="<?php echo esc_attr(get_the_ID()); ?>">
                                     <?php echo esc_html(get_the_title()); ?>

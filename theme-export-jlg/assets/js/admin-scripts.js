@@ -78,13 +78,110 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Gérer la case "Tout sélectionner" pour l'export sélectif
+    const patternList = document.querySelector('.pattern-selection-items');
+    const patternItems = patternList ? Array.from(patternList.querySelectorAll('.pattern-selection-item')) : [];
     const selectAllExportCheckbox = document.getElementById('select-all-export-patterns');
+    const patternSearchInput = document.getElementById('pattern-search');
+
+    function getVisiblePatternItems() {
+        return patternItems.filter(function(item) {
+            return !item.classList.contains('is-hidden');
+        });
+    }
+
+    function updateSelectAllExportCheckbox() {
+        if (!selectAllExportCheckbox) {
+            return;
+        }
+
+        const visibleItems = getVisiblePatternItems();
+        const visibleCheckboxes = visibleItems
+            .map(function(item) {
+                return item.querySelector('input[type="checkbox"]');
+            })
+            .filter(function(checkbox) {
+                return checkbox !== null;
+            });
+
+        if (visibleCheckboxes.length === 0) {
+            selectAllExportCheckbox.checked = false;
+            selectAllExportCheckbox.indeterminate = false;
+            selectAllExportCheckbox.disabled = true;
+            return;
+        }
+
+        selectAllExportCheckbox.disabled = false;
+
+        const checkedCount = visibleCheckboxes.filter(function(checkbox) {
+            return checkbox.checked;
+        }).length;
+
+        if (checkedCount === 0) {
+            selectAllExportCheckbox.checked = false;
+            selectAllExportCheckbox.indeterminate = false;
+        } else if (checkedCount === visibleCheckboxes.length) {
+            selectAllExportCheckbox.checked = true;
+            selectAllExportCheckbox.indeterminate = false;
+        } else {
+            selectAllExportCheckbox.checked = false;
+            selectAllExportCheckbox.indeterminate = true;
+        }
+    }
+
+    function filterPatternItems(query) {
+        if (!patternItems.length) {
+            updateSelectAllExportCheckbox();
+            return;
+        }
+
+        const normalizedQuery = query.trim().toLowerCase();
+
+        patternItems.forEach(function(item) {
+            const label = item.getAttribute('data-label') || '';
+            const isMatch = label.toLowerCase().indexOf(normalizedQuery) !== -1;
+
+            if (isMatch || normalizedQuery === '') {
+                item.classList.remove('is-hidden');
+            } else {
+                item.classList.add('is-hidden');
+            }
+        });
+
+        updateSelectAllExportCheckbox();
+    }
+
     if (selectAllExportCheckbox) {
         selectAllExportCheckbox.addEventListener('change', function(e) {
-            document.querySelectorAll('input[name="selected_patterns[]"]').forEach(function(checkbox) {
-                checkbox.checked = e.target.checked;
+            const shouldCheck = e.target.checked;
+            getVisiblePatternItems().forEach(function(item) {
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                if (checkbox) {
+                    checkbox.checked = shouldCheck;
+                }
             });
+
+            updateSelectAllExportCheckbox();
         });
+    }
+
+    if (patternItems.length) {
+        patternItems.forEach(function(item) {
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                checkbox.addEventListener('change', updateSelectAllExportCheckbox);
+            }
+        });
+
+        updateSelectAllExportCheckbox();
+    }
+
+    if (patternSearchInput) {
+        const searchHandler = function(event) {
+            filterPatternItems(event.target.value || '');
+        };
+
+        patternSearchInput.addEventListener('input', searchHandler);
+        patternSearchInput.addEventListener('keyup', searchHandler);
     }
 
 });
