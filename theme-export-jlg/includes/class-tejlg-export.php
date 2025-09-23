@@ -4,10 +4,23 @@ class TEJLG_Export {
     /**
      * Crée et télécharge l'archive ZIP du thème actif.
      */
-    public static function export_theme() {
+    public static function export_theme($exclusions = []) {
         if (!class_exists('ZipArchive')) {
             wp_die(esc_html__('La classe ZipArchive n\'est pas disponible.', 'theme-export-jlg'));
         }
+
+        $exclusions = array_values(array_filter(
+            array_map(
+                static function ($pattern) {
+                    $pattern = trim((string) $pattern);
+                    return ltrim($pattern, "\\/");
+                },
+                (array) $exclusions
+            ),
+            static function ($pattern) {
+                return '' !== $pattern;
+            }
+        ));
 
         $theme = wp_get_theme();
         $theme_dir_path = $theme->get_stylesheet_directory();
@@ -27,12 +40,41 @@ class TEJLG_Export {
         }
 
         $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($theme_dir_path), RecursiveIteratorIterator::LEAVES_ONLY);
+        $files_added = 0;
+
         foreach ($files as $name => $file) {
             if (!$file->isDir()) {
                 $file_path = $file->getRealPath();
                 $relative_path = substr($file_path, strlen($theme_dir_path) + 1);
+                $normalized_relative_path = function_exists('wp_normalize_path')
+                    ? wp_normalize_path($relative_path)
+                    : str_replace('\\', '/', $relative_path);
+                $normalized_relative_path = ltrim($normalized_relative_path, '/');
+
+                if (self::should_exclude_file($normalized_relative_path, $exclusions)) {
+                    continue;
+                }
+
                 $zip->addFile($file_path, $relative_path);
+                $files_added++;
             }
+        }
+
+        if (0 === $files_added) {
+            $zip->close();
+
+            if (file_exists($zip_file_path)) {
+                unlink($zip_file_path);
+            }
+
+            add_settings_error(
+                'tejlg_admin_messages',
+                'theme_export_all_excluded',
+                esc_html__("Erreur : tous les fichiers ont été exclus de l'export. Vérifiez vos motifs.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
         }
         $zip->close();
 
@@ -89,6 +131,41 @@ class TEJLG_Export {
 
         $filename = empty($sanitized_ids) ? 'exported-patterns.json' : 'selected-patterns.json';
         self::download_json($exported_patterns, $filename);
+    }
+
+    private static function should_exclude_file($relative_path, $patterns) {
+        if (empty($patterns)) {
+            return false;
+        }
+
+        foreach ($patterns as $pattern) {
+            $normalized_pattern = function_exists('wp_normalize_path')
+                ? wp_normalize_path($pattern)
+                : str_replace('\\', '/', $pattern);
+
+            if ('' === $normalized_pattern) {
+                continue;
+            }
+
+            $normalized_pattern = ltrim($normalized_pattern, '/');
+
+            if (function_exists('wp_match_path_pattern')) {
+                if (wp_match_path_pattern($normalized_pattern, $relative_path)) {
+                    return true;
+                }
+            } elseif (function_exists('fnmatch')) {
+                if (fnmatch($normalized_pattern, $relative_path)) {
+                    return true;
+                }
+            } else {
+                $regex = '#^' . str_replace('\\*', '.*', preg_quote($normalized_pattern, '#')) . '$#i';
+                if (preg_match($regex, $relative_path)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -495,6 +495,22 @@ msgstr[1] ""
 msgid "Aucune composition n'a pu être enregistrée (elles existent peut-être déjà ou des erreurs sont survenues)."
 msgstr ""
 
+#: includes/class-tejlg-admin.php:221
+msgid "Motifs d'exclusion (optionnel) :"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:222
+msgid "Ex. : assets/*.scss"
+msgstr ""
+
+#: includes/class-tejlg-admin.php:223
+msgid "Indiquez un motif par ligne ou séparez-les par des virgules (joker * accepté)."
+msgstr ""
+
+#: includes/class-tejlg-export.php:68
+msgid "Erreur : tous les fichiers ont été exclus de l'export. Vérifiez vos motifs."
+msgstr ""
+
 #: includes/class-tejlg-theme-tools.php:7
 msgid "Erreur : Le thème actif est déjà un thème enfant. Vous ne pouvez pas créer un enfant d'un enfant."
 msgstr ""
