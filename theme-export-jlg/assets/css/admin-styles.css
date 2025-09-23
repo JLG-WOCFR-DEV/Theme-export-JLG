@@ -129,6 +129,18 @@
     padding-bottom: 1rem;
 }
 
+.pattern-selection-search {
+    margin: 1rem 0;
+}
+
+#pattern-search {
+    width: 100%;
+    max-width: 100%;
+    padding: 6px 10px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
 .pattern-selection-list ul {
     max-height: 400px;
     overflow-y: auto;
@@ -142,4 +154,8 @@
     padding: 0.25rem 0;
     list-style: none;
     margin: 0;
+}
+
+.pattern-selection-list li.is-hidden {
+    display: none;
 }
