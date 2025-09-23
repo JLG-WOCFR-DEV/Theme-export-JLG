@@ -13,6 +13,45 @@
     box-shadow: 0 1px 1px rgba(0,0,0,.04);
 }
 
+.metrics-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 1px solid #ccd0d4;
+    border-radius: 6px;
+    background: #fff;
+    width: max-content;
+    margin-bottom: 20px;
+}
+
+.metrics-badge .metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.metrics-badge .metric-icon {
+    font-size: 26px;
+    line-height: 1;
+}
+
+.metrics-badge .metric-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #555d66;
+}
+
+.metrics-badge .metric-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1d2327;
+}
+
 /* Style pour l'aperçu des compositions */
 .pattern-item {
     border: 1px solid #ccd0d4;

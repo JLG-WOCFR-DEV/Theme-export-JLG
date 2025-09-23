@@ -356,6 +356,18 @@ class TEJLG_Admin {
             ? sprintf('<span style="color:green;">%s</span>', esc_html__('Activée', 'theme-export-jlg'))
             : sprintf('<span style="color:red; font-weight: bold;">%s</span>', esc_html__('Manquante (CRITIQUE pour la fiabilité des exports JSON)', 'theme-export-jlg'));
         ?>
+        <div class="metrics-badge" role="group" aria-label="<?php esc_attr_e('Indicateurs de performance', 'theme-export-jlg'); ?>">
+            <div class="metric metric-fps">
+                <span class="metric-icon metric-icon-fps dashicons dashicons-dashboard" aria-hidden="true"></span>
+                <span class="metric-label"><?php esc_html_e('FPS', 'theme-export-jlg'); ?></span>
+                <span class="metric-value" id="tejlg-metric-fps">--</span>
+            </div>
+            <div class="metric metric-latency">
+                <span class="metric-icon metric-icon-latency dashicons dashicons-clock" aria-hidden="true"></span>
+                <span class="metric-label"><?php esc_html_e('Latence', 'theme-export-jlg'); ?></span>
+                <span class="metric-value" id="tejlg-metric-latency">--</span>
+            </div>
+        </div>
         <h2><?php esc_html_e('Outils de Débogage', 'theme-export-jlg'); ?></h2>
         <p><?php esc_html_e('Ces informations peuvent vous aider à diagnostiquer des problèmes liés à votre configuration ou à vos données.', 'theme-export-jlg'); ?></p>
         <div id="debug-accordion">
