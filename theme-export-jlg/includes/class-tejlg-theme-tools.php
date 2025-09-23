@@ -162,6 +162,13 @@ PHP;
             return;
         }
 
+        wp_clean_themes_cache();
+        delete_site_transient( 'update_themes' );
+
+        if ( is_multisite() ) {
+            clean_site_details_cache();
+        }
+
         $themes_page_url = admin_url('themes.php');
         $success_message = sprintf(
             /* translators: 1: Child theme name, 2: URL to the themes admin page. */
