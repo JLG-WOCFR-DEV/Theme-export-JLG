@@ -45,7 +45,7 @@ class TEJLG_Admin {
             if (isset($_POST['tejlg_export_theme'])) {
                 $exclusions = [];
 
-                if (isset($_POST['tejlg_exclusion_patterns'])) {
+                if (isset($_POST['tejlg_exclusion_patterns']) && is_string($_POST['tejlg_exclusion_patterns'])) {
                     $raw_patterns = wp_unslash($_POST['tejlg_exclusion_patterns']);
                     $split_patterns = preg_split('/[\r\n,]+/', $raw_patterns);
 
@@ -220,8 +220,8 @@ class TEJLG_Admin {
                 <?php
                 $exclusion_patterns_value = '';
 
-                if (isset($_POST['tejlg_exclusion_patterns'])) {
-                    $exclusion_patterns_value = sanitize_textarea_field(wp_unslash($_POST['tejlg_exclusion_patterns']));
+                if (isset($_POST['tejlg_exclusion_patterns']) && is_string($_POST['tejlg_exclusion_patterns'])) {
+                    $exclusion_patterns_value = wp_unslash($_POST['tejlg_exclusion_patterns']);
                 }
                 ?>
                 <form method="post" action="">
