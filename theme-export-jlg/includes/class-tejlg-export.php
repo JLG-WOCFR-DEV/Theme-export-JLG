@@ -12,7 +12,16 @@ class TEJLG_Export {
         $exclusions = array_values(array_filter(
             array_map(
                 static function ($pattern) {
+                    if (!is_scalar($pattern)) {
+                        return '';
+                    }
+
                     $pattern = trim((string) $pattern);
+
+                    if ('' === $pattern) {
+                        return '';
+                    }
+
                     return ltrim($pattern, "\\/");
                 },
                 (array) $exclusions
