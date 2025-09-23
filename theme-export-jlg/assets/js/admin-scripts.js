@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Gérer la case "Tout sélectionner" pour l'export sélectif
-    const patternList = document.querySelector('.pattern-selection-items');
+    const patternList = document.querySelector('[data-searchable="true"]');
     const patternItems = patternList ? Array.from(patternList.querySelectorAll('.pattern-selection-item')) : [];
     const selectAllExportCheckbox = document.getElementById('select-all-export-patterns');
     const patternSearchInput = document.getElementById('pattern-search');

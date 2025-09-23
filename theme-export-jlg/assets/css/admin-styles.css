@@ -139,11 +139,21 @@
     padding: 6px 10px;
     font-size: 14px;
     box-sizing: border-box;
+    margin-top: 0.25rem;
+}
+
+#pattern-search:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
+}
+
+#pattern-selection-items {
+    max-height: 400px;
+    overflow-y: auto;
 }
 
 .pattern-selection-list ul {
-    max-height: 400px;
-    overflow-y: auto;
     border: 1px solid #ddd;
     padding: 1rem;
     margin-bottom: 1rem;
