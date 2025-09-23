@@ -241,6 +241,9 @@ class TEJLG_Admin {
             'post_status' => 'publish',
             'orderby' => 'title',
             'order' => 'ASC',
+            'no_found_rows' => true,
+            'update_post_meta_cache' => false,
+            'update_post_term_cache' => false,
         ]);
         ?>
         <p><a href="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'export'], admin_url('admin.php'))); ?>">&larr; <?php esc_html_e('Retour aux outils principaux', 'theme-export-jlg'); ?></a></p>
