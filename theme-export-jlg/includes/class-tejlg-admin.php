@@ -290,14 +290,16 @@ class TEJLG_Admin {
                     <p class="select-all-wrapper"><label><input type="checkbox" id="select-all-export-patterns"> <strong><?php esc_html_e('Tout sélectionner', 'theme-export-jlg'); ?></strong></label></p>
                     <p class="pattern-selection-search">
                         <label class="screen-reader-text" for="pattern-search"><?php esc_html_e('Rechercher une composition', 'theme-export-jlg'); ?></label>
-                        <input type="search" id="pattern-search" placeholder="<?php echo esc_attr__('Rechercher…', 'theme-export-jlg'); ?>">
+                        <input type="search" id="pattern-search" placeholder="<?php echo esc_attr__('Rechercher…', 'theme-export-jlg'); ?>" aria-controls="pattern-selection-items">
                     </p>
-                    <ul class="pattern-selection-items" aria-live="polite">
-                        <?php while ($patterns_query->have_posts()): $patterns_query->the_post(); ?>
-                            <li class="pattern-selection-item" data-label="<?php echo esc_attr(get_the_title()); ?>">
+                    <ul class="pattern-selection-items" id="pattern-selection-items" aria-live="polite" data-searchable="true">
+                        <?php while ($patterns_query->have_posts()): $patterns_query->the_post();
+                            $pattern_title = get_the_title();
+                        ?>
+                            <li class="pattern-selection-item" data-label="<?php echo esc_attr($pattern_title); ?>">
                                 <label>
                                     <input type="checkbox" name="selected_patterns[]" value="<?php echo esc_attr(get_the_ID()); ?>">
-                                    <?php echo esc_html(get_the_title()); ?>
+                                    <?php echo esc_html($pattern_title); ?>
                                 </label>
                             </li>
                         <?php endwhile; ?>
