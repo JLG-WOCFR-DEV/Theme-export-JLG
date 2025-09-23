@@ -78,10 +78,14 @@ class TEJLG_Export {
         }
         $zip->close();
 
+        nocache_headers();
+        self::clear_output_buffers();
+
         header('Content-Type: application/zip');
         header('Content-Disposition: attachment; filename="' . $zip_file_name . '"');
         header('Content-Length: ' . filesize($zip_file_path));
         readfile($zip_file_path);
+        flush();
 
         unlink($zip_file_path);
         exit;
@@ -315,10 +319,20 @@ class TEJLG_Export {
             );
         }
 
+        nocache_headers();
+        self::clear_output_buffers();
+
         header('Content-Type: application/json; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Content-Length: ' . strlen($json_data));
         echo $json_data;
+        flush();
         exit;
+    }
+
+    private static function clear_output_buffers() {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
     }
 }
