@@ -42,7 +42,25 @@ class TEJLG_Admin {
 
         // Export (TOUT)
         if (isset($_POST['tejlg_nonce']) && wp_verify_nonce($_POST['tejlg_nonce'], 'tejlg_export_action')) {
-            if (isset($_POST['tejlg_export_theme'])) TEJLG_Export::export_theme();
+            if (isset($_POST['tejlg_export_theme'])) {
+                $exclusions = [];
+
+                if (isset($_POST['tejlg_exclusion_patterns'])) {
+                    $raw_patterns = wp_unslash($_POST['tejlg_exclusion_patterns']);
+                    $split_patterns = preg_split('/[\r\n,]+/', $raw_patterns);
+
+                    if (false !== $split_patterns) {
+                        $exclusions = array_values(array_filter(
+                            array_map('trim', $split_patterns),
+                            static function ($pattern) {
+                                return '' !== $pattern;
+                            }
+                        ));
+                    }
+                }
+
+                TEJLG_Export::export_theme($exclusions);
+            }
             if (isset($_POST['tejlg_export_patterns'])) TEJLG_Export::export_patterns_json();
         }
 
@@ -199,8 +217,20 @@ class TEJLG_Admin {
             <div class="tejlg-card">
                 <h3><?php esc_html_e('Exporter le Thème Actif (.zip)', 'theme-export-jlg'); ?></h3>
                 <p><?php echo wp_kses_post(__('Crée une archive <code>.zip</code> de votre thème. Idéal pour les sauvegardes ou les migrations.', 'theme-export-jlg')); ?></p>
+                <?php
+                $exclusion_patterns_value = '';
+
+                if (isset($_POST['tejlg_exclusion_patterns'])) {
+                    $exclusion_patterns_value = sanitize_textarea_field(wp_unslash($_POST['tejlg_exclusion_patterns']));
+                }
+                ?>
                 <form method="post" action="">
                     <?php wp_nonce_field('tejlg_export_action', 'tejlg_nonce'); ?>
+                    <p>
+                        <label for="tejlg_exclusion_patterns"><?php esc_html_e('Motifs d\'exclusion (optionnel) :', 'theme-export-jlg'); ?></label><br>
+                        <textarea name="tejlg_exclusion_patterns" id="tejlg_exclusion_patterns" class="large-text code" rows="4" placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"><?php echo esc_textarea($exclusion_patterns_value); ?></textarea>
+                        <span class="description"><?php esc_html_e('Indiquez un motif par ligne ou séparez-les par des virgules (joker * accepté).', 'theme-export-jlg'); ?></span>
+                    </p>
                     <p><button type="submit" name="tejlg_export_theme" class="button button-primary"><?php esc_html_e('Exporter le Thème Actif', 'theme-export-jlg'); ?></button></p>
                 </form>
             </div>
