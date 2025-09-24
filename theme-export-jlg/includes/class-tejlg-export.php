@@ -244,6 +244,15 @@ class TEJLG_Export {
                 static function ($matches) use ($home_path) {
                     $relative = wp_make_link_relative($matches[0]);
 
+                    if ('' !== $relative && preg_match('#^https?://#i', $relative)) {
+                        $parsed_url = wp_parse_url($matches[0]);
+
+                        $path      = isset($parsed_url['path']) ? $parsed_url['path'] : '';
+                        $query     = isset($parsed_url['query']) ? '?' . $parsed_url['query'] : '';
+                        $fragment  = isset($parsed_url['fragment']) ? '#' . $parsed_url['fragment'] : '';
+                        $relative  = $path . $query . $fragment;
+                    }
+
                     if ('' !== $home_path && 0 === strpos($relative, $home_path)) {
                         $relative = substr($relative, strlen($home_path));
 
@@ -252,7 +261,15 @@ class TEJLG_Export {
                         }
                     }
 
-                    return '' !== $relative ? $relative : '/';
+                    if ('' === $relative) {
+                        return '/';
+                    }
+
+                    if ('/' !== $relative[0]) {
+                        $relative = '/' . ltrim($relative, '/');
+                    }
+
+                    return $relative;
                 },
                 $content
             );
