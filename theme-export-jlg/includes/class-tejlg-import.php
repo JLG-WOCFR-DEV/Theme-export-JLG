@@ -342,7 +342,10 @@ class TEJLG_Import {
                 'post_name'    => $slug,
             ];
 
+            $action = 'create';
+
             if ($existing_block instanceof WP_Post) {
+                $action = 'update';
                 $post_status = isset($existing_block->post_status) ? $existing_block->post_status : get_post_status($existing_block);
 
                 if ('publish' !== $post_status) {
@@ -385,10 +388,24 @@ class TEJLG_Import {
                 continue;
             }
 
-            if ($result) {
+            if (!empty($result)) {
                 $imported_count++;
+                continue;
+            }
+
+            $failed_patterns[$index] = $pattern;
+
+            if ('update' === $action) {
+                $errors[] = sprintf(
+                    __('La composition "%1$s" n\'a pas pu être mise à jour (ID %2$d).', 'theme-export-jlg'),
+                    $title,
+                    $existing_block instanceof WP_Post ? (int) $existing_block->ID : 0
+                );
             } else {
-                $failed_patterns[$index] = $pattern;
+                $errors[] = sprintf(
+                    __('La composition "%s" n\'a pas pu être créée.', 'theme-export-jlg'),
+                    $title
+                );
             }
         }
 
