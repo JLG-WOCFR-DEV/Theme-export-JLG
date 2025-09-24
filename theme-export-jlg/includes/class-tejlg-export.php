@@ -48,47 +48,86 @@ class TEJLG_Export {
             wp_die(esc_html__('Impossible de créer l\'archive ZIP.', 'theme-export-jlg'));
         }
 
-        $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($theme_dir_path), RecursiveIteratorIterator::LEAVES_ONLY);
-        $normalized_theme_dir = function_exists('wp_normalize_path')
-            ? wp_normalize_path($theme_dir_path)
-            : str_replace('\\', '/', $theme_dir_path);
-        $normalized_theme_dir = rtrim($normalized_theme_dir, '/');
+        $normalized_theme_dir = self::normalize_path($theme_dir_path);
         $files_added = 0;
 
-        foreach ($files as $name => $file) {
+        $directory_iterator = new RecursiveDirectoryIterator(
+            $theme_dir_path,
+            FilesystemIterator::SKIP_DOTS
+        );
+
+        $filter_iterator = new RecursiveCallbackFilterIterator(
+            $directory_iterator,
+            static function (SplFileInfo $file) use ($normalized_theme_dir, $exclusions) {
+                if ($file->isLink()) {
+                    return false;
+                }
+
+                $real_path = $file->getRealPath();
+
+                if (false === $real_path) {
+                    return false;
+                }
+
+                $normalized_file_path = self::normalize_path($real_path);
+
+                if (!self::is_path_within_base($normalized_file_path, $normalized_theme_dir)) {
+                    return false;
+                }
+
+                $relative_path = self::get_relative_path($normalized_file_path, $normalized_theme_dir);
+
+                if ($file->isDir()) {
+                    return '' === $relative_path || !self::should_exclude_file($relative_path, $exclusions);
+                }
+
+                if ('' === $relative_path) {
+                    return false;
+                }
+
+                return !self::should_exclude_file($relative_path, $exclusions);
+            }
+        );
+
+        $iterator = new RecursiveIteratorIterator(
+            $filter_iterator,
+            RecursiveIteratorIterator::SELF_FIRST,
+            RecursiveIteratorIterator::CATCH_GET_CHILD
+        );
+
+        $directories_added = [];
+
+        foreach ($iterator as $file) {
+            $real_path = $file->getRealPath();
+
+            if (false === $real_path) {
+                continue;
+            }
+
+            $normalized_file_path = self::normalize_path($real_path);
+
+            if (!self::is_path_within_base($normalized_file_path, $normalized_theme_dir)) {
+                continue;
+            }
+
+            $relative_path = self::get_relative_path($normalized_file_path, $normalized_theme_dir);
+
+            if ('' === $relative_path) {
+                continue;
+            }
+
             if ($file->isDir()) {
+                $zip_path = rtrim($relative_path, '/') . '/';
+
+                if (!isset($directories_added[$zip_path])) {
+                    $zip->addEmptyDir($zip_path);
+                    $directories_added[$zip_path] = true;
+                }
+
                 continue;
             }
 
-            if ($file->isLink()) {
-                continue;
-            }
-
-            $file_path = $file->getRealPath();
-
-            if (false === $file_path) {
-                continue;
-            }
-
-            $normalized_file_path = function_exists('wp_normalize_path')
-                ? wp_normalize_path($file_path)
-                : str_replace('\\', '/', $file_path);
-
-            if (strpos($normalized_file_path, $normalized_theme_dir . '/') !== 0 && $normalized_file_path !== $normalized_theme_dir) {
-                continue;
-            }
-
-            $relative_path = substr($file_path, strlen($theme_dir_path) + 1);
-            $normalized_relative_path = function_exists('wp_normalize_path')
-                ? wp_normalize_path($relative_path)
-                : str_replace('\\', '/', $relative_path);
-            $normalized_relative_path = ltrim($normalized_relative_path, '/');
-
-            if (self::should_exclude_file($normalized_relative_path, $exclusions)) {
-                continue;
-            }
-
-            $zip->addFile($file_path, $normalized_relative_path);
+            $zip->addFile($real_path, $relative_path);
             $files_added++;
         }
 
@@ -133,9 +172,13 @@ class TEJLG_Export {
         $sanitized_ids = array_filter(array_map('intval', (array) $pattern_ids));
         $exported_patterns = [];
         $args = [
-            'post_type'      => 'wp_block',
-            'posts_per_page' => -1,
-            'post_status'    => 'publish',
+            'post_type'              => 'wp_block',
+            'posts_per_page'         => -1,
+            'post_status'            => 'publish',
+            'no_found_rows'          => true,
+            'update_post_meta_cache' => false,
+            'update_post_term_cache' => false,
+            'lazy_load_term_meta'    => false,
         ];
 
         if (!empty($sanitized_ids)) {
@@ -169,6 +212,33 @@ class TEJLG_Export {
 
         $filename = empty($sanitized_ids) ? 'exported-patterns.json' : 'selected-patterns.json';
         self::download_json($exported_patterns, $filename);
+    }
+
+    private static function normalize_path($path) {
+        $normalized = function_exists('wp_normalize_path')
+            ? wp_normalize_path($path)
+            : str_replace('\\', '/', $path);
+
+        return rtrim($normalized, '/');
+    }
+
+    private static function is_path_within_base($path, $base) {
+        if ('' === $base) {
+            return true;
+        }
+
+        return $path === $base || 0 === strpos($path, $base . '/');
+    }
+
+    private static function get_relative_path($path, $base) {
+        if ($path === $base) {
+            return '';
+        }
+
+        $relative = substr($path, strlen($base));
+        $relative = ltrim($relative, '/');
+
+        return $relative;
     }
 
     private static function should_exclude_file($relative_path, $patterns) {
