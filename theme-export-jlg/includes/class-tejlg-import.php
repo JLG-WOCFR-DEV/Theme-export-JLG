@@ -544,7 +544,8 @@ class TEJLG_Import {
             return $payload;
         }
 
-        $transient_set = set_transient($transient_id, $payload, 15 * MINUTE_IN_SECONDS);
+        $expiration    = self::get_patterns_storage_expiration();
+        $transient_set = set_transient($transient_id, $payload, $expiration);
 
         if (!$transient_set) {
             self::cleanup_patterns_storage($payload);
@@ -563,6 +564,8 @@ class TEJLG_Import {
     }
 
     private static function create_patterns_storage_payload(array $patterns) {
+        self::cleanup_expired_patterns_storage();
+
         $json_options = JSON_UNESCAPED_UNICODE;
 
         if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
@@ -628,12 +631,42 @@ class TEJLG_Import {
                 );
             }
 
+            $expected_size     = isset($storage['size']) ? (int) $storage['size'] : null;
+            $expected_checksum = isset($storage['checksum']) ? (string) $storage['checksum'] : '';
+
+            if (null !== $expected_size && $expected_size >= 0 && strlen($contents) !== $expected_size) {
+                self::cleanup_patterns_storage($storage);
+
+                return new WP_Error(
+                    'tejlg_import_storage_size_mismatch',
+                    __('Erreur : Les données temporaires de la session d\'importation sont incomplètes ou corrompues.', 'theme-export-jlg')
+                );
+            }
+
+            if ('' !== $expected_checksum && md5($contents) !== $expected_checksum) {
+                self::cleanup_patterns_storage($storage);
+
+                return new WP_Error(
+                    'tejlg_import_storage_checksum_mismatch',
+                    __('Erreur : Les données temporaires de la session d\'importation ont été modifiées.', 'theme-export-jlg')
+                );
+            }
+
             $data = json_decode($contents, true);
 
             if (JSON_ERROR_NONE !== json_last_error() || !is_array($data)) {
                 return new WP_Error(
                     'tejlg_import_storage_corrupted',
                     __('Erreur : Les données temporaires de la session d\'importation sont corrompues.', 'theme-export-jlg')
+                );
+            }
+
+            if (isset($storage['count']) && (int) $storage['count'] !== count($data)) {
+                self::cleanup_patterns_storage($storage);
+
+                return new WP_Error(
+                    'tejlg_import_storage_count_mismatch',
+                    __('Erreur : Le contenu de la session d\'importation ne correspond pas aux données attendues.', 'theme-export-jlg')
                 );
             }
 
@@ -657,6 +690,72 @@ class TEJLG_Import {
             if ('' !== $path && @file_exists($path)) {
                 @unlink($path);
             }
+        }
+    }
+
+    public static function cleanup_expired_patterns_storage() {
+        $expiration = self::get_patterns_storage_expiration();
+
+        $max_age = (int) apply_filters(
+            'tejlg_import_patterns_storage_cleanup_max_age',
+            $expiration * 2
+        );
+
+        if ($max_age < $expiration) {
+            $max_age = $expiration;
+        }
+
+        self::cleanup_stale_pattern_files($max_age);
+    }
+
+    private static function get_patterns_storage_expiration() {
+        $expiration = (int) apply_filters('tejlg_import_patterns_storage_expiration', 15 * MINUTE_IN_SECONDS);
+
+        if ($expiration < MINUTE_IN_SECONDS) {
+            $expiration = MINUTE_IN_SECONDS;
+        }
+
+        return $expiration;
+    }
+
+    private static function cleanup_stale_pattern_files($max_age) {
+        if ($max_age <= 0 || !function_exists('get_temp_dir')) {
+            return;
+        }
+
+        $temp_dir = get_temp_dir();
+
+        if (!is_string($temp_dir) || '' === $temp_dir) {
+            return;
+        }
+
+        $temp_dir = trailingslashit($temp_dir);
+
+        if (!@is_dir($temp_dir) || !@is_readable($temp_dir)) {
+            return;
+        }
+
+        $files = @glob($temp_dir . 'tejlg-patterns*');
+
+        if (!is_array($files) || empty($files)) {
+            return;
+        }
+
+        $threshold = time() - (int) $max_age;
+
+        foreach ($files as $file) {
+            if (!@is_file($file)) {
+                continue;
+            }
+
+            $file_mtime = @filemtime($file);
+            $file_ctime = @filectime($file);
+
+            if ((false !== $file_mtime && $file_mtime > $threshold) || (false !== $file_ctime && $file_ctime > $threshold)) {
+                continue;
+            }
+
+            @unlink($file);
         }
     }
 

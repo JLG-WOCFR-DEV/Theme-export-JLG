@@ -52,6 +52,8 @@ class TEJLG_Admin {
             return;
         }
 
+        TEJLG_Import::cleanup_expired_patterns_storage();
+
         $this->handle_metrics_settings_request();
         $this->handle_export_requests();
         $this->handle_selected_patterns_export_request();
