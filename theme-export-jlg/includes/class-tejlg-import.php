@@ -208,7 +208,22 @@ class TEJLG_Import {
             wp_safe_redirect($redirect_url);
             exit;
         }
-        set_transient($transient_id, $patterns, 15 * MINUTE_IN_SECONDS);
+
+        $storage_result = self::persist_patterns_session($transient_id, $patterns);
+
+        if (is_wp_error($storage_result)) {
+            $message = $storage_result->get_error_message();
+            $message = '' !== $message ? $message : __('Erreur : Impossible de préparer la session d\'importation.', 'theme-export-jlg');
+
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html(self::sanitize_error_message($message)),
+                'error'
+            );
+
+            return;
+        }
 
         $redirect_url = add_query_arg(
             [
@@ -241,10 +256,28 @@ class TEJLG_Import {
             return;
         }
 
-        $all_patterns = get_transient($transient_id);
+        $storage = get_transient($transient_id);
 
-        if (false === $all_patterns) {
+        if (false === $storage) {
             add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Erreur : La session d\'importation a expiré. Veuillez réessayer.', 'theme-export-jlg'), 'error');
+            return;
+        }
+
+        $all_patterns = self::retrieve_patterns_from_storage($storage);
+
+        if (is_wp_error($all_patterns)) {
+            $message = $all_patterns->get_error_message();
+            $message = '' !== $message ? $message : __('Erreur : Impossible de récupérer les données de la session d\'importation.', 'theme-export-jlg');
+
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html(self::sanitize_error_message($message)),
+                'error'
+            );
+
+            self::delete_patterns_storage($transient_id, $storage);
+
             return;
         }
 
@@ -428,13 +461,22 @@ class TEJLG_Import {
         if (!empty($errors)) {
             add_settings_error('tejlg_import_messages', 'patterns_import_errors', esc_html(implode(' ', array_unique($errors))), 'error');
 
-            if (!empty($failed_patterns)) {
-                set_transient($transient_id, $failed_patterns, 15 * MINUTE_IN_SECONDS);
-            } else {
-                set_transient($transient_id, $all_patterns, 15 * MINUTE_IN_SECONDS);
+            $patterns_to_store = !empty($failed_patterns) ? $failed_patterns : $all_patterns;
+            $persist_result    = self::persist_patterns_session($transient_id, $patterns_to_store, $storage);
+
+            if (is_wp_error($persist_result)) {
+                $message = $persist_result->get_error_message();
+                $message = '' !== $message ? $message : __('Erreur : Impossible de conserver les données de la session d\'importation.', 'theme-export-jlg');
+
+                add_settings_error(
+                    'tejlg_import_messages',
+                    'patterns_import_status',
+                    esc_html(self::sanitize_error_message($message)),
+                    'error'
+                );
             }
         } else {
-            delete_transient($transient_id);
+            self::delete_patterns_storage($transient_id, $storage);
         }
 
         if ($imported_count > 0) {
@@ -495,6 +537,173 @@ class TEJLG_Import {
         return trim((string) $sanitized);
     }
 
+    private static function persist_patterns_session($transient_id, array $patterns, $previous_storage = null) {
+        $payload = self::create_patterns_storage_payload($patterns);
+
+        if (is_wp_error($payload)) {
+            return $payload;
+        }
+
+        $transient_set = set_transient($transient_id, $payload, 15 * MINUTE_IN_SECONDS);
+
+        if (!$transient_set) {
+            self::cleanup_patterns_storage($payload);
+
+            return new WP_Error(
+                'tejlg_import_transient_error',
+                __('Erreur : Impossible d\'enregistrer la session d\'importation.', 'theme-export-jlg')
+            );
+        }
+
+        if (null !== $previous_storage) {
+            self::cleanup_patterns_storage($previous_storage);
+        }
+
+        return true;
+    }
+
+    private static function create_patterns_storage_payload(array $patterns) {
+        $json_options = JSON_UNESCAPED_UNICODE;
+
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $json_options |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+
+        $encoded = wp_json_encode($patterns, $json_options);
+
+        if (false === $encoded || (function_exists('json_last_error') && json_last_error() !== JSON_ERROR_NONE)) {
+            return new WP_Error(
+                'tejlg_import_json_encode_error',
+                __('Erreur : Impossible de préparer les données des compositions pour l\'import.', 'theme-export-jlg')
+            );
+        }
+
+        $temp_file = wp_tempnam('tejlg-patterns');
+
+        if (empty($temp_file)) {
+            return new WP_Error(
+                'tejlg_import_temp_file_error',
+                __('Erreur : Impossible de créer un fichier temporaire pour l\'import.', 'theme-export-jlg')
+            );
+        }
+
+        $bytes_written = file_put_contents($temp_file, $encoded);
+
+        if (false === $bytes_written) {
+            @unlink($temp_file);
+
+            return new WP_Error(
+                'tejlg_import_temp_file_write_error',
+                __('Erreur : Impossible d\'écrire les données d\'importation sur le disque.', 'theme-export-jlg')
+            );
+        }
+
+        return [
+            'type'      => 'file',
+            'path'      => $temp_file,
+            'count'     => count($patterns),
+            'created'   => time(),
+            'checksum'  => md5($encoded),
+            'size'      => strlen($encoded),
+        ];
+    }
+
+    private static function retrieve_patterns_from_storage($storage) {
+        if (is_array($storage) && isset($storage['type']) && 'file' === $storage['type']) {
+            $path = isset($storage['path']) ? (string) $storage['path'] : '';
+
+            if ('' === $path || !is_readable($path)) {
+                return new WP_Error(
+                    'tejlg_import_storage_missing',
+                    __('Erreur : Le fichier temporaire de la session d\'importation est introuvable.', 'theme-export-jlg')
+                );
+            }
+
+            $contents = file_get_contents($path);
+
+            if (false === $contents) {
+                return new WP_Error(
+                    'tejlg_import_storage_unreadable',
+                    __('Erreur : Impossible de lire le fichier temporaire de la session d\'importation.', 'theme-export-jlg')
+                );
+            }
+
+            $data = json_decode($contents, true);
+
+            if (JSON_ERROR_NONE !== json_last_error() || !is_array($data)) {
+                return new WP_Error(
+                    'tejlg_import_storage_corrupted',
+                    __('Erreur : Les données temporaires de la session d\'importation sont corrompues.', 'theme-export-jlg')
+                );
+            }
+
+            return $data;
+        }
+
+        if (is_array($storage)) {
+            return $storage;
+        }
+
+        return new WP_Error(
+            'tejlg_import_storage_invalid',
+            __('Erreur : Les données de la session d\'importation sont invalides.', 'theme-export-jlg')
+        );
+    }
+
+    private static function cleanup_patterns_storage($storage) {
+        if (is_array($storage) && isset($storage['type']) && 'file' === $storage['type']) {
+            $path = isset($storage['path']) ? (string) $storage['path'] : '';
+
+            if ('' !== $path && @file_exists($path)) {
+                @unlink($path);
+            }
+        }
+    }
+
+    private static function delete_patterns_storage($transient_id, $storage) {
+        self::cleanup_patterns_storage($storage);
+        delete_transient($transient_id);
+    }
+
+    private static function generate_block_comment_token(array $existing_tokens) {
+        $attempts = 0;
+
+        do {
+            $random_segment = '';
+
+            if (function_exists('random_bytes')) {
+                try {
+                    $random_segment = bin2hex(random_bytes(12));
+                } catch (Exception $e) {
+                    $random_segment = '';
+                }
+            }
+
+            if ('' === $random_segment) {
+                if (function_exists('wp_unique_id')) {
+                    $random_segment = wp_unique_id('tejlg_wp_comment_');
+                } else {
+                    $random_segment = uniqid('tejlg_wp_comment_', true);
+                }
+            } else {
+                $random_segment = 'tejlg_wp_comment_' . $random_segment;
+            }
+
+            $token = '__' . $random_segment . '__';
+            $attempts++;
+        } while (isset($existing_tokens[$token]) && $attempts < 5);
+
+        if (isset($existing_tokens[$token])) {
+            $fallback_segment = function_exists('wp_unique_id')
+                ? wp_unique_id('tejlg_wp_comment_')
+                : uniqid('tejlg_wp_comment_', true);
+
+            $token = '__' . $fallback_segment . '__';
+        }
+
+        return $token;
+    }
+
     /**
      * Sanitize pattern content for users without the unfiltered_html capability while preserving block structure.
      */
@@ -508,7 +717,7 @@ class TEJLG_Import {
         $tokenized_content = preg_replace_callback(
             '/<!--\s*(\/?.*?wp:[^>]*?)\s*-->/',
             function ($matches) use (&$block_comment_tokens) {
-                $token = '[[TEJLG_WP_COMMENT_' . count($block_comment_tokens) . ']]';
+                $token = TEJLG_Import::generate_block_comment_token($block_comment_tokens);
                 $block_comment_tokens[$token] = $matches[0];
 
                 return $token;
