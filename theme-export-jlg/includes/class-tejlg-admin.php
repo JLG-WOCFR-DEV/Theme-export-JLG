@@ -1,6 +1,11 @@
 <?php
 class TEJLG_Admin {
 
+    const METRICS_ICON_OPTION  = 'tejlg_metrics_icon_size';
+    const METRICS_ICON_DEFAULT = 26;
+    const METRICS_ICON_MIN     = 12;
+    const METRICS_ICON_MAX     = 128;
+
     public function __construct() {
         add_action( 'admin_menu', [ $this, 'add_menu_page' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
@@ -24,6 +29,11 @@ class TEJLG_Admin {
             return;
         }
         wp_enqueue_style('tejlg-admin-styles', TEJLG_URL . 'assets/css/admin-styles.css', [], TEJLG_VERSION);
+        $icon_size = $this->get_metrics_icon_size();
+        if ($icon_size > 0) {
+            $inline_style = sprintf(':root { --tejlg-metric-icon-size: %dpx; }', (int) $icon_size);
+            wp_add_inline_style('tejlg-admin-styles', $inline_style);
+        }
         wp_enqueue_script('tejlg-admin-scripts', TEJLG_URL . 'assets/js/admin-scripts.js', [], TEJLG_VERSION, true);
         wp_localize_script(
             'tejlg-admin-scripts',
@@ -39,6 +49,61 @@ class TEJLG_Admin {
 
     public function handle_form_requests() {
         if (!current_user_can('manage_options')) return;
+
+        if (isset($_POST['tejlg_metrics_settings_nonce']) && wp_verify_nonce($_POST['tejlg_metrics_settings_nonce'], 'tejlg_metrics_settings_action')) {
+            $raw_icon_size  = isset($_POST['tejlg_metrics_icon_size']) ? wp_unslash($_POST['tejlg_metrics_icon_size']) : '';
+            $icon_size_input = is_scalar($raw_icon_size) ? trim((string) $raw_icon_size) : '';
+            $default_icon_size = $this->get_default_metrics_icon_size();
+
+            $messages = [];
+
+            if ($icon_size_input === '' || !is_numeric($icon_size_input)) {
+                $icon_size = $default_icon_size;
+                $messages[] = [
+                    'code'    => 'metrics_settings_invalid',
+                    'message' => esc_html__('Valeur invalide pour la taille des icônes. La valeur par défaut a été appliquée.', 'theme-export-jlg'),
+                    'type'    => 'error',
+                ];
+            } else {
+                $numeric_value = (float) $icon_size_input;
+                $icon_size     = $this->sanitize_metrics_icon_size($numeric_value);
+
+                $messages[] = [
+                    'code'    => 'metrics_settings_updated',
+                    'message' => esc_html__('Les réglages des indicateurs ont été mis à jour.', 'theme-export-jlg'),
+                    'type'    => 'updated',
+                ];
+
+                if ($icon_size !== (int) round($numeric_value)) {
+                    $messages[] = [
+                        'code'    => 'metrics_settings_adjusted',
+                        'message' => esc_html__('La valeur a été ajustée pour rester dans la plage autorisée (12 à 128 px).', 'theme-export-jlg'),
+                        'type'    => 'updated',
+                    ];
+                }
+            }
+
+            update_option(self::METRICS_ICON_OPTION, $icon_size);
+
+            foreach ($messages as $message) {
+                add_settings_error('tejlg_debug_messages', $message['code'], $message['message'], $message['type']);
+            }
+
+            $errors = get_settings_errors('tejlg_debug_messages');
+            set_transient('settings_errors', $errors, 30);
+
+            $redirect_url = add_query_arg(
+                [
+                    'page'             => 'theme-export-jlg',
+                    'tab'              => 'debug',
+                    'settings-updated' => 'true',
+                ],
+                admin_url('admin.php')
+            );
+
+            wp_safe_redirect($redirect_url);
+            exit;
+        }
 
         // Export (TOUT)
         if (isset($_POST['tejlg_nonce']) && wp_verify_nonce($_POST['tejlg_nonce'], 'tejlg_export_action')) {
@@ -355,7 +420,33 @@ class TEJLG_Admin {
         $mbstring_status = extension_loaded('mbstring')
             ? sprintf('<span style="color:green;">%s</span>', esc_html__('Activée', 'theme-export-jlg'))
             : sprintf('<span style="color:red; font-weight: bold;">%s</span>', esc_html__('Manquante (CRITIQUE pour la fiabilité des exports JSON)', 'theme-export-jlg'));
+
+        $metrics_icon_size = $this->get_metrics_icon_size();
         ?>
+        <?php settings_errors('tejlg_debug_messages'); ?>
+
+        <form method="post" action="" class="metrics-settings-form" novalidate>
+            <?php wp_nonce_field('tejlg_metrics_settings_action', 'tejlg_metrics_settings_nonce'); ?>
+            <label for="tejlg_metrics_icon_size">
+                <?php esc_html_e('Taille des icônes des métriques (px) :', 'theme-export-jlg'); ?>
+            </label>
+            <input
+                type="number"
+                id="tejlg_metrics_icon_size"
+                name="tejlg_metrics_icon_size"
+                min="<?php echo esc_attr(self::METRICS_ICON_MIN); ?>"
+                max="<?php echo esc_attr(self::METRICS_ICON_MAX); ?>"
+                step="1"
+                value="<?php echo esc_attr($metrics_icon_size); ?>"
+                aria-describedby="tejlg-metrics-icon-size-description"
+            >
+            <button type="submit" class="button button-secondary">
+                <?php esc_html_e('Enregistrer', 'theme-export-jlg'); ?>
+            </button>
+            <p id="tejlg-metrics-icon-size-description" class="description">
+                <?php esc_html_e('La barre de menu des métriques utilisera cette taille pour aligner les icônes.', 'theme-export-jlg'); ?>
+            </p>
+        </form>
         <div class="metrics-badge" role="group" aria-label="<?php esc_attr_e('Indicateurs de performance', 'theme-export-jlg'); ?>">
             <div class="metric metric-fps">
                 <span class="metric-icon metric-icon-fps dashicons dashicons-dashboard" aria-hidden="true"></span>
@@ -714,6 +805,38 @@ class TEJLG_Admin {
                     $error_code
                 );
         }
+    }
+
+    private function get_metrics_icon_size() {
+        $stored_value = get_option(self::METRICS_ICON_OPTION, self::METRICS_ICON_DEFAULT);
+
+        return $this->sanitize_metrics_icon_size($stored_value);
+    }
+
+    private function get_default_metrics_icon_size() {
+        return self::METRICS_ICON_DEFAULT;
+    }
+
+    private function sanitize_metrics_icon_size($value) {
+        if (is_string($value)) {
+            $value = trim($value);
+        }
+
+        if (!is_numeric($value)) {
+            $value = self::METRICS_ICON_DEFAULT;
+        }
+
+        $value = (int) round((float) $value);
+
+        if ($value < self::METRICS_ICON_MIN) {
+            return self::METRICS_ICON_MIN;
+        }
+
+        if ($value > self::METRICS_ICON_MAX) {
+            return self::METRICS_ICON_MAX;
+        }
+
+        return $value;
     }
 
     private function render_migration_guide_tab() {
