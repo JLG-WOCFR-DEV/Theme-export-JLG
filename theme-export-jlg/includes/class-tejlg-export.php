@@ -125,9 +125,11 @@ class TEJLG_Export {
 
     /**
      * Exporte toutes les compositions en JSON.
+     *
+     * @param array $pattern_ids Liste optionnelle d'identifiants de compositions à exporter.
+     * @param bool  $is_portable Active le nettoyage « portable » du contenu.
      */
-    public static function export_patterns_json($pattern_ids = []) {
-        $is_portable = isset($_POST['export_portable']);
+    public static function export_patterns_json($pattern_ids = [], $is_portable = false) {
         $sanitized_ids = array_filter(array_map('intval', (array) $pattern_ids));
         $exported_patterns = [];
         $args = [
@@ -206,9 +208,12 @@ class TEJLG_Export {
 
     /**
      * Exporte uniquement les compositions dont les IDs sont fournis.
+     *
+     * @param array $pattern_ids Liste d'identifiants de compositions à exporter.
+     * @param bool  $is_portable Active le nettoyage « portable » du contenu.
      */
-    public static function export_selected_patterns_json($pattern_ids) {
-        self::export_patterns_json($pattern_ids);
+    public static function export_selected_patterns_json($pattern_ids, $is_portable = false) {
+        self::export_patterns_json($pattern_ids, $is_portable);
     }
     
     /**
