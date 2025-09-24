@@ -2,7 +2,7 @@
 class TEJLG_Admin {
 
     const METRICS_ICON_OPTION  = 'tejlg_metrics_icon_size';
-    const METRICS_ICON_DEFAULT = 26;
+    const METRICS_ICON_DEFAULT = 60;
     const METRICS_ICON_MIN     = 12;
     const METRICS_ICON_MAX     = 128;
 
