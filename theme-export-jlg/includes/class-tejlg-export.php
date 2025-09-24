@@ -64,7 +64,7 @@ class TEJLG_Export {
                     continue;
                 }
 
-                $zip->addFile($file_path, $relative_path);
+                $zip->addFile($file_path, $normalized_relative_path);
                 $files_added++;
             }
         }
