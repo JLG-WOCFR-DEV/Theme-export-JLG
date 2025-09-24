@@ -48,220 +48,243 @@ class TEJLG_Admin {
     }
 
     public function handle_form_requests() {
-        if (!current_user_can('manage_options')) return;
-
-        if (isset($_POST['tejlg_metrics_settings_nonce']) && wp_verify_nonce($_POST['tejlg_metrics_settings_nonce'], 'tejlg_metrics_settings_action')) {
-            $raw_icon_size  = isset($_POST['tejlg_metrics_icon_size']) ? wp_unslash($_POST['tejlg_metrics_icon_size']) : '';
-            $icon_size_input = is_scalar($raw_icon_size) ? trim((string) $raw_icon_size) : '';
-            $default_icon_size = $this->get_default_metrics_icon_size();
-
-            $messages = [];
-
-            if ($icon_size_input === '' || !is_numeric($icon_size_input)) {
-                $icon_size = $default_icon_size;
-                $messages[] = [
-                    'code'    => 'metrics_settings_invalid',
-                    'message' => esc_html__('Valeur invalide pour la taille des icônes. La valeur par défaut a été appliquée.', 'theme-export-jlg'),
-                    'type'    => 'error',
-                ];
-            } else {
-                $numeric_value = (float) $icon_size_input;
-                $icon_size     = $this->sanitize_metrics_icon_size($numeric_value);
-
-                $messages[] = [
-                    'code'    => 'metrics_settings_updated',
-                    'message' => esc_html__('Les réglages des indicateurs ont été mis à jour.', 'theme-export-jlg'),
-                    'type'    => 'updated',
-                ];
-
-                if ($icon_size !== (int) round($numeric_value)) {
-                    $messages[] = [
-                        'code'    => 'metrics_settings_adjusted',
-                        'message' => esc_html__('La valeur a été ajustée pour rester dans la plage autorisée (12 à 128 px).', 'theme-export-jlg'),
-                        'type'    => 'updated',
-                    ];
-                }
-            }
-
-            update_option(self::METRICS_ICON_OPTION, $icon_size);
-
-            foreach ($messages as $message) {
-                add_settings_error('tejlg_debug_messages', $message['code'], $message['message'], $message['type']);
-            }
-
-            $errors = get_settings_errors('tejlg_debug_messages');
-            set_transient('settings_errors', $errors, 30);
-
-            $redirect_url = add_query_arg(
-                [
-                    'page'             => 'theme-export-jlg',
-                    'tab'              => 'debug',
-                    'settings-updated' => 'true',
-                ],
-                admin_url('admin.php')
-            );
-
-            $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=debug');
-            $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
-
-            wp_safe_redirect($redirect_url);
-            exit;
+        if (!current_user_can('manage_options')) {
+            return;
         }
 
-        // Export (TOUT)
-        if (isset($_POST['tejlg_nonce']) && wp_verify_nonce($_POST['tejlg_nonce'], 'tejlg_export_action')) {
-            if (isset($_POST['tejlg_export_theme'])) {
-                $exclusions = [];
+        $this->handle_metrics_settings_request();
+        $this->handle_export_requests();
+        $this->handle_selected_patterns_export_request();
+        $this->handle_theme_import_request();
+        $this->handle_patterns_import_step1_request();
+        $this->handle_patterns_import_step2_request();
+        $this->handle_child_theme_request();
+    }
 
-                if (isset($_POST['tejlg_exclusion_patterns']) && is_string($_POST['tejlg_exclusion_patterns'])) {
-                    $raw_patterns = wp_unslash($_POST['tejlg_exclusion_patterns']);
-                    $split_patterns = preg_split('/[\r\n,]+/', $raw_patterns);
+    private function handle_metrics_settings_request() {
+        if (!isset($_POST['tejlg_metrics_settings_nonce']) || !wp_verify_nonce($_POST['tejlg_metrics_settings_nonce'], 'tejlg_metrics_settings_action')) {
+            return;
+        }
 
-                    if (false !== $split_patterns) {
-                        $exclusions = array_values(array_filter(
+        $raw_icon_size     = isset($_POST['tejlg_metrics_icon_size']) ? wp_unslash($_POST['tejlg_metrics_icon_size']) : '';
+        $icon_size_input   = is_scalar($raw_icon_size) ? trim((string) $raw_icon_size) : '';
+        $default_icon_size = $this->get_default_metrics_icon_size();
+
+        $messages = [];
+
+        if ('' === $icon_size_input || !is_numeric($icon_size_input)) {
+            $icon_size = $default_icon_size;
+            $messages[] = [
+                'code'    => 'metrics_settings_invalid',
+                'message' => esc_html__('Valeur invalide pour la taille des icônes. La valeur par défaut a été appliquée.', 'theme-export-jlg'),
+                'type'    => 'error',
+            ];
+        } else {
+            $numeric_value = (float) $icon_size_input;
+            $icon_size     = $this->sanitize_metrics_icon_size($numeric_value);
+
+            $messages[] = [
+                'code'    => 'metrics_settings_updated',
+                'message' => esc_html__('Les réglages des indicateurs ont été mis à jour.', 'theme-export-jlg'),
+                'type'    => 'updated',
+            ];
+
+            if ($icon_size !== (int) round($numeric_value)) {
+                $messages[] = [
+                    'code'    => 'metrics_settings_adjusted',
+                    'message' => esc_html__('La valeur a été ajustée pour rester dans la plage autorisée (12 à 128 px).', 'theme-export-jlg'),
+                    'type'    => 'updated',
+                ];
+            }
+        }
+
+        update_option(self::METRICS_ICON_OPTION, $icon_size);
+
+        foreach ($messages as $message) {
+            add_settings_error('tejlg_debug_messages', $message['code'], $message['message'], $message['type']);
+        }
+
+        $errors = get_settings_errors('tejlg_debug_messages');
+        set_transient('settings_errors', $errors, 30);
+
+        $redirect_url = add_query_arg(
+            [
+                'page'             => 'theme-export-jlg',
+                'tab'              => 'debug',
+                'settings-updated' => 'true',
+            ],
+            admin_url('admin.php')
+        );
+
+        $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=debug');
+        $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
+        wp_safe_redirect($redirect_url);
+        exit;
+    }
+
+    private function handle_export_requests() {
+        if (!isset($_POST['tejlg_nonce']) || !wp_verify_nonce($_POST['tejlg_nonce'], 'tejlg_export_action')) {
+            return;
+        }
+
+        if (isset($_POST['tejlg_export_theme'])) {
+            $exclusions = [];
+
+            if (isset($_POST['tejlg_exclusion_patterns']) && is_string($_POST['tejlg_exclusion_patterns'])) {
+                $raw_patterns    = wp_unslash($_POST['tejlg_exclusion_patterns']);
+                $split_patterns  = preg_split('/[\r\n,]+/', $raw_patterns);
+
+                if (false !== $split_patterns) {
+                    $exclusions = array_values(
+                        array_filter(
                             array_map('trim', $split_patterns),
                             static function ($pattern) {
                                 return '' !== $pattern;
                             }
-                        ));
-                    }
+                        )
+                    );
                 }
-
-                TEJLG_Export::export_theme($exclusions);
             }
-            if (isset($_POST['tejlg_export_patterns'])) TEJLG_Export::export_patterns_json();
+
+            TEJLG_Export::export_theme($exclusions);
         }
 
-        // Export SÉLECTIF des compositions
-        if (isset($_POST['tejlg_export_selected_nonce']) && wp_verify_nonce($_POST['tejlg_export_selected_nonce'], 'tejlg_export_selected_action')) {
-            if (isset($_POST['selected_patterns']) && is_array($_POST['selected_patterns']) && !empty($_POST['selected_patterns'])) {
-                TEJLG_Export::export_selected_patterns_json($_POST['selected_patterns']);
-            } else {
-                add_settings_error(
-                    'tejlg_admin_messages',
-                    'patterns_export_no_selection',
-                    esc_html__("Erreur : Veuillez sélectionner au moins une composition avant de lancer l'export.", 'theme-export-jlg'),
-                    'error'
-                );
-            }
+        if (isset($_POST['tejlg_export_patterns'])) {
+            $is_portable = isset($_POST['export_portable']);
+            TEJLG_Export::export_patterns_json([], $is_portable);
         }
-        
-        // Import Thème
-        if (isset($_POST['tejlg_import_theme_nonce']) && wp_verify_nonce($_POST['tejlg_import_theme_nonce'], 'tejlg_import_theme_action')) {
-            $theme_file = isset($_FILES['theme_zip']) ? $_FILES['theme_zip'] : [ 'error' => UPLOAD_ERR_NO_FILE ];
+    }
 
-            if (!current_user_can('install_themes')) {
-                add_settings_error(
-                    'tejlg_import_messages',
-                    'theme_import_cap_missing',
-                    esc_html__('Vous n\'avez pas l\'autorisation d\'installer des thèmes sur ce site.', 'theme-export-jlg'),
-                    'error'
-                );
-            } elseif ((int) $theme_file['error'] === UPLOAD_ERR_OK) {
-                TEJLG_Import::import_theme($theme_file);
-            } else {
-                if (!empty($theme_file['tmp_name']) && is_string($theme_file['tmp_name']) && file_exists($theme_file['tmp_name'])) {
-                    @unlink($theme_file['tmp_name']);
-                }
-
-                add_settings_error(
-                    'tejlg_import_messages',
-                    'theme_import_upload_error_' . (int) $theme_file['error'],
-                    $this->get_upload_error_message((int) $theme_file['error'], esc_html__('du thème', 'theme-export-jlg')),
-                    'error'
-                );
-            }
+    private function handle_selected_patterns_export_request() {
+        if (!isset($_POST['tejlg_export_selected_nonce']) || !wp_verify_nonce($_POST['tejlg_export_selected_nonce'], 'tejlg_export_selected_action')) {
+            return;
         }
 
-        // Import Compositions (Étape 1)
-        if (isset($_POST['tejlg_import_patterns_step1_nonce']) && wp_verify_nonce($_POST['tejlg_import_patterns_step1_nonce'], 'tejlg_import_patterns_step1_action')) {
-            $patterns_file = isset($_FILES['patterns_json']) ? $_FILES['patterns_json'] : [ 'error' => UPLOAD_ERR_NO_FILE ];
+        $selected_patterns = isset($_POST['selected_patterns'])
+            ? $this->sanitize_pattern_ids($_POST['selected_patterns'])
+            : [];
 
-            if ((int) $patterns_file['error'] === UPLOAD_ERR_OK) {
-                TEJLG_Import::handle_patterns_upload_step1($patterns_file);
-            } else {
-                if (!empty($patterns_file['tmp_name']) && is_string($patterns_file['tmp_name']) && file_exists($patterns_file['tmp_name'])) {
-                    @unlink($patterns_file['tmp_name']);
-                }
-
-                add_settings_error(
-                    'tejlg_import_messages',
-                    'patterns_import_upload_error_' . (int) $patterns_file['error'],
-                    $this->get_upload_error_message((int) $patterns_file['error'], esc_html__('des compositions', 'theme-export-jlg')),
-                    'error'
-                );
-            }
+        if (!empty($selected_patterns)) {
+            $is_portable = isset($_POST['export_portable']);
+            TEJLG_Export::export_selected_patterns_json($selected_patterns, $is_portable);
+            return;
         }
 
-        // Import Compositions (Étape 2)
-        if (isset($_POST['tejlg_import_patterns_step2_nonce']) && wp_verify_nonce($_POST['tejlg_import_patterns_step2_nonce'], 'tejlg_import_patterns_step2_action')) {
-            $transient_id = isset($_POST['transient_id']) ? sanitize_key($_POST['transient_id']) : '';
+        add_settings_error(
+            'tejlg_admin_messages',
+            'patterns_export_no_selection',
+            esc_html__("Erreur : Veuillez sélectionner au moins une composition avant de lancer l'export.", 'theme-export-jlg'),
+            'error'
+        );
+    }
 
-            if ('' === $transient_id || 0 !== strpos($transient_id, 'tejlg_')) {
-                add_settings_error(
-                    'tejlg_import_messages',
-                    'patterns_import_status',
-                    esc_html__("Erreur : L'identifiant de session est invalide. Veuillez réessayer.", 'theme-export-jlg'),
-                    'error'
-                );
-                return;
-            }
+    private function handle_theme_import_request() {
+        if (!isset($_POST['tejlg_import_theme_nonce']) || !wp_verify_nonce($_POST['tejlg_import_theme_nonce'], 'tejlg_import_theme_action')) {
+            return;
+        }
 
-            if (isset($_POST['selected_patterns']) && is_array($_POST['selected_patterns']) && !empty($_POST['selected_patterns'])) {
-                TEJLG_Import::handle_patterns_import_step2($transient_id, $_POST['selected_patterns']);
+        $theme_file = isset($_FILES['theme_zip']) ? $_FILES['theme_zip'] : [ 'error' => UPLOAD_ERR_NO_FILE ];
 
-                $errors = get_settings_errors('tejlg_import_messages');
-                set_transient('settings_errors', $errors, 30);
-
-                $has_error = false;
-                foreach ($errors as $error) {
-                    if (isset($error['type']) && 'error' === $error['type']) {
-                        $has_error = true;
-                        break;
-                    }
-                }
-
-                $redirect_args = [
-                    'page'             => 'theme-export-jlg',
-                    'tab'              => 'import',
-                    'settings-updated' => $has_error ? 'false' : 'true',
-                ];
-
-                $remaining_patterns = get_transient($transient_id);
-                if (!empty($remaining_patterns)) {
-                    $redirect_args['action'] = 'preview_patterns';
-                    $redirect_args['transient_id'] = $transient_id;
-                }
-
-                $redirect_url = add_query_arg($redirect_args, admin_url('admin.php'));
-
-                $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
-                $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
-
-                wp_safe_redirect($redirect_url);
-                exit;
-            }
-
+        if (!current_user_can('install_themes')) {
             add_settings_error(
                 'tejlg_import_messages',
-                'patterns_import_no_selection',
-                esc_html__("Erreur : Veuillez sélectionner au moins une composition avant de lancer l'import.", 'theme-export-jlg'),
+                'theme_import_cap_missing',
+                esc_html__('Vous n\'avez pas l\'autorisation d\'installer des thèmes sur ce site.', 'theme-export-jlg'),
                 'error'
             );
+            return;
+        }
+
+        if ((int) $theme_file['error'] === UPLOAD_ERR_OK) {
+            TEJLG_Import::import_theme($theme_file);
+            return;
+        }
+
+        if (!empty($theme_file['tmp_name']) && is_string($theme_file['tmp_name']) && file_exists($theme_file['tmp_name'])) {
+            @unlink($theme_file['tmp_name']);
+        }
+
+        add_settings_error(
+            'tejlg_import_messages',
+            'theme_import_upload_error_' . (int) $theme_file['error'],
+            $this->get_upload_error_message((int) $theme_file['error'], esc_html__('du thème', 'theme-export-jlg')),
+            'error'
+        );
+    }
+
+    private function handle_patterns_import_step1_request() {
+        if (!isset($_POST['tejlg_import_patterns_step1_nonce']) || !wp_verify_nonce($_POST['tejlg_import_patterns_step1_nonce'], 'tejlg_import_patterns_step1_action')) {
+            return;
+        }
+
+        $patterns_file = isset($_FILES['patterns_json']) ? $_FILES['patterns_json'] : [ 'error' => UPLOAD_ERR_NO_FILE ];
+
+        if ((int) $patterns_file['error'] === UPLOAD_ERR_OK) {
+            TEJLG_Import::handle_patterns_upload_step1($patterns_file);
+            return;
+        }
+
+        if (!empty($patterns_file['tmp_name']) && is_string($patterns_file['tmp_name']) && file_exists($patterns_file['tmp_name'])) {
+            @unlink($patterns_file['tmp_name']);
+        }
+
+        add_settings_error(
+            'tejlg_import_messages',
+            'patterns_import_upload_error_' . (int) $patterns_file['error'],
+            $this->get_upload_error_message((int) $patterns_file['error'], esc_html__('des compositions', 'theme-export-jlg')),
+            'error'
+        );
+    }
+
+    private function handle_patterns_import_step2_request() {
+        if (!isset($_POST['tejlg_import_patterns_step2_nonce']) || !wp_verify_nonce($_POST['tejlg_import_patterns_step2_nonce'], 'tejlg_import_patterns_step2_action')) {
+            return;
+        }
+
+        $transient_id = isset($_POST['transient_id']) ? sanitize_key($_POST['transient_id']) : '';
+
+        if ('' === $transient_id || 0 !== strpos($transient_id, 'tejlg_')) {
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html__("Erreur : L'identifiant de session est invalide. Veuillez réessayer.", 'theme-export-jlg'),
+                'error'
+            );
+            return;
+        }
+
+        $selected_patterns = isset($_POST['selected_patterns'])
+            ? $this->sanitize_pattern_indices($_POST['selected_patterns'])
+            : [];
+
+        if (!empty($selected_patterns)) {
+            TEJLG_Import::handle_patterns_import_step2($transient_id, $selected_patterns);
 
             $errors = get_settings_errors('tejlg_import_messages');
             set_transient('settings_errors', $errors, 30);
 
-            $redirect_url = add_query_arg(
-                [
-                    'page'            => 'theme-export-jlg',
-                    'tab'             => 'import',
-                    'action'          => 'preview_patterns',
-                    'transient_id'    => $transient_id,
-                    'settings-updated' => 'false',
-                ],
-                admin_url('admin.php')
-            );
+            $has_error = false;
+            foreach ($errors as $error) {
+                if (isset($error['type']) && 'error' === $error['type']) {
+                    $has_error = true;
+                    break;
+                }
+            }
+
+            $redirect_args = [
+                'page'             => 'theme-export-jlg',
+                'tab'              => 'import',
+                'settings-updated' => $has_error ? 'false' : 'true',
+            ];
+
+            $remaining_patterns = get_transient($transient_id);
+            if (!empty($remaining_patterns)) {
+                $redirect_args['action']       = 'preview_patterns';
+                $redirect_args['transient_id'] = $transient_id;
+            }
+
+            $redirect_url = add_query_arg($redirect_args, admin_url('admin.php'));
 
             $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
             $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
@@ -270,12 +293,78 @@ class TEJLG_Admin {
             exit;
         }
 
-        // Création du thème enfant
-        if (isset($_POST['tejlg_create_child_nonce']) && wp_verify_nonce($_POST['tejlg_create_child_nonce'], 'tejlg_create_child_action')) {
-            if (isset($_POST['child_theme_name'])) {
-                TEJLG_Theme_Tools::create_child_theme(sanitize_text_field(wp_unslash($_POST['child_theme_name'])));
-            }
+        add_settings_error(
+            'tejlg_import_messages',
+            'patterns_import_no_selection',
+            esc_html__("Erreur : Veuillez sélectionner au moins une composition avant de lancer l'import.", 'theme-export-jlg'),
+            'error'
+        );
+
+        $errors = get_settings_errors('tejlg_import_messages');
+        set_transient('settings_errors', $errors, 30);
+
+        $redirect_url = add_query_arg(
+            [
+                'page'             => 'theme-export-jlg',
+                'tab'              => 'import',
+                'action'           => 'preview_patterns',
+                'transient_id'     => $transient_id,
+                'settings-updated' => 'false',
+            ],
+            admin_url('admin.php')
+        );
+
+        $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
+        $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
+        wp_safe_redirect($redirect_url);
+        exit;
+    }
+
+    private function handle_child_theme_request() {
+        if (!isset($_POST['tejlg_create_child_nonce']) || !wp_verify_nonce($_POST['tejlg_create_child_nonce'], 'tejlg_create_child_action')) {
+            return;
         }
+
+        if (!isset($_POST['child_theme_name'])) {
+            return;
+        }
+
+        TEJLG_Theme_Tools::create_child_theme(sanitize_text_field(wp_unslash($_POST['child_theme_name'])));
+    }
+
+    private function sanitize_pattern_ids($pattern_ids) {
+        $sanitized = [];
+
+        foreach ((array) $pattern_ids as $pattern_id) {
+            if (!is_scalar($pattern_id) || !is_numeric($pattern_id)) {
+                continue;
+            }
+
+            $pattern_id = (int) $pattern_id;
+
+            if ($pattern_id <= 0) {
+                continue;
+            }
+
+            $sanitized[$pattern_id] = $pattern_id;
+        }
+
+        return array_values($sanitized);
+    }
+
+    private function sanitize_pattern_indices($pattern_ids) {
+        $sanitized = [];
+
+        foreach ((array) $pattern_ids as $pattern_id) {
+            if (!is_scalar($pattern_id) || !is_numeric($pattern_id)) {
+                continue;
+            }
+
+            $sanitized[] = (int) $pattern_id;
+        }
+
+        return $sanitized;
     }
 
     public function render_admin_page() {
@@ -366,16 +455,33 @@ class TEJLG_Admin {
     private function render_pattern_selection_page() {
         settings_errors('tejlg_admin_messages');
 
-        $patterns_query = new WP_Query([
-            'post_type' => 'wp_block',
-            'posts_per_page' => -1,
-            'post_status' => 'publish',
-            'orderby' => 'title',
-            'order' => 'ASC',
-            'no_found_rows' => true,
+        $per_page     = (int) apply_filters('tejlg_patterns_selection_per_page', 100);
+        $per_page     = $per_page < 1 ? -1 : $per_page;
+        $current_page = isset($_GET['pattern_page']) ? max(1, absint($_GET['pattern_page'])) : 1;
+
+        $query_args = [
+            'post_type'              => 'wp_block',
+            'posts_per_page'         => $per_page,
+            'post_status'            => 'publish',
+            'orderby'                => 'title',
+            'order'                  => 'ASC',
+            'paged'                  => $per_page < 1 ? 1 : $current_page,
+            'no_found_rows'          => $per_page < 1,
             'update_post_meta_cache' => false,
             'update_post_term_cache' => false,
-        ]);
+        ];
+
+        $patterns_query  = new WP_Query($query_args);
+        $total_pages     = $per_page < 1 ? 1 : (int) $patterns_query->max_num_pages;
+        $pagination_base = add_query_arg(
+            [
+                'page'   => 'theme-export-jlg',
+                'tab'    => 'export',
+                'action' => 'select_patterns',
+            ],
+            admin_url('admin.php')
+        );
+        $pagination_base = add_query_arg('pattern_page', '%#%', $pagination_base);
         ?>
         <p><a href="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'export'], admin_url('admin.php'))); ?>">&larr; <?php esc_html_e('Retour aux outils principaux', 'theme-export-jlg'); ?></a></p>
         <h2><?php esc_html_e('Exporter une sélection de compositions', 'theme-export-jlg'); ?></h2>
@@ -405,6 +511,24 @@ class TEJLG_Admin {
                             </li>
                         <?php endwhile; ?>
                     </ul>
+                    <?php if ($per_page > 0 && $total_pages > 1): ?>
+                        <div class="tablenav">
+                            <div class="tablenav-pages">
+                                <?php
+                                echo wp_kses_post(
+                                    paginate_links([
+                                        'base'      => $pagination_base,
+                                        'format'    => '',
+                                        'current'   => $current_page,
+                                        'total'     => $total_pages,
+                                        'prev_text' => '&laquo;',
+                                        'next_text' => '&raquo;',
+                                    ])
+                                );
+                                ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 <?php wp_reset_postdata(); ?>
 
