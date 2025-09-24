@@ -608,7 +608,7 @@ class TEJLG_Import {
         ];
     }
 
-    private static function retrieve_patterns_from_storage($storage) {
+    public static function retrieve_patterns_from_storage($storage) {
         if (is_array($storage) && isset($storage['type']) && 'file' === $storage['type']) {
             $path = isset($storage['path']) ? (string) $storage['path'] : '';
 
@@ -660,7 +660,7 @@ class TEJLG_Import {
         }
     }
 
-    private static function delete_patterns_storage($transient_id, $storage) {
+    public static function delete_patterns_storage($transient_id, $storage) {
         self::cleanup_patterns_storage($storage);
         delete_transient($transient_id);
     }

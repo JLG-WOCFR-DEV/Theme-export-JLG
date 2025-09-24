@@ -170,12 +170,17 @@ class TEJLG_Export {
      */
     public static function export_patterns_json($pattern_ids = [], $is_portable = false) {
         $sanitized_ids = array_filter(array_map('intval', (array) $pattern_ids));
-        $exported_patterns = [];
+        $batch_size    = (int) apply_filters('tejlg_export_patterns_batch_size', 100);
+
+        if ($batch_size < 1) {
+            $batch_size = 100;
+        }
+
         $args = [
             'post_type'              => 'wp_block',
-            'posts_per_page'         => -1,
+            'posts_per_page'         => $batch_size,
             'post_status'            => 'publish',
-            'no_found_rows'          => true,
+            'no_found_rows'          => false,
             'update_post_meta_cache' => false,
             'update_post_term_cache' => false,
             'lazy_load_term_meta'    => false,
@@ -186,32 +191,96 @@ class TEJLG_Export {
             $args['orderby']  = 'post__in';
         }
 
-        $patterns_query = new WP_Query($args);
+        $temp_file = wp_tempnam('tejlg-patterns-export');
 
-        if ($patterns_query->have_posts()) {
+        if (empty($temp_file)) {
+            wp_die(esc_html__("Une erreur critique est survenue lors de la préparation du fichier JSON d'export.", 'theme-export-jlg'));
+        }
+
+        $handle = fopen($temp_file, 'w');
+
+        if (false === $handle) {
+            @unlink($temp_file);
+            wp_die(esc_html__("Impossible de créer le flux de téléchargement pour l'export JSON.", 'theme-export-jlg'));
+        }
+
+        $has_written_items = false;
+        fwrite($handle, "[\n");
+
+        $page = 1;
+
+        while (true) {
+            $args['paged'] = $page;
+            $patterns_query = new WP_Query($args);
+
+            if (!$patterns_query->have_posts()) {
+                wp_reset_postdata();
+                break;
+            }
+
             while ($patterns_query->have_posts()) {
                 $patterns_query->the_post();
+
                 $content = self::get_sanitized_content();
                 if ($is_portable) {
                     $content = self::clean_pattern_content($content);
                 }
+
                 $slug = get_post_field('post_name', get_the_ID());
                 if ('' === $slug) {
                     $slug = sanitize_title(get_the_title());
                 }
 
-                $exported_patterns[] = [
+                $pattern_data = [
                     'title'   => get_the_title(),
                     'slug'    => $slug,
                     'content' => $content,
                 ];
+
+                $encoded_pattern = wp_json_encode($pattern_data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+                if (false === $encoded_pattern || (function_exists('json_last_error') && json_last_error() !== JSON_ERROR_NONE)) {
+                    fclose($handle);
+                    @unlink($temp_file);
+
+                    $json_error_message = function_exists('json_last_error_msg')
+                        ? json_last_error_msg()
+                        : esc_html__('Erreur JSON inconnue.', 'theme-export-jlg');
+
+                    wp_die(
+                        esc_html(
+                            sprintf(
+                                __('Une erreur critique est survenue lors de la création du fichier JSON : %s. Cela peut être dû à des caractères invalides dans une de vos compositions.', 'theme-export-jlg'),
+                                $json_error_message
+                            )
+                        )
+                    );
+                }
+
+                $formatted_pattern = self::indent_json_fragment($encoded_pattern);
+
+                if ($has_written_items) {
+                    fwrite($handle, ",\n" . $formatted_pattern);
+                } else {
+                    fwrite($handle, $formatted_pattern);
+                    $has_written_items = true;
+                }
             }
+
+            wp_reset_postdata();
+
+            if ($patterns_query->max_num_pages <= $page) {
+                break;
+            }
+
+            $page++;
         }
 
-        wp_reset_postdata();
+        fwrite($handle, $has_written_items ? "\n]\n" : "]\n");
+        fclose($handle);
 
         $filename = empty($sanitized_ids) ? 'exported-patterns.json' : 'selected-patterns.json';
-        self::download_json($exported_patterns, $filename);
+        self::stream_json_file($temp_file, $filename);
     }
 
     private static function normalize_path($path) {
@@ -448,20 +517,75 @@ class TEJLG_Export {
             );
         }
 
-        nocache_headers();
-        self::clear_output_buffers();
+        $temp_file = wp_tempnam('tejlg-patterns-export');
 
-        header('Content-Type: application/json; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Content-Length: ' . strlen($json_data));
-        echo $json_data;
-        flush();
-        exit;
+        if (empty($temp_file)) {
+            wp_die(esc_html__("Une erreur critique est survenue lors de la préparation du fichier JSON d'export.", 'theme-export-jlg'));
+        }
+
+        $bytes = file_put_contents($temp_file, $json_data);
+
+        if (false === $bytes) {
+            @unlink($temp_file);
+            wp_die(esc_html__("Impossible d'écrire le fichier d'export JSON sur le disque.", 'theme-export-jlg'));
+        }
+
+        self::stream_json_file($temp_file, $filename);
     }
 
     private static function clear_output_buffers() {
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
+    }
+
+    private static function indent_json_fragment($json, $depth = 1) {
+        $json  = trim((string) $json);
+        $lines = explode("\n", $json);
+        $indent = str_repeat('    ', max(0, (int) $depth));
+
+        $lines = array_map(
+            static function ($line) use ($indent) {
+                return $indent . rtrim($line, "\r");
+            },
+            $lines
+        );
+
+        return implode("\n", $lines);
+    }
+
+    private static function stream_json_file($file_path, $filename) {
+        if (!@file_exists($file_path) || !is_readable($file_path)) {
+            @unlink($file_path);
+            wp_die(esc_html__("Le fichier d'export JSON est introuvable ou illisible.", 'theme-export-jlg'));
+        }
+
+        $file_size = filesize($file_path);
+
+        nocache_headers();
+        self::clear_output_buffers();
+
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        if (false !== $file_size) {
+            header('Content-Length: ' . $file_size);
+        }
+
+        $handle = fopen($file_path, 'rb');
+
+        if (false === $handle) {
+            @unlink($file_path);
+            wp_die(esc_html__("Impossible de lire le fichier d'export JSON.", 'theme-export-jlg'));
+        }
+
+        while (!feof($handle)) {
+            echo fread($handle, 8192);
+        }
+
+        fclose($handle);
+        @unlink($file_path);
+        flush();
+        exit;
     }
 }

@@ -710,9 +710,20 @@ class TEJLG_Admin {
             return;
         }
 
-        $patterns = get_transient($transient_id);
-        if (false === $patterns) {
+        $storage = get_transient($transient_id);
+        if (false === $storage) {
             echo '<div class="error"><p>' . esc_html__('La session d\'importation a expiré ou est invalide. Veuillez téléverser à nouveau votre fichier.', 'theme-export-jlg') . '</p></div>';
+            return;
+        }
+
+        $patterns = TEJLG_Import::retrieve_patterns_from_storage($storage);
+
+        if (is_wp_error($patterns)) {
+            TEJLG_Import::delete_patterns_storage($transient_id, $storage);
+
+            echo '<div class="error"><p>' . esc_html($patterns->get_error_message()) . '</p></div>';
+            echo '<p><a href="' . esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))) . '">&larr; ' . esc_html__('Retour au formulaire d\'import', 'theme-export-jlg') . '</a></p>';
+
             return;
         }
 
@@ -802,7 +813,7 @@ class TEJLG_Admin {
         }
 
         if (empty($prepared_patterns) || !$has_renderable_pattern) {
-            delete_transient($transient_id);
+            TEJLG_Import::delete_patterns_storage($transient_id, $storage);
             echo '<div class="error"><p>' . esc_html__('Erreur : Aucune composition valide n\'a pu être prévisualisée. Veuillez vérifier le fichier importé.', 'theme-export-jlg') . '</p></div>';
             echo '<p><a href="' . esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))) . '">&larr; ' . esc_html__('Retour au formulaire d\'import', 'theme-export-jlg') . '</a></p>';
             return;
