@@ -235,7 +235,12 @@ class TEJLG_Export {
 
         if (!empty($blocks)) {
             $blocks = array_map([__CLASS__, 'clean_block_recursive'], $blocks);
-            $content = implode('', array_map('serialize_block', $blocks));
+
+            if (function_exists('serialize_block')) {
+                $content = implode('', array_map('serialize_block', $blocks));
+            } elseif (function_exists('render_block')) {
+                $content = implode('', array_map('render_block', $blocks));
+            }
         }
 
         // 1. Remplace les URLs absolues du site par des URLs relatives
