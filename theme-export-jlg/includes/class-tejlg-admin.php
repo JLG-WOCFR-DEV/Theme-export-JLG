@@ -101,6 +101,9 @@ class TEJLG_Admin {
                 admin_url('admin.php')
             );
 
+            $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=debug');
+            $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
             wp_safe_redirect($redirect_url);
             exit;
         }
@@ -232,6 +235,9 @@ class TEJLG_Admin {
 
                 $redirect_url = add_query_arg($redirect_args, admin_url('admin.php'));
 
+                $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
+                $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
                 wp_safe_redirect($redirect_url);
                 exit;
             }
@@ -256,6 +262,9 @@ class TEJLG_Admin {
                 ],
                 admin_url('admin.php')
             );
+
+            $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
+            $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
 
             wp_safe_redirect($redirect_url);
             exit;

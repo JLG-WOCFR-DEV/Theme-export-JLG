@@ -202,14 +202,28 @@ class TEJLG_Import {
                 admin_url('admin.php?page=theme-export-jlg&tab=import')
             );
 
+            $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
+            $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
             wp_safe_redirect($redirect_url);
             exit;
         }
         set_transient($transient_id, $patterns, 15 * MINUTE_IN_SECONDS);
 
-        wp_safe_redirect(
-            admin_url('admin.php?page=theme-export-jlg&tab=import&action=preview_patterns&transient_id=' . $transient_id)
+        $redirect_url = add_query_arg(
+            [
+                'page'         => 'theme-export-jlg',
+                'tab'          => 'import',
+                'action'       => 'preview_patterns',
+                'transient_id' => $transient_id,
+            ],
+            admin_url('admin.php')
         );
+
+        $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
+        $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
+        wp_safe_redirect($redirect_url);
         exit;
     }
 
@@ -328,7 +342,10 @@ class TEJLG_Import {
                 'post_name'    => $slug,
             ];
 
+            $action = 'create';
+
             if ($existing_block instanceof WP_Post) {
+                $action = 'update';
                 $post_status = isset($existing_block->post_status) ? $existing_block->post_status : get_post_status($existing_block);
 
                 if ('publish' !== $post_status) {
@@ -366,20 +383,61 @@ class TEJLG_Import {
             }
 
             if (is_wp_error($result)) {
-                $errors[] = $result->get_error_message();
                 $failed_patterns[$index] = $pattern;
+
+                $operation_label = ('update' === $action)
+                    ? __('mise à jour', 'theme-export-jlg')
+                    : __('créée', 'theme-export-jlg');
+
+                $raw_error_message = wp_strip_all_tags($result->get_error_message());
+                $error_message     = trim($raw_error_message);
+
+                if ('' === $error_message) {
+                    $error_message = __('erreur inconnue', 'theme-export-jlg');
+                }
+
+                $errors[] = sprintf(
+                    /* translators: 1: Pattern title. 2: Action verb (updated/created). 3: Error message. */
+                    __('La composition "%1$s" n\'a pas pu être %2$s : %3$s.', 'theme-export-jlg'),
+                    $title,
+                    $operation_label,
+                    $error_message
+                );
                 continue;
             }
 
-            if ($result) {
+            if (!empty($result)) {
                 $imported_count++;
+                continue;
+            }
+
+            $failed_patterns[$index] = $pattern;
+
+            if ('update' === $action) {
+                $errors[] = sprintf(
+                    __('La composition "%1$s" (ID %2$d) n\'a pas pu être mise à jour : WordPress a renvoyé un identifiant vide.', 'theme-export-jlg'),
+                    $title,
+                    $existing_block instanceof WP_Post ? (int) $existing_block->ID : 0
+                );
             } else {
-                $failed_patterns[$index] = $pattern;
+                $errors[] = sprintf(
+                    __('La composition "%1$s" (slug "%2$s") n\'a pas pu être créée : WordPress a renvoyé un identifiant vide.', 'theme-export-jlg'),
+                    $title,
+                    $slug
+                );
             }
         }
 
         if (!empty($errors)) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_errors', esc_html(implode(' ', array_unique($errors))), 'error');
+            $unique_errors    = array_unique($errors);
+            $sanitized_errors = array_map(
+                static function ($message) {
+                    return esc_html($message);
+                },
+                $unique_errors
+            );
+
+            add_settings_error('tejlg_import_messages', 'patterns_import_errors', implode(' ', $sanitized_errors), 'error');
 
             if (!empty($failed_patterns)) {
                 set_transient($transient_id, $failed_patterns, 15 * MINUTE_IN_SECONDS);
