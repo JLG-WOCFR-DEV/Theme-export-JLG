@@ -202,14 +202,28 @@ class TEJLG_Import {
                 admin_url('admin.php?page=theme-export-jlg&tab=import')
             );
 
+            $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
+            $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
             wp_safe_redirect($redirect_url);
             exit;
         }
         set_transient($transient_id, $patterns, 15 * MINUTE_IN_SECONDS);
 
-        wp_safe_redirect(
-            admin_url('admin.php?page=theme-export-jlg&tab=import&action=preview_patterns&transient_id=' . $transient_id)
+        $redirect_url = add_query_arg(
+            [
+                'page'         => 'theme-export-jlg',
+                'tab'          => 'import',
+                'action'       => 'preview_patterns',
+                'transient_id' => $transient_id,
+            ],
+            admin_url('admin.php')
         );
+
+        $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
+        $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
+        wp_safe_redirect($redirect_url);
         exit;
     }
 
