@@ -1,6 +1,13 @@
 <?php
 class TEJLG_Admin {
 
+    /**
+     * Hook suffix returned by add_menu_page().
+     *
+     * @var string
+     */
+    private $menu_hook_suffix = '';
+
     const METRICS_ICON_OPTION  = 'tejlg_metrics_icon_size';
     const METRICS_ICON_DEFAULT = 60;
     const METRICS_ICON_MIN     = 12;
@@ -13,7 +20,7 @@ class TEJLG_Admin {
     }
 
     public function add_menu_page() {
-        add_menu_page(
+        $this->menu_hook_suffix = add_menu_page(
             __('Theme Export - JLG', 'theme-export-jlg'),
             __('Theme Export', 'theme-export-jlg'),
             'manage_options',
@@ -22,6 +29,10 @@ class TEJLG_Admin {
             'dashicons-download',
             80
         );
+
+        if (!empty($this->menu_hook_suffix)) {
+            add_action('load-' . $this->menu_hook_suffix, [ 'TEJLG_Import', 'cleanup_expired_patterns_storage' ]);
+        }
     }
 
     public function enqueue_assets($hook) {
@@ -51,8 +62,6 @@ class TEJLG_Admin {
         if (!current_user_can('manage_options')) {
             return;
         }
-
-        TEJLG_Import::cleanup_expired_patterns_storage();
 
         $this->handle_metrics_settings_request();
         $this->handle_export_requests();
@@ -325,6 +334,17 @@ class TEJLG_Admin {
 
     private function handle_child_theme_request() {
         if (!isset($_POST['tejlg_create_child_nonce']) || !wp_verify_nonce($_POST['tejlg_create_child_nonce'], 'tejlg_create_child_action')) {
+            return;
+        }
+
+        if (!current_user_can('install_themes')) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'child_theme_capabilities',
+                esc_html__("Erreur : Vous n'avez pas les autorisations nécessaires pour créer un thème enfant.", 'theme-export-jlg'),
+                'error'
+            );
+
             return;
         }
 
