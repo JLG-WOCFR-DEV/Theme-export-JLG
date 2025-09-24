@@ -49,24 +49,47 @@ class TEJLG_Export {
         }
 
         $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($theme_dir_path), RecursiveIteratorIterator::LEAVES_ONLY);
+        $normalized_theme_dir = function_exists('wp_normalize_path')
+            ? wp_normalize_path($theme_dir_path)
+            : str_replace('\\', '/', $theme_dir_path);
+        $normalized_theme_dir = rtrim($normalized_theme_dir, '/');
         $files_added = 0;
 
         foreach ($files as $name => $file) {
-            if (!$file->isDir()) {
-                $file_path = $file->getRealPath();
-                $relative_path = substr($file_path, strlen($theme_dir_path) + 1);
-                $normalized_relative_path = function_exists('wp_normalize_path')
-                    ? wp_normalize_path($relative_path)
-                    : str_replace('\\', '/', $relative_path);
-                $normalized_relative_path = ltrim($normalized_relative_path, '/');
-
-                if (self::should_exclude_file($normalized_relative_path, $exclusions)) {
-                    continue;
-                }
-
-                $zip->addFile($file_path, $normalized_relative_path);
-                $files_added++;
+            if ($file->isDir()) {
+                continue;
             }
+
+            if ($file->isLink()) {
+                continue;
+            }
+
+            $file_path = $file->getRealPath();
+
+            if (false === $file_path) {
+                continue;
+            }
+
+            $normalized_file_path = function_exists('wp_normalize_path')
+                ? wp_normalize_path($file_path)
+                : str_replace('\\', '/', $file_path);
+
+            if (strpos($normalized_file_path, $normalized_theme_dir . '/') !== 0 && $normalized_file_path !== $normalized_theme_dir) {
+                continue;
+            }
+
+            $relative_path = substr($file_path, strlen($theme_dir_path) + 1);
+            $normalized_relative_path = function_exists('wp_normalize_path')
+                ? wp_normalize_path($relative_path)
+                : str_replace('\\', '/', $relative_path);
+            $normalized_relative_path = ltrim($normalized_relative_path, '/');
+
+            if (self::should_exclude_file($normalized_relative_path, $exclusions)) {
+                continue;
+            }
+
+            $zip->addFile($file_path, $normalized_relative_path);
+            $files_added++;
         }
 
         if (0 === $files_added) {

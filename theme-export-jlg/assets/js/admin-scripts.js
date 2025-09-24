@@ -67,6 +67,42 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const previewWrappers = document.querySelectorAll('.pattern-preview-wrapper');
+    if (previewWrappers.length && typeof URL === 'object' && typeof URL.createObjectURL === 'function') {
+        const blobUrls = [];
+
+        previewWrappers.forEach(function(wrapper) {
+            const dataElement = wrapper.querySelector('.pattern-preview-data');
+            const iframe = wrapper.querySelector('.pattern-preview-iframe');
+
+            if (!dataElement || !iframe) {
+                return;
+            }
+
+            let htmlContent = '';
+            try {
+                htmlContent = JSON.parse(dataElement.textContent || '""');
+            } catch (error) {
+                htmlContent = '';
+            }
+
+            if (typeof htmlContent !== 'string' || htmlContent === '') {
+                return;
+            }
+
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const blobUrl = URL.createObjectURL(blob);
+            iframe.src = blobUrl;
+            blobUrls.push(blobUrl);
+        });
+
+        window.addEventListener('beforeunload', function() {
+            blobUrls.forEach(function(blobUrl) {
+                URL.revokeObjectURL(blobUrl);
+            });
+        });
+    }
+
     // Gérer la confirmation d'importation de thème
     const themeImportForm = document.getElementById('tejlg-import-theme-form');
     if (themeImportForm && themeImportConfirmMessage) {
