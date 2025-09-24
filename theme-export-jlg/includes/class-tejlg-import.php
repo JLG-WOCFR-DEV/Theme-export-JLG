@@ -202,14 +202,28 @@ class TEJLG_Import {
                 admin_url('admin.php?page=theme-export-jlg&tab=import')
             );
 
+            $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
+            $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
             wp_safe_redirect($redirect_url);
             exit;
         }
         set_transient($transient_id, $patterns, 15 * MINUTE_IN_SECONDS);
 
-        wp_safe_redirect(
-            admin_url('admin.php?page=theme-export-jlg&tab=import&action=preview_patterns&transient_id=' . $transient_id)
+        $redirect_url = add_query_arg(
+            [
+                'page'         => 'theme-export-jlg',
+                'tab'          => 'import',
+                'action'       => 'preview_patterns',
+                'transient_id' => $transient_id,
+            ],
+            admin_url('admin.php')
         );
+
+        $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
+        $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
+        wp_safe_redirect($redirect_url);
         exit;
     }
 
@@ -328,7 +342,10 @@ class TEJLG_Import {
                 'post_name'    => $slug,
             ];
 
+            $action = 'create';
+
             if ($existing_block instanceof WP_Post) {
+                $action = 'update';
                 $post_status = isset($existing_block->post_status) ? $existing_block->post_status : get_post_status($existing_block);
 
                 if ('publish' !== $post_status) {
@@ -371,10 +388,24 @@ class TEJLG_Import {
                 continue;
             }
 
-            if ($result) {
+            if (!empty($result)) {
                 $imported_count++;
+                continue;
+            }
+
+            $failed_patterns[$index] = $pattern;
+
+            if ('update' === $action) {
+                $errors[] = sprintf(
+                    __('La composition "%1$s" n\'a pas pu être mise à jour (ID %2$d).', 'theme-export-jlg'),
+                    $title,
+                    $existing_block instanceof WP_Post ? (int) $existing_block->ID : 0
+                );
             } else {
-                $failed_patterns[$index] = $pattern;
+                $errors[] = sprintf(
+                    __('La composition "%s" n\'a pas pu être créée.', 'theme-export-jlg'),
+                    $title
+                );
             }
         }
 
