@@ -88,6 +88,66 @@ class TEJLG_Import {
     }
 
     public static function handle_patterns_upload_step1($file) {
+        if (!isset($file['tmp_name']) || '' === $file['tmp_name']) {
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html__("Erreur : Aucun fichier n'a été téléchargé.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        if (isset($file['error']) && UPLOAD_ERR_OK !== (int) $file['error']) {
+            @unlink($file['tmp_name']);
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html__("Erreur : Le téléchargement du fichier a échoué. Veuillez réessayer.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $max_size = (int) apply_filters('tejlg_import_patterns_max_filesize', 5 * 1024 * 1024);
+        if ($max_size < 1) {
+            $max_size = 5 * 1024 * 1024;
+        }
+
+        $file_size = isset($file['size']) ? (int) $file['size'] : 0;
+        if ((0 === $file_size || $file_size < 0) && @is_file($file['tmp_name'])) {
+            $file_size = (int) @filesize($file['tmp_name']);
+        }
+
+        if ($file_size > $max_size) {
+            @unlink($file['tmp_name']);
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                sprintf(
+                    esc_html__("Erreur : Le fichier est trop volumineux. La taille maximale autorisée est de %s Mo.", 'theme-export-jlg'),
+                    number_format_i18n($max_size / (1024 * 1024), 2)
+                ),
+                'error'
+            );
+
+            return;
+        }
+
+        if (!is_readable($file['tmp_name'])) {
+            @unlink($file['tmp_name']);
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html__("Erreur : Impossible d'accéder au fichier téléchargé.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
         $json_content = file_get_contents($file['tmp_name']);
 
         if (false === $json_content) {

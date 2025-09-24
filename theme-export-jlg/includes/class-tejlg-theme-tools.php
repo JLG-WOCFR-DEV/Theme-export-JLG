@@ -82,6 +82,20 @@ class TEJLG_Theme_Tools {
         }
 
         $child_slug = sanitize_title( $sanitized_child_name );
+
+        if ( '' === $child_slug ) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'child_theme_error',
+                esc_html__(
+                    "Erreur : Le nom du thème enfant doit contenir des lettres ou des chiffres.",
+                    'theme-export-jlg'
+                ),
+                'error'
+            );
+            return;
+        }
+
         $child_dir = $theme_root . '/' . $child_slug;
         if ( $wp_filesystem->exists( $child_dir ) ) {
             add_settings_error('tejlg_admin_messages', 'child_theme_error', esc_html__('Erreur : Un thème avec le même nom de dossier existe déjà.', 'theme-export-jlg'), 'error');
