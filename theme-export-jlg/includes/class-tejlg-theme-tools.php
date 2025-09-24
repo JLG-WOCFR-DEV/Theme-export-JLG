@@ -2,6 +2,20 @@
 class TEJLG_Theme_Tools {
 
     public static function create_child_theme( $child_name ) {
+        if ( ! current_user_can( 'install_themes' ) ) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'child_theme_capabilities',
+                esc_html__(
+                    "Erreur : Vous n'avez pas les autorisations nécessaires pour créer ou installer des thèmes.",
+                    'theme-export-jlg'
+                ),
+                'error'
+            );
+
+            return;
+        }
+
         if (
             ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS ) ||
             ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT )

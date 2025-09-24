@@ -41,7 +41,9 @@ class TEJLG_Export {
             wp_die(esc_html__('Impossible de créer le fichier temporaire pour l\'archive ZIP.', 'theme-export-jlg'));
         }
 
-        unlink($zip_file_path);
+        if (file_exists($zip_file_path) && !self::delete_temp_file($zip_file_path)) {
+            wp_die(esc_html__('Impossible de préparer le fichier temporaire pour l\'archive ZIP.', 'theme-export-jlg'));
+        }
 
         $zip = new ZipArchive();
         if ($zip->open($zip_file_path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
@@ -135,7 +137,7 @@ class TEJLG_Export {
             $zip->close();
 
             if (file_exists($zip_file_path)) {
-                unlink($zip_file_path);
+                self::delete_temp_file($zip_file_path);
             }
 
             add_settings_error(
@@ -158,7 +160,7 @@ class TEJLG_Export {
         readfile($zip_file_path);
         flush();
 
-        unlink($zip_file_path);
+        self::delete_temp_file($zip_file_path);
         exit;
     }
 
@@ -340,6 +342,28 @@ class TEJLG_Export {
                     return true;
                 }
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * Safely removes a temporary file, logging failures when possible.
+     *
+     * @param string $file_path Absolute path to the file to delete.
+     * @return bool True on success or if the file is absent, false otherwise.
+     */
+    private static function delete_temp_file($file_path) {
+        if (empty($file_path) || !file_exists($file_path)) {
+            return true;
+        }
+
+        if (@unlink($file_path)) {
+            return true;
+        }
+
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log(sprintf('[Theme Export JLG] Unable to delete temporary file: %s', $file_path));
         }
 
         return false;
