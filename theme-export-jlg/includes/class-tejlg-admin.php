@@ -206,7 +206,34 @@ class TEJLG_Admin {
 
             if (isset($_POST['selected_patterns']) && is_array($_POST['selected_patterns']) && !empty($_POST['selected_patterns'])) {
                 TEJLG_Import::handle_patterns_import_step2($transient_id, $_POST['selected_patterns']);
-                return;
+
+                $errors = get_settings_errors('tejlg_import_messages');
+                set_transient('settings_errors', $errors, 30);
+
+                $has_error = false;
+                foreach ($errors as $error) {
+                    if (isset($error['type']) && 'error' === $error['type']) {
+                        $has_error = true;
+                        break;
+                    }
+                }
+
+                $redirect_args = [
+                    'page'             => 'theme-export-jlg',
+                    'tab'              => 'import',
+                    'settings-updated' => $has_error ? 'false' : 'true',
+                ];
+
+                $remaining_patterns = get_transient($transient_id);
+                if (!empty($remaining_patterns)) {
+                    $redirect_args['action'] = 'preview_patterns';
+                    $redirect_args['transient_id'] = $transient_id;
+                }
+
+                $redirect_url = add_query_arg($redirect_args, admin_url('admin.php'));
+
+                wp_safe_redirect($redirect_url);
+                exit;
             }
 
             add_settings_error(
@@ -661,6 +688,10 @@ class TEJLG_Admin {
                 <?php foreach ($prepared_patterns as $pattern_data): ?>
                     <?php
                     $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $pattern_data['rendered'] . '</body></html>';
+                    $iframe_json = wp_json_encode($iframe_content);
+                    if (false === $iframe_json) {
+                        $iframe_json = '""';
+                    }
                     ?>
                     <div class="pattern-item">
                         <div class="pattern-selector">
@@ -670,7 +701,8 @@ class TEJLG_Admin {
                             </label>
                         </div>
                         <div class="pattern-preview-wrapper">
-                            <iframe srcdoc="<?php echo esc_attr($iframe_content); ?>" class="pattern-preview-iframe" sandbox="allow-same-origin"></iframe>
+                            <iframe class="pattern-preview-iframe" sandbox="allow-same-origin"></iframe>
+                            <script type="application/json" class="pattern-preview-data"><?php echo $iframe_json; ?></script>
                         </div>
 
                         <div class="pattern-controls">
