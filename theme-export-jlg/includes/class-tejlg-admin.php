@@ -325,23 +325,31 @@ class TEJLG_Admin {
                     $exclusion_patterns_value = wp_unslash($_POST['tejlg_exclusion_patterns']);
                 }
                 ?>
-                <form method="post" action="">
+                <form method="post" action="" data-tejlg-submit-feedback="true">
                     <?php wp_nonce_field('tejlg_export_action', 'tejlg_nonce'); ?>
                     <p>
                         <label for="tejlg_exclusion_patterns"><?php esc_html_e('Motifs d\'exclusion (optionnel) :', 'theme-export-jlg'); ?></label><br>
                         <textarea name="tejlg_exclusion_patterns" id="tejlg_exclusion_patterns" class="large-text code" rows="4" placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"><?php echo esc_textarea($exclusion_patterns_value); ?></textarea>
                         <span class="description"><?php esc_html_e('Indiquez un motif par ligne ou séparez-les par des virgules (joker * accepté).', 'theme-export-jlg'); ?></span>
                     </p>
-                    <p><button type="submit" name="tejlg_export_theme" class="button button-primary"><?php esc_html_e('Exporter le Thème Actif', 'theme-export-jlg'); ?></button></p>
+                    <p class="tejlg-submit-actions">
+                        <button type="submit" name="tejlg_export_theme" class="button button-primary"><?php esc_html_e('Exporter le Thème Actif', 'theme-export-jlg'); ?></button>
+                        <span class="spinner tejlg-spinner" aria-hidden="true"></span>
+                        <span class="tejlg-submit-feedback-text" data-tejlg-message="<?php echo esc_attr__('Préparation de l\'archive…', 'theme-export-jlg'); ?>" role="status" aria-live="polite"></span>
+                    </p>
                 </form>
             </div>
             <div class="tejlg-card">
                 <h3><?php esc_html_e('Exporter les Compositions (.json)', 'theme-export-jlg'); ?></h3>
                 <p><?php echo wp_kses_post(__('Générez un fichier <code>.json</code> contenant vos compositions.', 'theme-export-jlg')); ?></p>
-                <form method="post" action="">
+                <form method="post" action="" data-tejlg-submit-feedback="true">
                     <?php wp_nonce_field('tejlg_export_action', 'tejlg_nonce'); ?>
                     <p><label><input type="checkbox" name="export_portable" value="1"> <strong><?php esc_html_e('Export portable', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(compatibilité maximale)', 'theme-export-jlg'); ?></label></p>
-                    <p><button type="submit" name="tejlg_export_patterns" class="button button-primary"><?php esc_html_e('Exporter TOUTES les compositions', 'theme-export-jlg'); ?></button></p>
+                    <p class="tejlg-submit-actions">
+                        <button type="submit" name="tejlg_export_patterns" class="button button-primary"><?php esc_html_e('Exporter TOUTES les compositions', 'theme-export-jlg'); ?></button>
+                        <span class="spinner tejlg-spinner" aria-hidden="true"></span>
+                        <span class="tejlg-submit-feedback-text" data-tejlg-message="<?php echo esc_attr__('Génération du fichier…', 'theme-export-jlg'); ?>" role="status" aria-live="polite"></span>
+                    </p>
                 </form>
                 <p>
                     <a href="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'export', 'action' => 'select_patterns'], admin_url('admin.php'))); ?>" class="button"><?php esc_html_e('Exporter une sélection...', 'theme-export-jlg'); ?></a>
@@ -350,13 +358,17 @@ class TEJLG_Admin {
              <div class="tejlg-card">
                 <h3><?php esc_html_e('Créer un Thème Enfant', 'theme-export-jlg'); ?></h3>
                 <p><?php esc_html_e('Générez un thème enfant pour le thème actif. Indispensable pour ajouter du code personnalisé.', 'theme-export-jlg'); ?></p>
-                <form method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'export'], admin_url('admin.php'))); ?>">
+                <form method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'export'], admin_url('admin.php'))); ?>" data-tejlg-submit-feedback="true">
                     <?php wp_nonce_field('tejlg_create_child_action', 'tejlg_create_child_nonce'); ?>
                     <p>
                         <label for="child_theme_name"><?php esc_html_e('Nom du thème enfant :', 'theme-export-jlg'); ?></label>
                         <input type="text" name="child_theme_name" id="child_theme_name" class="regular-text" placeholder="<?php echo esc_attr(wp_get_theme()->get('Name') . ' ' . __('Enfant', 'theme-export-jlg')); ?>" required>
                     </p>
-                    <p><button type="submit" name="tejlg_create_child" class="button button-primary"><?php esc_html_e('Créer le Thème Enfant', 'theme-export-jlg'); ?></button></p>
+                    <p class="tejlg-submit-actions">
+                        <button type="submit" name="tejlg_create_child" class="button button-primary"><?php esc_html_e('Créer le Thème Enfant', 'theme-export-jlg'); ?></button>
+                        <span class="spinner tejlg-spinner" aria-hidden="true"></span>
+                        <span class="tejlg-submit-feedback-text" data-tejlg-message="<?php echo esc_attr__('Création du thème enfant…', 'theme-export-jlg'); ?>" role="status" aria-live="polite"></span>
+                    </p>
                 </form>
             </div>
         </div>
@@ -384,7 +396,7 @@ class TEJLG_Admin {
         <?php if (!$patterns_query->have_posts()): ?>
             <p><?php esc_html_e('Aucune composition personnalisée n\'a été trouvée.', 'theme-export-jlg'); ?></p>
         <?php else: ?>
-            <form method="post" action="">
+            <form method="post" action="" data-tejlg-submit-feedback="true">
                 <?php wp_nonce_field('tejlg_export_selected_action', 'tejlg_export_selected_nonce'); ?>
 
                 <div class="pattern-selection-list">
@@ -410,7 +422,11 @@ class TEJLG_Admin {
 
                 <p><label><input type="checkbox" name="export_portable" value="1" checked> <strong><?php esc_html_e('Générer un export "portable"', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(Recommandé pour migrer vers un autre site)', 'theme-export-jlg'); ?></label></p>
 
-                <p><button type="submit" name="tejlg_export_selected_patterns" class="button button-primary button-hero"><?php esc_html_e('Exporter la sélection', 'theme-export-jlg'); ?></button></p>
+                <p class="tejlg-submit-actions">
+                    <button type="submit" name="tejlg_export_selected_patterns" class="button button-primary button-hero"><?php esc_html_e('Exporter la sélection', 'theme-export-jlg'); ?></button>
+                    <span class="spinner tejlg-spinner" aria-hidden="true"></span>
+                    <span class="tejlg-submit-feedback-text" data-tejlg-message="<?php echo esc_attr__('Génération du fichier…', 'theme-export-jlg'); ?>" role="status" aria-live="polite"></span>
+                </p>
             </form>
         <?php endif; ?>
         <?php
@@ -428,20 +444,28 @@ class TEJLG_Admin {
                 <div class="tejlg-card">
                     <h3><?php esc_html_e('Importer un Thème (.zip)', 'theme-export-jlg'); ?></h3>
                     <p><?php echo wp_kses_post(__('Téléversez une archive <code>.zip</code> d\'un thème. Le plugin l\'installera (capacité WordPress « Installer des thèmes » requise). <strong>Attention :</strong> Un thème existant sera remplacé.', 'theme-export-jlg')); ?></p>
-                    <form id="tejlg-import-theme-form" method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>" enctype="multipart/form-data">
+                    <form id="tejlg-import-theme-form" method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>" enctype="multipart/form-data" data-tejlg-submit-feedback="true">
                         <?php wp_nonce_field('tejlg_import_theme_action', 'tejlg_import_theme_nonce'); ?>
                         <p><label for="theme_zip"><?php esc_html_e('Fichier du thème (.zip) :', 'theme-export-jlg'); ?></label><br><input type="file" id="theme_zip" name="theme_zip" accept=".zip" required></p>
-                        <p><button type="submit" name="tejlg_import_theme" class="button button-primary"><?php esc_html_e('Importer le Thème', 'theme-export-jlg'); ?></button></p>
+                        <p class="tejlg-submit-actions">
+                            <button type="submit" name="tejlg_import_theme" class="button button-primary"><?php esc_html_e('Importer le Thème', 'theme-export-jlg'); ?></button>
+                            <span class="spinner tejlg-spinner" aria-hidden="true"></span>
+                            <span class="tejlg-submit-feedback-text" data-tejlg-message="<?php echo esc_attr__('Importation du thème…', 'theme-export-jlg'); ?>" role="status" aria-live="polite"></span>
+                        </p>
                     </form>
                 </div>
                 <div class="tejlg-card">
                     <h3><?php esc_html_e('Importer des Compositions (.json)', 'theme-export-jlg'); ?></h3>
                     <p><?php echo wp_kses_post(__('Téléversez un fichier <code>.json</code> (généré par l\'export). Vous pourrez choisir quelles compositions importer à l\'étape suivante.', 'theme-export-jlg')); ?></p>
-                     <form method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>" enctype="multipart/form-data">
+                     <form method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>" enctype="multipart/form-data" data-tejlg-submit-feedback="true">
                         <?php wp_nonce_field('tejlg_import_patterns_step1_action', 'tejlg_import_patterns_step1_nonce'); ?>
                         <p><label for="patterns_json"><?php esc_html_e('Fichier des compositions (.json, .txt) :', 'theme-export-jlg'); ?></label><br><input type="file" id="patterns_json" name="patterns_json" accept=".json,.txt" required></p>
-                        <p><button type="submit" name="tejlg_import_patterns_step1" class="button button-primary"><?php esc_html_e('Analyser et prévisualiser', 'theme-export-jlg'); ?></button></p>
-                    </form>
+                        <p class="tejlg-submit-actions">
+                            <button type="submit" name="tejlg_import_patterns_step1" class="button button-primary"><?php esc_html_e('Analyser et prévisualiser', 'theme-export-jlg'); ?></button>
+                            <span class="spinner tejlg-spinner" aria-hidden="true"></span>
+                            <span class="tejlg-submit-feedback-text" data-tejlg-message="<?php echo esc_attr__('Analyse du fichier…', 'theme-export-jlg'); ?>" role="status" aria-live="polite"></span>
+                        </p>
+                     </form>
                 </div>
             </div>
             <?php
@@ -687,7 +711,7 @@ class TEJLG_Admin {
         ?>
         <h2><?php esc_html_e('Étape 2 : Choisir les compositions à importer', 'theme-export-jlg'); ?></h2>
         <p><?php esc_html_e('Cochez les compositions à importer. Vous pouvez prévisualiser le rendu et inspecter le code du bloc (le code CSS du thème est masqué par défaut).', 'theme-export-jlg'); ?></p>
-        <form method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>">
+        <form method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>" data-tejlg-submit-feedback="true">
             <?php wp_nonce_field('tejlg_import_patterns_step2_action', 'tejlg_import_patterns_step2_nonce'); ?>
             <input type="hidden" name="transient_id" value="<?php echo esc_attr($transient_id); ?>">
             <div id="patterns-preview-list">
@@ -730,7 +754,11 @@ class TEJLG_Admin {
                     </div>
                 <?php endforeach; ?>
             </div>
-            <p><button type="submit" name="tejlg_import_patterns_step2" class="button button-primary button-hero"><?php esc_html_e('Importer la sélection', 'theme-export-jlg'); ?></button></p>
+            <p class="tejlg-submit-actions">
+                <button type="submit" name="tejlg_import_patterns_step2" class="button button-primary button-hero"><?php esc_html_e('Importer la sélection', 'theme-export-jlg'); ?></button>
+                <span class="spinner tejlg-spinner" aria-hidden="true"></span>
+                <span class="tejlg-submit-feedback-text" data-tejlg-message="<?php echo esc_attr__('Importation des compositions…', 'theme-export-jlg'); ?>" role="status" aria-live="polite"></span>
+            </p>
         </form>
         <?php
     }

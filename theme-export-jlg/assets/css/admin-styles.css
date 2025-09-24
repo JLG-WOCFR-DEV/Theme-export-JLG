@@ -133,7 +133,33 @@
 
 /* Fix pour l'input */
 .tejlg-card input.regular-text {
-    max-width: 100%; 
+    max-width: 100%;
+}
+
+.tejlg-submit-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tejlg-submit-actions .spinner {
+    float: none;
+    margin: 0;
+}
+
+.tejlg-submit-feedback-text {
+    display: none;
+    font-weight: 600;
+    color: #2271b1;
+}
+
+.tejlg-submit-feedback-text.is-visible {
+    display: inline;
+}
+
+.tejlg-submit-actions button.is-busy {
+    opacity: 0.75;
+    cursor: progress;
 }
 
 /* Styles pour l'affichage du code */

@@ -220,4 +220,42 @@ document.addEventListener('DOMContentLoaded', function() {
         patternSearchInput.addEventListener('keyup', searchHandler);
     }
 
+    const submitFeedbackForms = document.querySelectorAll('form[data-tejlg-submit-feedback]');
+    if (submitFeedbackForms.length) {
+        submitFeedbackForms.forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.dataset.tejlgSubmitting === 'true') {
+                    event.preventDefault();
+                    return;
+                }
+
+                if (event.defaultPrevented) {
+                    return;
+                }
+
+                form.dataset.tejlgSubmitting = 'true';
+
+                const submitters = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+                submitters.forEach(function(submitter) {
+                    submitter.disabled = true;
+                    submitter.classList.add('is-busy');
+                });
+
+                const spinner = form.querySelector('.tejlg-spinner');
+                if (spinner) {
+                    spinner.classList.add('is-active');
+                }
+
+                const feedback = form.querySelector('.tejlg-submit-feedback-text');
+                if (feedback) {
+                    const message = feedback.getAttribute('data-tejlg-message') || '';
+                    if (message && feedback.textContent !== message) {
+                        feedback.textContent = message;
+                    }
+                    feedback.classList.add('is-visible');
+                }
+            });
+        });
+    }
+
 });
