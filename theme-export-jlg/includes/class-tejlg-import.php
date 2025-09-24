@@ -276,7 +276,9 @@ class TEJLG_Import {
 
             $slug = sanitize_title($raw_slug);
             if ('' === $slug) {
-                $errors[] = sprintf(__('La composition à l\'index %d ne possède pas de slug valide.', 'theme-export-jlg'), $index);
+                $errors[] = self::sanitize_error_message(
+                    sprintf(__('La composition à l\'index %d ne possède pas de slug valide.', 'theme-export-jlg'), $index)
+                );
                 $failed_patterns[$index] = $pattern;
                 continue;
             }
@@ -353,14 +355,28 @@ class TEJLG_Import {
                         $untrash_result = wp_untrash_post($existing_block->ID);
 
                         if (is_wp_error($untrash_result)) {
-                            $errors[] = $untrash_result->get_error_message();
                             $failed_patterns[$index] = $pattern;
+                            $errors[]              = self::build_pattern_error_message(
+                                'update',
+                                $title,
+                                $slug,
+                                $existing_block instanceof WP_Post ? (int) $existing_block->ID : 0,
+                                [$untrash_result->get_error_message()]
+                            );
+
                             continue;
                         }
 
                         if (false === $untrash_result) {
-                            $errors[] = sprintf(__('Impossible de restaurer la composition "%s".', 'theme-export-jlg'), $title);
                             $failed_patterns[$index] = $pattern;
+                            $errors[]              = self::build_pattern_error_message(
+                                'update',
+                                $title,
+                                $slug,
+                                $existing_block instanceof WP_Post ? (int) $existing_block->ID : 0,
+                                [__('Impossible de restaurer la composition depuis la corbeille.', 'theme-export-jlg')]
+                            );
+
                             continue;
                         }
 
@@ -382,31 +398,31 @@ class TEJLG_Import {
                 $result = wp_insert_post(wp_slash($post_data), true);
             }
 
+            $failure_reasons = [];
+
             if (is_wp_error($result)) {
-                $errors[] = $result->get_error_message();
+                $failure_reasons[] = $result->get_error_message();
+            }
+
+            if (empty($result)) {
+                $failure_reasons[] = __('WordPress a renvoyé une réponse vide.', 'theme-export-jlg');
+            }
+
+            if (!empty($failure_reasons)) {
                 $failed_patterns[$index] = $pattern;
-                continue;
-            }
 
-            if (!empty($result)) {
-                $imported_count++;
-                continue;
-            }
-
-            $failed_patterns[$index] = $pattern;
-
-            if ('update' === $action) {
-                $errors[] = sprintf(
-                    __('La composition "%1$s" n\'a pas pu être mise à jour (ID %2$d).', 'theme-export-jlg'),
+                $errors[] = self::build_pattern_error_message(
+                    $action,
                     $title,
-                    $existing_block instanceof WP_Post ? (int) $existing_block->ID : 0
+                    $slug,
+                    $existing_block instanceof WP_Post ? (int) $existing_block->ID : 0,
+                    $failure_reasons
                 );
-            } else {
-                $errors[] = sprintf(
-                    __('La composition "%s" n\'a pas pu être créée.', 'theme-export-jlg'),
-                    $title
-                );
+
+                continue;
             }
+
+            $imported_count++;
         }
 
         if (!empty($errors)) {
@@ -431,6 +447,52 @@ class TEJLG_Import {
         } else {
             add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Aucune composition n\'a pu être enregistrée (elles existent peut-être déjà ou des erreurs sont survenues).', 'theme-export-jlg'), 'info');
         }
+    }
+
+    private static function build_pattern_error_message($action, $title, $slug, $existing_id, array $details = []) {
+        $safe_title = '' !== $title ? $title : __('(Titre manquant)', 'theme-export-jlg');
+        $safe_slug  = '' !== $slug ? $slug : __('(slug manquant)', 'theme-export-jlg');
+
+        $details = array_filter(
+            array_map(
+                [__CLASS__, 'sanitize_error_message'],
+                $details
+            )
+        );
+
+        if ('update' === $action) {
+            $message = sprintf(
+                __('Échec de la mise à jour de la composition "%1$s" (ID %2$d).', 'theme-export-jlg'),
+                $safe_title,
+                (int) $existing_id
+            );
+        } else {
+            $message = sprintf(
+                __('Échec de la création de la composition "%1$s" (slug "%2$s").', 'theme-export-jlg'),
+                $safe_title,
+                $safe_slug
+            );
+        }
+
+        if (!empty($details)) {
+            $message .= ' ' . sprintf(
+                __('Raison : %s.', 'theme-export-jlg'),
+                implode(' ', $details)
+            );
+        }
+
+        return self::sanitize_error_message($message);
+    }
+
+    private static function sanitize_error_message($message) {
+        if (!is_scalar($message)) {
+            return '';
+        }
+
+        $sanitized = wp_strip_all_tags((string) $message, true);
+        $sanitized = preg_replace('/\s+/', ' ', $sanitized);
+
+        return trim((string) $sanitized);
     }
 
     /**
