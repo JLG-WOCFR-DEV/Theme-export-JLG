@@ -179,10 +179,9 @@ class TEJLG_Import {
             return;
         }
 
-        delete_transient($transient_id);
-
         $imported_count = 0;
         $errors = [];
+        $failed_patterns = [];
 
         foreach ($selected_indices as $index) {
             $index = intval($index);
@@ -204,6 +203,7 @@ class TEJLG_Import {
             $slug = sanitize_title($raw_slug);
             if ('' === $slug) {
                 $errors[] = sprintf(__('La composition à l\'index %d ne possède pas de slug valide.', 'theme-export-jlg'), $index);
+                $failed_patterns[$index] = $pattern;
                 continue;
             }
 
@@ -277,11 +277,13 @@ class TEJLG_Import {
 
                         if (is_wp_error($untrash_result)) {
                             $errors[] = $untrash_result->get_error_message();
+                            $failed_patterns[$index] = $pattern;
                             continue;
                         }
 
                         if (false === $untrash_result) {
                             $errors[] = sprintf(__('Impossible de restaurer la composition "%s".', 'theme-export-jlg'), $title);
+                            $failed_patterns[$index] = $pattern;
                             continue;
                         }
 
@@ -305,16 +307,27 @@ class TEJLG_Import {
 
             if (is_wp_error($result)) {
                 $errors[] = $result->get_error_message();
+                $failed_patterns[$index] = $pattern;
                 continue;
             }
 
             if ($result) {
                 $imported_count++;
+            } else {
+                $failed_patterns[$index] = $pattern;
             }
         }
 
         if (!empty($errors)) {
             add_settings_error('tejlg_import_messages', 'patterns_import_errors', esc_html(implode(' ', array_unique($errors))), 'error');
+
+            if (!empty($failed_patterns)) {
+                set_transient($transient_id, $failed_patterns, 15 * MINUTE_IN_SECONDS);
+            } else {
+                set_transient($transient_id, $all_patterns, 15 * MINUTE_IN_SECONDS);
+            }
+        } else {
+            delete_transient($transient_id);
         }
 
         if ($imported_count > 0) {
