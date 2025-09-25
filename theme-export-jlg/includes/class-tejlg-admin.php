@@ -65,10 +65,12 @@ class TEJLG_Admin {
 
         $this->handle_metrics_settings_request();
         $this->handle_export_requests();
+        $this->handle_global_styles_export_request();
         $this->handle_selected_patterns_export_request();
         $this->handle_theme_import_request();
         $this->handle_patterns_import_step1_request();
         $this->handle_patterns_import_step2_request();
+        $this->handle_global_styles_import_request();
         $this->handle_child_theme_request();
     }
 
@@ -173,6 +175,14 @@ class TEJLG_Admin {
         }
     }
 
+    private function handle_global_styles_export_request() {
+        if (!isset($_POST['tejlg_export_global_styles_nonce']) || !wp_verify_nonce($_POST['tejlg_export_global_styles_nonce'], 'tejlg_export_global_styles_action')) {
+            return;
+        }
+
+        TEJLG_Export::export_global_styles();
+    }
+
     private function handle_selected_patterns_export_request() {
         if (!isset($_POST['tejlg_export_selected_nonce']) || !wp_verify_nonce($_POST['tejlg_export_selected_nonce'], 'tejlg_export_selected_action')) {
             return;
@@ -194,6 +204,25 @@ class TEJLG_Admin {
             esc_html__("Erreur : Veuillez sélectionner au moins une composition avant de lancer l'export.", 'theme-export-jlg'),
             'error'
         );
+    }
+
+    private function handle_global_styles_import_request() {
+        if (!isset($_POST['tejlg_import_global_styles_nonce']) || !wp_verify_nonce($_POST['tejlg_import_global_styles_nonce'], 'tejlg_import_global_styles_action')) {
+            return;
+        }
+
+        if (!isset($_FILES['global_styles_json'])) {
+            add_settings_error(
+                'tejlg_import_messages',
+                'global_styles_import_status',
+                esc_html__("Erreur : Aucun fichier n'a été téléchargé.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        TEJLG_Import::import_global_styles($_FILES['global_styles_json']);
     }
 
     private function handle_theme_import_request() {
@@ -464,6 +493,14 @@ class TEJLG_Admin {
                     <a href="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'export', 'action' => 'select_patterns'], admin_url('admin.php'))); ?>" class="button"><?php esc_html_e('Exporter une sélection...', 'theme-export-jlg'); ?></a>
                 </p>
             </div>
+            <div class="tejlg-card">
+                <h3><?php esc_html_e('Exporter les Styles Globaux (.json)', 'theme-export-jlg'); ?></h3>
+                <p><?php echo wp_kses_post(__("Récupérez les réglages <code>theme.json</code> (paramètres globaux) du site courant pour les réutiliser ailleurs.", 'theme-export-jlg')); ?></p>
+                <form method="post" action="">
+                    <?php wp_nonce_field('tejlg_export_global_styles_action', 'tejlg_export_global_styles_nonce'); ?>
+                    <p><button type="submit" name="tejlg_export_global_styles" class="button button-primary"><?php esc_html_e('Exporter les styles globaux', 'theme-export-jlg'); ?></button></p>
+                </form>
+            </div>
              <div class="tejlg-card">
                 <h3><?php esc_html_e('Créer un Thème Enfant', 'theme-export-jlg'); ?></h3>
                 <p><?php esc_html_e('Générez un thème enfant pour le thème actif. Indispensable pour ajouter du code personnalisé.', 'theme-export-jlg'); ?></p>
@@ -593,6 +630,15 @@ class TEJLG_Admin {
                         <?php wp_nonce_field('tejlg_import_patterns_step1_action', 'tejlg_import_patterns_step1_nonce'); ?>
                         <p><label for="patterns_json"><?php esc_html_e('Fichier des compositions (.json, .txt) :', 'theme-export-jlg'); ?></label><br><input type="file" id="patterns_json" name="patterns_json" accept=".json,.txt" required></p>
                         <p><button type="submit" name="tejlg_import_patterns_step1" class="button button-primary"><?php esc_html_e('Analyser et prévisualiser', 'theme-export-jlg'); ?></button></p>
+                    </form>
+                </div>
+                <div class="tejlg-card">
+                    <h3><?php esc_html_e('Importer les Styles Globaux (.json)', 'theme-export-jlg'); ?></h3>
+                    <p><?php echo wp_kses_post(__("Téléversez le fichier exporté des réglages globaux pour appliquer les mêmes paramètres <code>theme.json</code> sur ce site.", 'theme-export-jlg')); ?></p>
+                    <form method="post" action="<?php echo esc_url(add_query_arg(['page' => 'theme-export-jlg', 'tab' => 'import'], admin_url('admin.php'))); ?>" enctype="multipart/form-data">
+                        <?php wp_nonce_field('tejlg_import_global_styles_action', 'tejlg_import_global_styles_nonce'); ?>
+                        <p><label for="global_styles_json"><?php esc_html_e('Fichier des styles globaux (.json) :', 'theme-export-jlg'); ?></label><br><input type="file" id="global_styles_json" name="global_styles_json" accept=".json" required></p>
+                        <p><button type="submit" name="tejlg_import_global_styles" class="button button-primary"><?php esc_html_e('Importer les styles globaux', 'theme-export-jlg'); ?></button></p>
                     </form>
                 </div>
             </div>
