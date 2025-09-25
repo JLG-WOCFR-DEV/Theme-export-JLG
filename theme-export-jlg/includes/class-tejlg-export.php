@@ -97,7 +97,23 @@ class TEJLG_Export {
             RecursiveIteratorIterator::CATCH_GET_CHILD
         );
 
-        $directories_added = [];
+        $zip_root_directory = rtrim($theme_slug, '/') . '/';
+
+        if (true !== $zip->addEmptyDir($zip_root_directory)) {
+            self::abort_zip_export(
+                $zip,
+                $zip_file_path,
+                sprintf(
+                    /* translators: %s: slug of the theme used as the root directory of the ZIP archive. */
+                    esc_html__("Impossible d'ajouter le dossier racine « %s » à l'archive ZIP.", 'theme-export-jlg'),
+                    esc_html($zip_root_directory)
+                )
+            );
+        }
+
+        $directories_added = [
+            $zip_root_directory => true,
+        ];
 
         foreach ($iterator as $file) {
             $real_path = $file->getRealPath();
@@ -119,7 +135,7 @@ class TEJLG_Export {
             }
 
             if ($file->isDir()) {
-                $zip_path = rtrim($relative_path, '/') . '/';
+                $zip_path = $zip_root_directory . rtrim($relative_path, '/') . '/';
 
                 if (!isset($directories_added[$zip_path])) {
                     if (true !== $zip->addEmptyDir($zip_path)) {
@@ -140,14 +156,16 @@ class TEJLG_Export {
                 continue;
             }
 
-            if (true !== $zip->addFile($real_path, $relative_path)) {
+            $zip_file_path_in_archive = $zip_root_directory . ltrim($relative_path, '/');
+
+            if (true !== $zip->addFile($real_path, $zip_file_path_in_archive)) {
                 self::abort_zip_export(
                     $zip,
                     $zip_file_path,
                     sprintf(
                         /* translators: %s: relative path of the file that failed to be added to the ZIP archive. */
                         esc_html__('Impossible d\'ajouter le fichier « %s » à l\'archive ZIP.', 'theme-export-jlg'),
-                        esc_html($relative_path)
+                        esc_html($zip_file_path_in_archive)
                     )
                 );
             }
