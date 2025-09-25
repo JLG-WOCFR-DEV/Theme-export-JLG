@@ -453,6 +453,7 @@ class TEJLG_Export {
         $home_url = get_home_url();
         $home_parts = wp_parse_url($home_url);
         $home_path  = '';
+        $allowed_ports = [];
 
         if (!empty($home_parts['path'])) {
             $trimmed_path = trim($home_parts['path'], '/');
@@ -467,9 +468,25 @@ class TEJLG_Export {
             $port_pattern = '';
 
             if (!empty($home_parts['port'])) {
-                $port_pattern = '(?::' . preg_quote((string) $home_parts['port'], '#') . ')?';
+                $allowed_ports[] = (string) $home_parts['port'];
             } else {
-                $port_pattern = '(?::\d+)?';
+                $scheme = isset($home_parts['scheme']) ? strtolower($home_parts['scheme']) : '';
+
+                if ('http' === $scheme) {
+                    $allowed_ports[] = '80';
+                } elseif ('https' === $scheme) {
+                    $allowed_ports[] = '443';
+                }
+            }
+
+            if (!empty($allowed_ports)) {
+                $escaped_ports = array_map(
+                    static function ($port) {
+                        return preg_quote($port, '#');
+                    },
+                    $allowed_ports
+                );
+                $port_pattern = '(?::(?:' . implode('|', $escaped_ports) . '))?';
             }
 
             $pattern = '#https?:\/\/' . $host_pattern . $port_pattern . '(?=[\/\?#]|$)([\/\?#][^\s"\'>]*)?#i';
