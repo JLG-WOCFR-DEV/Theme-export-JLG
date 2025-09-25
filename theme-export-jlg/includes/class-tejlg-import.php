@@ -87,6 +87,181 @@ class TEJLG_Import {
         add_settings_error('tejlg_import_messages', 'theme_import_status', $message_text, $message_type);
     }
 
+    public static function import_global_styles($file) {
+        if (!isset($file['tmp_name']) || '' === $file['tmp_name']) {
+            add_settings_error(
+                'tejlg_import_messages',
+                'global_styles_import_status',
+                esc_html__("Erreur : Aucun fichier n'a été téléchargé.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        if (isset($file['error']) && UPLOAD_ERR_OK !== (int) $file['error']) {
+            @unlink($file['tmp_name']);
+            add_settings_error(
+                'tejlg_import_messages',
+                'global_styles_import_status',
+                esc_html__("Erreur : Le téléchargement du fichier a échoué. Veuillez réessayer.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $max_size = (int) apply_filters('tejlg_import_global_styles_max_filesize', 1024 * 1024);
+
+        if ($max_size < 1) {
+            $max_size = 1024 * 1024;
+        }
+
+        $file_size = isset($file['size']) ? (int) $file['size'] : 0;
+
+        if ((0 === $file_size || $file_size < 0) && @is_file($file['tmp_name'])) {
+            $file_size = (int) @filesize($file['tmp_name']);
+        }
+
+        if ($file_size > $max_size) {
+            @unlink($file['tmp_name']);
+            add_settings_error(
+                'tejlg_import_messages',
+                'global_styles_import_status',
+                sprintf(
+                    esc_html__("Erreur : Le fichier est trop volumineux. La taille maximale autorisée est de %s Mo.", 'theme-export-jlg'),
+                    number_format_i18n($max_size / (1024 * 1024), 2)
+                ),
+                'error'
+            );
+
+            return;
+        }
+
+        if (!is_readable($file['tmp_name'])) {
+            @unlink($file['tmp_name']);
+            add_settings_error(
+                'tejlg_import_messages',
+                'global_styles_import_status',
+                esc_html__("Erreur : Impossible d'accéder au fichier téléchargé.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $json_content = file_get_contents($file['tmp_name']);
+
+        @unlink($file['tmp_name']);
+
+        if (false === $json_content) {
+            add_settings_error(
+                'tejlg_import_messages',
+                'global_styles_import_status',
+                esc_html__("Erreur : Impossible de lire le fichier téléchargé.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $data = json_decode($json_content, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+            add_settings_error(
+                'tejlg_import_messages',
+                'global_styles_import_status',
+                esc_html__("Erreur : Le fichier n'est pas un fichier JSON valide.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $settings   = [];
+        $stylesheet = '';
+
+        if (isset($data['data']) && is_array($data['data'])) {
+            if (isset($data['data']['settings'])) {
+                $settings = $data['data']['settings'];
+            }
+
+            if (isset($data['data']['stylesheet']) && is_string($data['data']['stylesheet'])) {
+                $stylesheet = $data['data']['stylesheet'];
+            }
+        }
+
+        if (empty($settings) && isset($data['settings'])) {
+            $settings = $data['settings'];
+        }
+
+        if ('' === $stylesheet && isset($data['stylesheet']) && is_string($data['stylesheet'])) {
+            $stylesheet = $data['stylesheet'];
+        }
+
+        if (!is_array($settings)) {
+            add_settings_error(
+                'tejlg_import_messages',
+                'global_styles_import_status',
+                esc_html__("Erreur : La structure du fichier de styles globaux est invalide.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $applied = false;
+        $errors  = [];
+
+        if (function_exists('wp_update_global_settings')) {
+            $result = wp_update_global_settings($settings);
+
+            if (is_wp_error($result)) {
+                $errors[] = $result->get_error_message();
+            } elseif (false === $result) {
+                $errors[] = esc_html__("WordPress a renvoyé une réponse vide lors de la mise à jour des réglages globaux.", 'theme-export-jlg');
+            } else {
+                $applied = true;
+            }
+        }
+
+        if (!$applied) {
+            $persist_result = self::persist_global_styles_post($settings, $stylesheet);
+
+            if (is_wp_error($persist_result)) {
+                $errors[] = $persist_result->get_error_message();
+            } elseif (false === $persist_result) {
+                $errors[] = esc_html__("Erreur inconnue lors de l'enregistrement des styles globaux.", 'theme-export-jlg');
+            } else {
+                $applied = true;
+            }
+        }
+
+        if (!$applied) {
+            $errors = array_filter(array_map([__CLASS__, 'sanitize_error_message'], $errors));
+
+            if (empty($errors)) {
+                $errors[] = esc_html__("Erreur : Les styles globaux n'ont pas pu être importés.", 'theme-export-jlg');
+            }
+
+            add_settings_error(
+                'tejlg_import_messages',
+                'global_styles_import_status',
+                esc_html(implode(' ', array_unique($errors))),
+                'error'
+            );
+
+            return;
+        }
+
+        add_settings_error(
+            'tejlg_import_messages',
+            'global_styles_import_status',
+            esc_html__('Les styles globaux ont été importés avec succès.', 'theme-export-jlg'),
+            'success'
+        );
+    }
+
     public static function handle_patterns_upload_step1($file) {
         if (!isset($file['tmp_name']) || '' === $file['tmp_name']) {
             add_settings_error(
@@ -612,6 +787,136 @@ class TEJLG_Import {
         }
 
         return self::sanitize_error_message($message);
+    }
+
+    private static function persist_global_styles_post($settings, $stylesheet) {
+        if (!post_type_exists('wp_global_styles')) {
+            return new WP_Error(
+                'global_styles_post_type_missing',
+                esc_html__("Erreur : Cette installation de WordPress ne prend pas en charge l'enregistrement des styles globaux.", 'theme-export-jlg')
+            );
+        }
+
+        $theme = wp_get_theme();
+
+        if (!is_object($theme)) {
+            return new WP_Error(
+                'global_styles_theme_missing',
+                esc_html__("Erreur : Impossible de déterminer le thème actif pour appliquer les styles globaux.", 'theme-export-jlg')
+            );
+        }
+
+        $theme_slug = (string) $theme->get_stylesheet();
+
+        if ('' === $theme_slug) {
+            return new WP_Error(
+                'global_styles_theme_slug_missing',
+                esc_html__("Erreur : Le thème actif ne dispose pas d'identifiant valide pour stocker les styles globaux.", 'theme-export-jlg')
+            );
+        }
+
+        $json_options = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $json_options |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+
+        $content = wp_json_encode(['settings' => $settings], $json_options);
+
+        if (false === $content || (function_exists('json_last_error') && json_last_error() !== JSON_ERROR_NONE)) {
+            return new WP_Error(
+                'global_styles_encode_error',
+                esc_html__("Erreur : Impossible de préparer les données de styles globaux.", 'theme-export-jlg')
+            );
+        }
+
+        $existing_id = self::find_existing_global_styles_post($theme_slug);
+        $post_title  = sprintf(__('Styles globaux pour %s', 'theme-export-jlg'), $theme->get('Name'));
+        $post_name   = 'wp-global-styles-' . sanitize_key($theme_slug);
+
+        $post_data = [
+            'post_type'            => 'wp_global_styles',
+            'post_status'          => 'publish',
+            'post_title'           => $post_title,
+            'post_name'            => $post_name,
+            'post_content'         => $content,
+            'post_content_filtered'=> is_string($stylesheet) ? $stylesheet : '',
+        ];
+
+        if ($existing_id > 0) {
+            $post_data['ID'] = $existing_id;
+            $result          = wp_update_post(wp_slash($post_data), true);
+            $post_id         = $existing_id;
+        } else {
+            $post_data['post_author'] = get_current_user_id();
+            $result                   = wp_insert_post(wp_slash($post_data), true);
+            $post_id                  = is_wp_error($result) ? 0 : (int) $result;
+        }
+
+        if (is_wp_error($result) || empty($result)) {
+            $message = is_wp_error($result)
+                ? $result->get_error_message()
+                : esc_html__("Erreur inconnue lors de l'enregistrement des styles globaux.", 'theme-export-jlg');
+
+            return new WP_Error('global_styles_persist_error', self::sanitize_error_message($message));
+        }
+
+        if ($post_id > 0 && taxonomy_exists('wp_theme')) {
+            wp_set_post_terms($post_id, [$theme_slug], 'wp_theme', false);
+        }
+
+        return true;
+    }
+
+    private static function find_existing_global_styles_post($theme_slug) {
+        $theme_slug = (string) $theme_slug;
+
+        if ('' === $theme_slug || !post_type_exists('wp_global_styles')) {
+            return 0;
+        }
+
+        $query_args = [
+            'post_type'      => 'wp_global_styles',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'no_found_rows'  => true,
+            'fields'         => 'ids',
+        ];
+
+        $sanitized_slug = sanitize_key($theme_slug);
+
+        if (taxonomy_exists('wp_theme')) {
+            $query_args['tax_query'] = [
+                [
+                    'taxonomy' => 'wp_theme',
+                    'field'    => 'name',
+                    'terms'    => [$theme_slug],
+                ],
+            ];
+        } else {
+            $query_args['name'] = 'wp-global-styles-' . $sanitized_slug;
+        }
+
+        $query   = new WP_Query($query_args);
+        $post_id = 0;
+
+        if (!empty($query->posts)) {
+            $post_id = (int) $query->posts[0];
+        }
+
+        wp_reset_postdata();
+
+        if ($post_id > 0) {
+            return $post_id;
+        }
+
+        $post = get_page_by_path('wp-global-styles-' . $sanitized_slug, OBJECT, 'wp_global_styles');
+
+        if ($post instanceof WP_Post) {
+            return (int) $post->ID;
+        }
+
+        return 0;
     }
 
     private static function sanitize_error_message($message) {

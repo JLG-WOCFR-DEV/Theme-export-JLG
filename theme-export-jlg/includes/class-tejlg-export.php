@@ -434,6 +434,109 @@ class TEJLG_Export {
     public static function export_selected_patterns_json($pattern_ids, $is_portable = false) {
         self::export_patterns_json($pattern_ids, $is_portable);
     }
+
+    public static function export_global_styles() {
+        if (!function_exists('wp_get_global_settings')) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'global_styles_export_unsupported',
+                esc_html__("Erreur : Cette version de WordPress ne permet pas l'export des réglages globaux.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $settings = wp_get_global_settings();
+
+        if (!is_array($settings)) {
+            $settings = [];
+        }
+
+        $stylesheet = '';
+
+        if (function_exists('wp_get_global_stylesheet')) {
+            $raw_stylesheet = wp_get_global_stylesheet();
+            $stylesheet     = is_string($raw_stylesheet) ? $raw_stylesheet : '';
+        }
+
+        $theme     = wp_get_theme();
+        $theme_name = is_object($theme) ? $theme->get('Name') : '';
+        $theme_slug = is_object($theme) ? $theme->get_stylesheet() : '';
+
+        $payload = [
+            'meta' => [
+                'generated_at' => gmdate('c'),
+                'site_url'     => home_url('/'),
+                'wp_version'   => get_bloginfo('version'),
+                'tejlg_version' => defined('TEJLG_VERSION') ? TEJLG_VERSION : null,
+                'theme'        => [
+                    'name'       => $theme_name,
+                    'stylesheet' => $theme_slug,
+                ],
+            ],
+            'data' => [
+                'settings'   => $settings,
+                'stylesheet' => $stylesheet,
+            ],
+        ];
+
+        if (null === $payload['meta']['tejlg_version']) {
+            unset($payload['meta']['tejlg_version']);
+        }
+
+        $json_options = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $json_options |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+
+        $json_data = wp_json_encode($payload, $json_options);
+
+        if (false === $json_data || (function_exists('json_last_error') && json_last_error() !== JSON_ERROR_NONE)) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'global_styles_export_json_error',
+                esc_html__("Erreur : Impossible de générer le fichier JSON des styles globaux.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $temp_file = wp_tempnam('tejlg-global-styles');
+
+        if (empty($temp_file)) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'global_styles_export_tmp_error',
+                esc_html__("Erreur : Impossible de préparer le fichier d'export des styles globaux.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $bytes = file_put_contents($temp_file, $json_data);
+
+        if (false === $bytes) {
+            @unlink($temp_file);
+
+            add_settings_error(
+                'tejlg_admin_messages',
+                'global_styles_export_write_error',
+                esc_html__("Erreur : Impossible d'écrire le fichier d'export des styles globaux.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $filename = sanitize_key($theme_slug);
+        $filename = '' !== $filename ? 'global-styles-' . $filename . '.json' : 'global-styles.json';
+
+        self::stream_json_file($temp_file, $filename);
+    }
     
     /**
      * Récupère le contenu et garantit qu'il est en UTF-8 valide.
