@@ -298,16 +298,91 @@ class TEJLG_Import {
 
             $pattern = $all_patterns[$index];
 
-            $raw_slug = isset($pattern['slug']) ? (string) $pattern['slug'] : '';
-            $raw_slug = trim($raw_slug);
+            $raw_slug_sources = [];
 
-            if (0 === strpos($raw_slug, 'custom-patterns/')) {
-                $raw_slug = substr($raw_slug, strlen('custom-patterns/'));
+            foreach (['slug', 'name'] as $slug_field) {
+                if (!isset($pattern[$slug_field])) {
+                    continue;
+                }
+
+                $value = $pattern[$slug_field];
+
+                if (is_scalar($value)) {
+                    $value = (string) $value;
+                } elseif (is_array($value) && isset($value['rendered']) && is_scalar($value['rendered'])) {
+                    $value = (string) $value['rendered'];
+                } else {
+                    $value = '';
+                }
+
+                $value = trim($value);
+
+                if ('' !== $value) {
+                    $raw_slug_sources[] = $value;
+                }
             }
 
-            $original_slug = $raw_slug;
+            $title_value = '';
 
-            $slug = sanitize_title($raw_slug);
+            if (isset($pattern['title'])) {
+                $title_value = $pattern['title'];
+
+                if (is_array($title_value)) {
+                    if (isset($title_value['rendered']) && is_scalar($title_value['rendered'])) {
+                        $title_value = (string) $title_value['rendered'];
+                    } elseif (isset($title_value['raw']) && is_scalar($title_value['raw'])) {
+                        $title_value = (string) $title_value['raw'];
+                    } else {
+                        $title_value = '';
+                    }
+                } elseif (!is_scalar($title_value)) {
+                    $title_value = '';
+                }
+            }
+
+            $title = sanitize_text_field((string) $title_value);
+
+            $title_slug_source = trim(wp_strip_all_tags((string) $title_value));
+            if ('' !== $title_slug_source) {
+                $raw_slug_sources[] = $title_slug_source;
+            }
+
+            $raw_slug_sources = array_values(
+                array_filter(
+                    array_unique($raw_slug_sources),
+                    static function ($value) {
+                        return '' !== $value;
+                    }
+                )
+            );
+
+            $slug = '';
+            $primary_slug_source = '';
+            $normalized_slug_sources = [];
+
+            foreach ($raw_slug_sources as $candidate) {
+                if (0 === strpos($candidate, 'custom-patterns/')) {
+                    $candidate = substr($candidate, strlen('custom-patterns/'));
+                }
+
+                $candidate = trim($candidate);
+
+                if ('' === $candidate) {
+                    continue;
+                }
+
+                $normalized_slug_sources[] = $candidate;
+
+                if ('' === $slug) {
+                    $sanitized_candidate = sanitize_title($candidate);
+
+                    if ('' !== $sanitized_candidate) {
+                        $slug = $sanitized_candidate;
+                        $primary_slug_source = $candidate;
+                    }
+                }
+            }
+
             if ('' === $slug) {
                 $errors[] = self::sanitize_error_message(
                     sprintf(__('La composition à l\'index %d ne possède pas de slug valide.', 'theme-export-jlg'), $index)
@@ -316,27 +391,40 @@ class TEJLG_Import {
                 continue;
             }
 
-            $title = isset($pattern['title']) ? sanitize_text_field($pattern['title']) : '';
-            $content = '';
+            $candidate_slugs = [];
 
-            if (isset($pattern['content'])) {
-                $content = self::sanitize_pattern_content_for_current_user((string) $pattern['content']);
+            foreach ($normalized_slug_sources as $candidate) {
+                $candidate_slugs[] = $candidate;
+
+                $sanitized_candidate = sanitize_title($candidate);
+
+                if ('' !== $sanitized_candidate) {
+                    $candidate_slugs[] = $sanitized_candidate;
+                    $candidate_slugs[] = 'custom-patterns/' . $sanitized_candidate;
+                }
             }
 
-            $candidate_slugs = array_unique([
-                $slug,
-                $original_slug,
-                '' !== $slug ? 'custom-patterns/' . $slug : '',
-            ]);
+            $candidate_slugs[] = $slug;
+            $candidate_slugs[] = 'custom-patterns/' . $slug;
+
+            if ('' !== $primary_slug_source) {
+                $candidate_slugs[] = $primary_slug_source;
+            }
 
             $candidate_slugs = array_values(
                 array_filter(
-                    $candidate_slugs,
+                    array_unique($candidate_slugs),
                     static function ($value) {
                         return '' !== $value;
                     }
                 )
             );
+
+            $content = '';
+
+            if (isset($pattern['content'])) {
+                $content = self::sanitize_pattern_content_for_current_user((string) $pattern['content']);
+            }
 
             $existing_block = null;
 

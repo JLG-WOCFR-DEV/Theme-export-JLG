@@ -111,7 +111,13 @@ class TEJLG_Admin {
 
         update_option(self::METRICS_ICON_OPTION, $icon_size);
 
+        $has_error = false;
+
         foreach ($messages as $message) {
+            if (isset($message['type']) && 'error' === $message['type']) {
+                $has_error = true;
+            }
+
             add_settings_error('tejlg_debug_messages', $message['code'], $message['message'], $message['type']);
         }
 
@@ -122,7 +128,7 @@ class TEJLG_Admin {
             [
                 'page'             => 'theme-export-jlg',
                 'tab'              => 'debug',
-                'settings-updated' => 'true',
+                'settings-updated' => $has_error ? 'false' : 'true',
             ],
             admin_url('admin.php')
         );

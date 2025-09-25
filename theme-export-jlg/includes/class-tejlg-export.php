@@ -122,14 +122,35 @@ class TEJLG_Export {
                 $zip_path = rtrim($relative_path, '/') . '/';
 
                 if (!isset($directories_added[$zip_path])) {
-                    $zip->addEmptyDir($zip_path);
+                    if (true !== $zip->addEmptyDir($zip_path)) {
+                        self::abort_zip_export(
+                            $zip,
+                            $zip_file_path,
+                            sprintf(
+                                /* translators: %s: relative path of the directory that failed to be added to the ZIP archive. */
+                                esc_html__('Impossible d\'ajouter le dossier « %s » à l\'archive ZIP.', 'theme-export-jlg'),
+                                esc_html($zip_path)
+                            )
+                        );
+                    }
+
                     $directories_added[$zip_path] = true;
                 }
 
                 continue;
             }
 
-            $zip->addFile($real_path, $relative_path);
+            if (true !== $zip->addFile($real_path, $relative_path)) {
+                self::abort_zip_export(
+                    $zip,
+                    $zip_file_path,
+                    sprintf(
+                        /* translators: %s: relative path of the file that failed to be added to the ZIP archive. */
+                        esc_html__('Impossible d\'ajouter le fichier « %s » à l\'archive ZIP.', 'theme-export-jlg'),
+                        esc_html($relative_path)
+                    )
+                );
+            }
             $files_added++;
         }
 
@@ -162,6 +183,23 @@ class TEJLG_Export {
 
         self::delete_temp_file($zip_file_path);
         exit;
+    }
+
+    /**
+     * Aborts the ZIP export, cleans up temporary files and stops execution.
+     *
+     * @param ZipArchive $zip           Archive instance to close.
+     * @param string     $zip_file_path Path to the temporary ZIP file.
+     * @param string     $message       Sanitized error message displayed to the user.
+     */
+    private static function abort_zip_export(ZipArchive $zip, $zip_file_path, $message) {
+        $zip->close();
+
+        if (file_exists($zip_file_path)) {
+            self::delete_temp_file($zip_file_path);
+        }
+
+        wp_die($message);
     }
 
     /**
