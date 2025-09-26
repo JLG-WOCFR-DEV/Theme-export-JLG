@@ -134,8 +134,10 @@ class TEJLG_Export {
                 continue;
             }
 
+            $relative_path_in_zip = $zip_root_directory . ltrim($relative_path, '/');
+
             if ($file->isDir()) {
-                $zip_path = $zip_root_directory . rtrim($relative_path, '/') . '/';
+                $zip_path = rtrim($relative_path_in_zip, '/') . '/';
 
                 if (!isset($directories_added[$zip_path])) {
                     if (true !== $zip->addEmptyDir($zip_path)) {
@@ -156,16 +158,14 @@ class TEJLG_Export {
                 continue;
             }
 
-            $zip_file_path_in_archive = $zip_root_directory . ltrim($relative_path, '/');
-
-            if (true !== $zip->addFile($real_path, $zip_file_path_in_archive)) {
+            if (true !== $zip->addFile($real_path, $relative_path_in_zip)) {
                 self::abort_zip_export(
                     $zip,
                     $zip_file_path,
                     sprintf(
                         /* translators: %s: relative path of the file that failed to be added to the ZIP archive. */
                         esc_html__('Impossible d\'ajouter le fichier « %s » à l\'archive ZIP.', 'theme-export-jlg'),
-                        esc_html($zip_file_path_in_archive)
+                        esc_html($relative_path_in_zip)
                     )
                 );
             }
