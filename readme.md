@@ -15,6 +15,15 @@ Theme Export - JLG est un plugin WordPress pour administrateurs de sites blocs q
 2. Activez l’extension **Theme Export - JLG** depuis le menu **Extensions** de WordPress.【F:theme-export-jlg/theme-export-jlg.php†L3-L13】
 3. Accédez à la nouvelle entrée de menu **Theme Export** dans la barre latérale d’administration pour lancer les assistants d’export, d’import et de migration.【F:theme-export-jlg/includes/class-tejlg-admin.php†L10-L138】
 
+## Tests automatisés
+Le dépôt inclut une suite de tests unitaires WordPress (`WP_UnitTestCase`) qui valident notamment les flux d’import et le stockage temporaire des compositions.
+
+1. Installez les dépendances de développement : `composer install`.
+2. Mettez à disposition une copie du cœur WordPress (par défaut attendue dans `/usr/share/wordpress/`, valeur modifiable via la variable d’environnement `WP_TESTS_ABSPATH`).
+3. Exécutez la suite : `composer test` (alias de `vendor/bin/phpunit`).
+
+Le chargeur de tests (`tests/bootstrap.php`) s’appuie sur [`wp-phpunit/wp-phpunit`](https://github.com/wp-phpunit/wp-phpunit) pour initialiser WordPress et lit les paramètres de connexion (`WP_TESTS_DB_*`) depuis l’environnement afin de fonctionner dans la CI comme en local.
+
 ## Fonctionnalités principales
 - **Exporter le thème actif au format ZIP** pour cloner un environnement ou préparer un audit. Le plugin construit l’archive à partir des fichiers du thème actif et la propose en téléchargement direct.【F:theme-export-jlg/includes/class-tejlg-admin.php†L102-L111】【F:theme-export-jlg/includes/class-tejlg-export.php†L7-L37】
 - **Sauvegarder les compositions personnalisées en JSON**, avec un mode « export portable » qui neutralise les IDs médias et les métadonnées pour limiter les dépendances à un site spécifique.【F:theme-export-jlg/includes/class-tejlg-admin.php†L112-L177】【F:theme-export-jlg/includes/class-tejlg-export.php†L43-L125】
