@@ -595,11 +595,11 @@ class TEJLG_Import {
                 )
             );
 
-            $content = '';
+            $content_source = isset($pattern['content'])
+                ? self::extract_pattern_content_value($pattern['content'])
+                : '';
 
-            if (isset($pattern['content'])) {
-                $content = self::sanitize_pattern_content_for_current_user((string) $pattern['content']);
-            }
+            $content = self::sanitize_pattern_content_for_current_user($content_source);
 
             $existing_block = null;
 
@@ -1194,6 +1194,42 @@ class TEJLG_Import {
         }
 
         return $token;
+    }
+
+    /**
+     * Extract a usable pattern content string from various content formats.
+     *
+     * @param mixed $raw_content Content field from the imported pattern.
+     * @return string Pattern content suitable for parsing or sanitizing.
+     */
+    public static function extract_pattern_content_value($raw_content) {
+        if (is_array($raw_content)) {
+            foreach (['raw', 'rendered'] as $content_key) {
+                if (!array_key_exists($content_key, $raw_content)) {
+                    continue;
+                }
+
+                $candidate = $raw_content[$content_key];
+
+                if (!is_scalar($candidate)) {
+                    continue;
+                }
+
+                $candidate_string = (string) $candidate;
+
+                if ('' !== trim($candidate_string)) {
+                    return $candidate_string;
+                }
+            }
+
+            $raw_content = '';
+        }
+
+        if (!is_scalar($raw_content)) {
+            return '';
+        }
+
+        return (string) $raw_content;
     }
 
     /**

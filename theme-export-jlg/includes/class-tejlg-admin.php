@@ -829,11 +829,8 @@ class TEJLG_Admin {
                 $title = sprintf(__('Composition sans titre #%d', 'theme-export-jlg'), ((int) $index) + 1);
             }
 
-            $raw_content = $pattern['content'];
-            if (!is_scalar($raw_content)) {
-                $raw_content = '';
-            }
-            $pattern_content = (string) $raw_content;
+            $raw_content = isset($pattern['content']) ? $pattern['content'] : '';
+            $pattern_content = TEJLG_Import::extract_pattern_content_value($raw_content);
 
             $parsed_blocks = '' !== $pattern_content ? parse_blocks($pattern_content) : [];
             $rendered_pattern = '';
