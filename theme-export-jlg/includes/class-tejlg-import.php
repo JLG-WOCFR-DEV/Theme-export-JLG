@@ -1207,7 +1207,7 @@ class TEJLG_Import {
         $block_comment_tokens = [];
 
         $tokenized_content = preg_replace_callback(
-            '/<!--\s*(\/?.*?wp:[^>]*?)\s*-->/',
+            '/<!--\s*\/?wp:(?:[\s\S]*?)-->/',
             function ($matches) use (&$block_comment_tokens) {
                 $token = TEJLG_Import::generate_block_comment_token($block_comment_tokens);
                 $block_comment_tokens[$token] = $matches[0];
