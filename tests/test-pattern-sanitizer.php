@@ -1,5 +1,6 @@
 <?php
 
+require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-import.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
 
@@ -110,5 +111,70 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
         $this->assertCount(1, $decoded);
         $this->assertArrayHasKey('content', $decoded[0]);
         $this->assertStringContainsString('/subdir/wp-content/uploads/2024/05/test.png', $decoded[0]['content']);
+    }
+
+    public function test_preview_and_import_succeeds_with_array_content() {
+        $admin_id = self::factory()->user->create([
+            'role' => 'administrator',
+        ]);
+
+        wp_set_current_user($admin_id);
+
+        $raw_block_content = '<!-- wp:paragraph --><p>Array content body</p><!-- /wp:paragraph -->';
+
+        $pattern = [
+            'title'   => 'Array Content Pattern',
+            'slug'    => 'custom-patterns/array-content-pattern',
+            'name'    => 'array-content-pattern',
+            'content' => [
+                'raw'      => $raw_block_content,
+                'rendered' => '<p>Array content body</p>',
+            ],
+        ];
+
+        $create_payload = new ReflectionMethod(TEJLG_Import::class, 'create_patterns_storage_payload');
+        $create_payload->setAccessible(true);
+
+        $preview_transient_id = 'tejlg_' . md5(uniqid('preview', true));
+        $preview_payload      = $create_payload->invoke(null, [$pattern]);
+
+        set_transient($preview_transient_id, $preview_payload, HOUR_IN_SECONDS);
+
+        $admin_instance = new TEJLG_Admin();
+        $preview_method = new ReflectionMethod(TEJLG_Admin::class, 'render_patterns_preview_page');
+        $preview_method->setAccessible(true);
+
+        ob_start();
+        $preview_method->invoke($admin_instance, $preview_transient_id);
+        $preview_output = ob_get_clean();
+
+        $this->assertStringContainsString('pattern-preview-iframe', $preview_output);
+        $this->assertStringContainsString('Array Content Pattern', $preview_output);
+        $this->assertStringNotContainsString('Erreur : Aucune composition valide', $preview_output);
+
+        TEJLG_Import::delete_patterns_storage($preview_transient_id, $preview_payload);
+
+        $import_transient_id = 'tejlg_' . md5(uniqid('import', true));
+        $import_payload      = $create_payload->invoke(null, [$pattern]);
+
+        set_transient($import_transient_id, $import_payload, HOUR_IN_SECONDS);
+
+        global $wp_settings_errors;
+        $wp_settings_errors = [];
+
+        TEJLG_Import::handle_patterns_import_step2($import_transient_id, [0]);
+
+        $imported_post = get_page_by_path('array-content-pattern', OBJECT, 'wp_block');
+        $this->assertInstanceOf(WP_Post::class, $imported_post);
+        $this->assertStringContainsString('Array content body', $imported_post->post_content);
+
+        $messages = get_settings_errors('tejlg_import_messages');
+        $this->assertNotEmpty($messages);
+
+        $message_types = wp_list_pluck($messages, 'type');
+        $this->assertContains('success', $message_types);
+
+        wp_delete_post($imported_post->ID, true);
+        TEJLG_Import::delete_patterns_storage($import_transient_id, $import_payload);
     }
 }
