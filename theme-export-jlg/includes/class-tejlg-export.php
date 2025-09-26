@@ -338,7 +338,7 @@ class TEJLG_Export {
         fclose($handle);
 
         $filename = empty($sanitized_ids) ? 'exported-patterns.json' : 'selected-patterns.json';
-        self::stream_json_file($temp_file, $filename);
+        return self::stream_json_file($temp_file, $filename);
     }
 
     private static function normalize_path($path) {
@@ -432,7 +432,7 @@ class TEJLG_Export {
      * @param bool  $is_portable Active le nettoyage « portable » du contenu.
      */
     public static function export_selected_patterns_json($pattern_ids, $is_portable = false) {
-        self::export_patterns_json($pattern_ids, $is_portable);
+        return self::export_patterns_json($pattern_ids, $is_portable);
     }
 
     public static function export_global_styles() {
@@ -629,7 +629,13 @@ class TEJLG_Export {
                         $remaining = substr($relative, strlen($home_path));
 
                         if ($remaining === '' || in_array($remaining[0], ['/', '?', '#'], true)) {
-                            $relative = $remaining;
+                            $has_duplicate_prefix = 0 === strpos($remaining, $home_path)
+                                && ('' === substr($remaining, strlen($home_path))
+                                    || in_array(substr($remaining, strlen($home_path), 1), ['/', '?', '#'], true));
+
+                            if ($has_duplicate_prefix) {
+                                $relative = $home_path . substr($remaining, strlen($home_path));
+                            }
 
                             if ($relative === '' || '/' !== $relative[0]) {
                                 $relative = '/' . ltrim($relative, '/');
@@ -762,6 +768,15 @@ class TEJLG_Export {
         if (!@file_exists($file_path) || !is_readable($file_path)) {
             @unlink($file_path);
             wp_die(esc_html__("Le fichier d'export JSON est introuvable ou illisible.", 'theme-export-jlg'));
+        }
+
+        $should_stream = apply_filters('tejlg_export_stream_json_file', true, $file_path, $filename);
+
+        if (!$should_stream) {
+            $contents = @file_get_contents($file_path);
+            @unlink($file_path);
+
+            return false === $contents ? '' : $contents;
         }
 
         $file_size = filesize($file_path);
