@@ -73,7 +73,46 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
 
         $cleaned = $method->invoke(null, $content);
 
-        $this->assertStringContainsString('href="/page"', $cleaned);
+        $this->assertStringContainsString('href="/sub/page"', $cleaned);
         $this->assertStringContainsString('href="/submarine-news"', $cleaned);
+    }
+
+    public function test_export_patterns_json_preserves_subdirectory_prefix_in_media_urls() {
+        update_option('home', 'https://example.com/subdir');
+        update_option('siteurl', 'https://example.com/subdir');
+
+        $content = '<!-- wp:image --><figure class="wp-block-image">'
+            . '<img src="https://example.com/subdir/wp-content/uploads/2024/01/image.png" alt="Example" />'
+            . '</figure><!-- /wp:image -->';
+
+        $pattern_id = self::factory()->post->create([
+            'post_type'    => 'wp_block',
+            'post_status'  => 'publish',
+            'post_title'   => 'Subdir Pattern',
+            'post_content' => $content,
+        ]);
+
+        $captured_json = '';
+
+        $filter = static function ($should_stream, $file_path) use (&$captured_json) {
+            $captured_json = file_get_contents($file_path);
+
+            return false;
+        };
+
+        add_filter('tejlg_export_should_stream_json_file', $filter, 10, 3);
+
+        TEJLG_Export::export_patterns_json([$pattern_id], true);
+
+        remove_filter('tejlg_export_should_stream_json_file', $filter, 10);
+
+        $this->assertNotSame('', $captured_json, 'The export JSON should be captured for inspection.');
+
+        $decoded = json_decode($captured_json, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertNotEmpty($decoded);
+        $this->assertArrayHasKey('content', $decoded[0]);
+        $this->assertStringContainsString('/subdir/wp-content/', $decoded[0]['content']);
     }
 }

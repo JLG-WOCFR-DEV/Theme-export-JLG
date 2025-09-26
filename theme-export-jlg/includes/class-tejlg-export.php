@@ -625,7 +625,7 @@ class TEJLG_Export {
                         $relative  = $path . $query . $fragment;
                     }
 
-                    if ('' !== $home_path && 0 === strpos($relative, $home_path)) {
+                    if ('' !== $home_path && 0 === strpos($relative, $home_path . $home_path)) {
                         $remaining = substr($relative, strlen($home_path));
 
                         if ($remaining === '' || in_array($remaining[0], ['/', '?', '#'], true)) {
@@ -781,6 +781,15 @@ class TEJLG_Export {
         if (false === $handle) {
             @unlink($file_path);
             wp_die(esc_html__("Impossible de lire le fichier d'export JSON.", 'theme-export-jlg'));
+        }
+
+        $should_stream = apply_filters('tejlg_export_should_stream_json_file', true, $file_path, $filename);
+
+        if (!$should_stream) {
+            fclose($handle);
+            @unlink($file_path);
+
+            return;
         }
 
         while (!feof($handle)) {
