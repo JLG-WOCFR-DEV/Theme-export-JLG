@@ -1205,17 +1205,67 @@ class TEJLG_Import {
         }
 
         $block_comment_tokens = [];
+        $tokenized_content    = '';
+        $offset               = 0;
+        $length               = strlen($raw_content);
 
-        $tokenized_content = preg_replace_callback(
-            '/<!--\s*\/?wp:(?:[\s\S]*?)-->/',
-            function ($matches) use (&$block_comment_tokens) {
-                $token = TEJLG_Import::generate_block_comment_token($block_comment_tokens);
-                $block_comment_tokens[$token] = $matches[0];
+        while (false !== ($start = strpos($raw_content, '<!--', $offset))) {
+            $tokenized_content .= substr($raw_content, $offset, $start - $offset);
 
-                return $token;
-            },
-            $raw_content
-        );
+            $comment_candidate = substr($raw_content, $start);
+
+            if (!preg_match('/^<!--\s*\/?wp:/i', $comment_candidate)) {
+                $tokenized_content .= '<!--';
+                $offset = $start + 4;
+                continue;
+            }
+
+            $in_single_quote = false;
+            $in_double_quote = false;
+            $comment_end     = false;
+
+            for ($i = $start + 4; $i < $length; $i++) {
+                $char = $raw_content[$i];
+
+                $backslash_count = 0;
+                for ($j = $i - 1; $j >= $start + 4 && '\\' === $raw_content[$j]; $j--) {
+                    $backslash_count++;
+                }
+
+                $is_escaped = ($backslash_count % 2) === 1;
+
+                if (!$in_single_quote && '"' === $char && !$is_escaped) {
+                    $in_double_quote = !$in_double_quote;
+                } elseif (!$in_double_quote && "'" === $char && !$is_escaped) {
+                    $in_single_quote = !$in_single_quote;
+                }
+
+                if (!$in_single_quote && !$in_double_quote && '-' === $char) {
+                    if (substr($raw_content, $i, 3) === '-->') {
+                        $comment_end = $i + 3;
+                        break;
+                    }
+                }
+            }
+
+            if (false === $comment_end) {
+                $tokenized_content .= substr($raw_content, $start);
+                $offset = $length;
+                break;
+            }
+
+            $comment = substr($raw_content, $start, $comment_end - $start);
+            $token   = self::generate_block_comment_token($block_comment_tokens);
+
+            $block_comment_tokens[$token] = $comment;
+            $tokenized_content           .= $token;
+
+            $offset = $comment_end;
+        }
+
+        if ($offset < $length) {
+            $tokenized_content .= substr($raw_content, $offset);
+        }
 
         $allowed_html      = wp_kses_allowed_html('post');
         $allowed_protocols = wp_allowed_protocols();
