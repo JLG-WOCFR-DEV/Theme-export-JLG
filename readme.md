@@ -47,3 +47,24 @@ Les fichiers analysés sont stockés temporairement dans un transient de 15 minu
 - [Guide des thèmes enfants (WordPress.org)](https://developer.wordpress.org/themes/advanced-topics/child-themes/) – Pour approfondir les personnalisations apportées par le générateur de thème enfant.
 
 Pour toute autre question, consultez le **Guide de migration** intégré ou utilisez l’onglet **Débogage** pour réunir les informations nécessaires avant de contacter votre hébergeur ou votre agence WordPress.【F:theme-export-jlg/includes/class-tejlg-admin.php†L214-L352】
+
+## Tests
+
+Préparez l’environnement de test WordPress (par exemple avec [`wp-env`](https://developer.wordpress.org/block-editor/reference-guides/packages/packages-env/)) puis installez les dépendances JavaScript :
+
+```
+npm install
+npx playwright install
+```
+
+Ensuite, lancez votre instance WordPress locale (par exemple `npx wp-env start`) avant d’exécuter la commande qui enchaîne les tests unitaires PHP existants et le test d’interface Playwright qui vérifie le filtrage et la case « Tout sélectionner » de l’écran d’export sélectif :
+
+```
+npm test
+```
+
+Pour exécuter uniquement le test d’interface, utilisez :
+
+```
+npm run test:e2e
+```
