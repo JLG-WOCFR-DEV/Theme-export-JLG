@@ -1,0 +1,14 @@
+{
+  "name": "theme-export-jlg",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:php": "phpunit",
+    "test:e2e": "playwright test",
+    "test": "npm run test:php && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "@wordpress/e2e-test-utils-playwright": "^1.31.0"
+  }
+}
