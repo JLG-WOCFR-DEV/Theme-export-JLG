@@ -626,10 +626,14 @@ class TEJLG_Export {
                     }
 
                     if ('' !== $home_path && 0 === strpos($relative, $home_path)) {
-                        $relative = substr($relative, strlen($home_path));
+                        $remaining = substr($relative, strlen($home_path));
 
-                        if ($relative === '' || '/' !== $relative[0]) {
-                            $relative = '/' . ltrim($relative, '/');
+                        if ($remaining === '' || in_array($remaining[0], ['/', '?', '#'], true)) {
+                            $relative = $remaining;
+
+                            if ($relative === '' || '/' !== $relative[0]) {
+                                $relative = '/' . ltrim($relative, '/');
+                            }
                         }
                     }
 
