@@ -59,19 +59,30 @@ class TEJLG_Theme_Tools {
             require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
         }
 
-        $filesystem_url  = admin_url( 'themes.php' );
-        $filesystem_creds = request_filesystem_credentials( $filesystem_url, '', false, $theme_root );
+        $filesystem_url = admin_url( 'admin.php?page=theme-export-jlg&tab=export' );
+
+        $extra_fields = [
+            'tejlg_create_child_nonce' => isset( $_POST['tejlg_create_child_nonce'] )
+                ? wp_unslash( $_POST['tejlg_create_child_nonce'] )
+                : '',
+            'child_theme_name'        => isset( $_POST['child_theme_name'] )
+                ? wp_unslash( $_POST['child_theme_name'] )
+                : '',
+        ];
+
+        if ( isset( $_POST['tejlg_create_child'] ) ) {
+            $extra_fields['tejlg_create_child'] = wp_unslash( $_POST['tejlg_create_child'] );
+        }
+
+        $filesystem_creds = request_filesystem_credentials(
+            $filesystem_url,
+            '',
+            false,
+            $theme_root,
+            $extra_fields
+        );
 
         if ( false === $filesystem_creds ) {
-            add_settings_error(
-                'tejlg_admin_messages',
-                'child_theme_error',
-                esc_html__(
-                    'Erreur : Les identifiants du système de fichiers sont requis pour créer le thème enfant.',
-                    'theme-export-jlg'
-                ),
-                'error'
-            );
             return;
         }
 
