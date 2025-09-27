@@ -903,7 +903,10 @@ class TEJLG_Admin {
                 <?php foreach ($prepared_patterns as $pattern_data): ?>
                     <?php
                     $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $pattern_data['rendered'] . '</body></html>';
-                    $iframe_json = wp_json_encode($iframe_content);
+                    $iframe_json = wp_json_encode(
+                        $iframe_content,
+                        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+                    );
                     if (false === $iframe_json) {
                         $iframe_json = '""';
                     }
