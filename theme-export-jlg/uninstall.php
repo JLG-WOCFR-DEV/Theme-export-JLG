@@ -35,6 +35,6 @@ $wpdb->query(
     )
 );
 
-// Supprimer l'option stockant la taille des icônes de métriques.
+// Supprimer l'option stockant la taille des icônes de métriques (mono et multisites).
 delete_option( 'tejlg_metrics_icon_size' );
 delete_site_option( 'tejlg_metrics_icon_size' );
