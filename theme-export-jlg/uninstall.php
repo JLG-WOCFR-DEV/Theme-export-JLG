@@ -34,3 +34,7 @@ $wpdb->query(
         $timeout_pattern
     )
 );
+
+// Supprimer l'option stockant la taille des icônes de métriques.
+delete_option( 'tejlg_metrics_icon_size' );
+delete_site_option( 'tejlg_metrics_icon_size' );
