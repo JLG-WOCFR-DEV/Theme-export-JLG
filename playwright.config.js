@@ -1,4 +1,4 @@
-const baseConfig = require('@wordpress/e2e-test-utils-playwright/config');
+const baseConfig = require('@wordpress/e2e-test-utils-playwright/build/config');
 
 module.exports = {
   ...baseConfig,
