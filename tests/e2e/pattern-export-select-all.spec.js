@@ -94,4 +94,49 @@ test.describe('Pattern export selection screen', () => {
     await expect(selectAll).not.toBeChecked();
     await expect(selectAll).toHaveJSProperty('indeterminate', true);
   });
+
+  test('displays fallback title for untitled patterns and allows searching with it', async ({ admin, page, requestUtils }) => {
+    await requestUtils.activatePlugin('theme-export-jlg/theme-export-jlg.php');
+
+    await requestUtils.deleteAllPosts({ postType: 'wp_block' });
+
+    await requestUtils.createPost({
+      postType: 'wp_block',
+      title: '   ',
+      status: 'publish',
+      content: '<!-- wp:paragraph --><p>Untitled Content</p><!-- /wp:paragraph -->',
+    });
+
+    await requestUtils.createPost({
+      postType: 'wp_block',
+      title: 'Zeta Pattern',
+      status: 'publish',
+      content: '<!-- wp:paragraph --><p>Zeta Pattern</p><!-- /wp:paragraph -->',
+    });
+
+    await admin.visitAdminPage('admin.php', 'page=theme-export-jlg&tab=export&action=select_patterns');
+
+    const fallbackText = 'Composition sans titre #1';
+    const fallbackItem = page.locator('.pattern-selection-item').filter({ hasText: fallbackText }).first();
+    const visibleItems = page.locator('.pattern-selection-item:not(.is-hidden)');
+    const searchInput = page.locator('#pattern-search');
+
+    await expect(fallbackItem).toBeVisible();
+    await expect(fallbackItem).toHaveAttribute('data-label', fallbackText);
+
+    await searchInput.fill('sans titre #1');
+
+    await expect(visibleItems).toHaveCount(1);
+    await expect(fallbackItem).toBeVisible();
+
+    await searchInput.fill('zeta');
+
+    await expect(visibleItems).toHaveCount(1);
+    await expect(visibleItems.first()).toContainText('Zeta Pattern');
+
+    await searchInput.fill('sans titre');
+
+    await expect(visibleItems).toHaveCount(1);
+    await expect(fallbackItem).toBeVisible();
+  });
 });
