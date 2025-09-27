@@ -565,8 +565,22 @@ class TEJLG_Admin {
                         <input type="search" id="pattern-search" placeholder="<?php echo esc_attr__('Rechercher…', 'theme-export-jlg'); ?>" aria-controls="pattern-selection-items">
                     </p>
                     <ul class="pattern-selection-items" id="pattern-selection-items" aria-live="polite" data-searchable="true">
-                        <?php while ($patterns_query->have_posts()): $patterns_query->the_post();
-                            $pattern_title = get_the_title();
+                        <?php
+                        $pattern_counter = $per_page > 0 ? (($current_page - 1) * $per_page) : 0;
+                        while ($patterns_query->have_posts()):
+                            $patterns_query->the_post();
+                            $pattern_counter++;
+                            $raw_title = get_the_title();
+                            if (!is_scalar($raw_title)) {
+                                $raw_title = '';
+                            }
+                            $pattern_title = trim((string) $raw_title);
+                            if ('' === $pattern_title) {
+                                $pattern_title = sprintf(
+                                    esc_html__('Composition sans titre #%d', 'theme-export-jlg'),
+                                    (int) $pattern_counter
+                                );
+                            }
                         ?>
                             <li class="pattern-selection-item" data-label="<?php echo esc_attr($pattern_title); ?>">
                                 <label>
