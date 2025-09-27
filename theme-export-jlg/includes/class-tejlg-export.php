@@ -193,9 +193,33 @@ class TEJLG_Export {
         nocache_headers();
         self::clear_output_buffers();
 
+        $zip_file_size = filesize($zip_file_path);
+        /**
+         * Filters the computed ZIP file size before streaming the archive.
+         *
+         * This allows testing utilities or custom integrations to override the
+         * detected size when required.
+         *
+         * @since 1.0.0
+         *
+         * @param int|false $zip_file_size  The detected ZIP file size or false on failure.
+         * @param string    $zip_file_path  Absolute path to the ZIP file being exported.
+         */
+        $zip_file_size = apply_filters('tejlg_export_zip_file_size', $zip_file_size, $zip_file_path);
+
+        if (!is_numeric($zip_file_size)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log(sprintf('[Theme Export JLG] Unable to determine ZIP size for download: %s (value: %s)', $zip_file_path, var_export($zip_file_size, true)));
+            }
+
+            self::delete_temp_file($zip_file_path);
+
+            wp_die(esc_html__("Impossible de déterminer la taille de l'archive ZIP à télécharger.", 'theme-export-jlg'));
+        }
+
         header('Content-Type: application/zip');
         header('Content-Disposition: attachment; filename="' . $zip_file_name . '"');
-        header('Content-Length: ' . filesize($zip_file_path));
+        header('Content-Length: ' . (string) (int) $zip_file_size);
         readfile($zip_file_path);
         flush();
 
