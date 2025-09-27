@@ -459,6 +459,18 @@ class TEJLG_Admin {
         ?>
         <?php settings_errors('tejlg_admin_messages'); ?>
 
+        <?php
+        $child_theme_value = '';
+
+        if (isset($_POST['child_theme_name'])) {
+            $raw_child_theme = $_POST['child_theme_name'];
+
+            if (is_scalar($raw_child_theme)) {
+                $child_theme_value = sanitize_text_field(wp_unslash($raw_child_theme));
+            }
+        }
+        ?>
+
         <h2><?php esc_html_e('Actions sur le Thème Actif', 'theme-export-jlg'); ?></h2>
         <div class="tejlg-cards-container">
             <div class="tejlg-card">
@@ -508,7 +520,7 @@ class TEJLG_Admin {
                     <?php wp_nonce_field('tejlg_create_child_action', 'tejlg_create_child_nonce'); ?>
                     <p>
                         <label for="child_theme_name"><?php esc_html_e('Nom du thème enfant :', 'theme-export-jlg'); ?></label>
-                        <input type="text" name="child_theme_name" id="child_theme_name" class="regular-text" placeholder="<?php echo esc_attr(wp_get_theme()->get('Name') . ' ' . __('Enfant', 'theme-export-jlg')); ?>" required>
+                        <input type="text" name="child_theme_name" id="child_theme_name" class="regular-text" value="<?php echo esc_attr($child_theme_value); ?>" placeholder="<?php echo esc_attr(wp_get_theme()->get('Name') . ' ' . __('Enfant', 'theme-export-jlg')); ?>" required>
                     </p>
                     <p><button type="submit" name="tejlg_create_child" class="button button-primary"><?php esc_html_e('Créer le Thème Enfant', 'theme-export-jlg'); ?></button></p>
                 </form>
