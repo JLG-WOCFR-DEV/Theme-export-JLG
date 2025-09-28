@@ -17,6 +17,24 @@ class TEJLG_Import {
             return;
         }
 
+        if (
+            (defined('DISALLOW_FILE_MODS') && DISALLOW_FILE_MODS) ||
+            (defined('DISALLOW_FILE_EDIT') && DISALLOW_FILE_EDIT)
+        ) {
+            if (isset($file['tmp_name'])) {
+                @unlink($file['tmp_name']);
+            }
+
+            add_settings_error(
+                'tejlg_import_messages',
+                'theme_import_file_mods_disabled',
+                esc_html__('Erreur : Les modifications de fichiers sont désactivées sur ce site.', 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
         require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
         require_once ABSPATH . 'wp-admin/includes/file.php';
 
