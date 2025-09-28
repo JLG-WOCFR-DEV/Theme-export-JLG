@@ -177,4 +177,52 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
         wp_delete_post($imported_post->ID, true);
         TEJLG_Import::delete_patterns_storage($import_transient_id, $import_payload);
     }
+
+    public function filter_export_batch_size($size) {
+        return 3;
+    }
+
+    public function test_export_patterns_json_processes_all_pages_before_stopping() {
+        $pattern_ids = [];
+
+        for ($i = 0; $i < 7; $i++) {
+            $pattern_ids[] = self::factory()->post->create([
+                'post_type'    => 'wp_block',
+                'post_status'  => 'publish',
+                'post_title'   => 'Pattern ' . $i,
+                'post_name'    => 'pattern-' . $i,
+                'post_content' => '<!-- wp:paragraph --><p>Pattern ' . $i . '</p><!-- /wp:paragraph -->',
+            ]);
+        }
+
+        add_filter('tejlg_export_patterns_batch_size', [$this, 'filter_export_batch_size']);
+        add_filter('tejlg_export_stream_json_file', '__return_false');
+
+        try {
+            $json = TEJLG_Export::export_selected_patterns_json($pattern_ids, false);
+        } finally {
+            remove_filter('tejlg_export_patterns_batch_size', [$this, 'filter_export_batch_size']);
+            remove_filter('tejlg_export_stream_json_file', '__return_false');
+        }
+
+        foreach ($pattern_ids as $pattern_id) {
+            wp_delete_post($pattern_id, true);
+        }
+
+        $this->assertIsString($json);
+        $decoded = json_decode($json, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertCount(count($pattern_ids), $decoded);
+
+        $slugs = wp_list_pluck($decoded, 'slug');
+        $expected_slugs = array_map(
+            static function ($index) {
+                return 'pattern-' . $index;
+            },
+            range(0, 6)
+        );
+
+        $this->assertSame($expected_slugs, $slugs);
+    }
 }
