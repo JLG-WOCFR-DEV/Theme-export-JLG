@@ -11,12 +11,14 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
 
     protected $previous_home_url;
     protected $previous_site_url;
+    protected $custom_batch_size = 3;
 
     public function setUp(): void {
         parent::setUp();
 
         $this->previous_home_url = get_option('home');
         $this->previous_site_url = get_option('siteurl');
+        $this->custom_batch_size = 3;
     }
 
     public function tearDown(): void {
@@ -179,7 +181,7 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
     }
 
     public function filter_export_batch_size($size) {
-        return 3;
+        return $this->custom_batch_size;
     }
 
     public function test_export_patterns_json_processes_all_pages_before_stopping() {
@@ -221,6 +223,52 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
                 return 'pattern-' . $index;
             },
             range(0, 6)
+        );
+
+        $this->assertSame($expected_slugs, $slugs);
+    }
+
+    public function test_export_patterns_json_exports_all_patterns_with_partial_last_batch() {
+        $pattern_ids = [];
+
+        for ($i = 0; $i < 5; $i++) {
+            $pattern_ids[] = self::factory()->post->create([
+                'post_type'    => 'wp_block',
+                'post_status'  => 'publish',
+                'post_title'   => 'Partial Batch Pattern ' . $i,
+                'post_name'    => 'partial-batch-pattern-' . $i,
+                'post_content' => '<!-- wp:paragraph --><p>Partial ' . $i . '</p><!-- /wp:paragraph -->',
+            ]);
+        }
+
+        $this->custom_batch_size = 4;
+
+        add_filter('tejlg_export_patterns_batch_size', [$this, 'filter_export_batch_size']);
+        add_filter('tejlg_export_stream_json_file', '__return_false');
+
+        try {
+            $json = TEJLG_Export::export_selected_patterns_json($pattern_ids, false);
+        } finally {
+            remove_filter('tejlg_export_patterns_batch_size', [$this, 'filter_export_batch_size']);
+            remove_filter('tejlg_export_stream_json_file', '__return_false');
+        }
+
+        foreach ($pattern_ids as $pattern_id) {
+            wp_delete_post($pattern_id, true);
+        }
+
+        $this->assertIsString($json);
+
+        $decoded = json_decode($json, true);
+        $this->assertIsArray($decoded);
+        $this->assertCount(count($pattern_ids), $decoded);
+
+        $slugs = wp_list_pluck($decoded, 'slug');
+        $expected_slugs = array_map(
+            static function ($index) {
+                return 'partial-batch-pattern-' . $index;
+            },
+            range(0, 4)
         );
 
         $this->assertSame($expected_slugs, $slugs);
