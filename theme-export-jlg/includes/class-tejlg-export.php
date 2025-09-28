@@ -262,7 +262,7 @@ class TEJLG_Export {
             'post_type'              => 'wp_block',
             'posts_per_page'         => $batch_size,
             'post_status'            => 'publish',
-            'no_found_rows'          => false,
+            'no_found_rows'          => true,
             'update_post_meta_cache' => false,
             'update_post_term_cache' => false,
             'lazy_load_term_meta'    => false,
@@ -351,7 +351,7 @@ class TEJLG_Export {
 
             wp_reset_postdata();
 
-            if ($patterns_query->max_num_pages <= $page) {
+            if (count($patterns_query->posts) < $batch_size) {
                 break;
             }
 
