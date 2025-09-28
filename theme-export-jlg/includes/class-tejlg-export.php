@@ -300,6 +300,8 @@ class TEJLG_Export {
                 break;
             }
 
+            $current_batch_count = count($patterns_query->posts);
+
             while ($patterns_query->have_posts()) {
                 $patterns_query->the_post();
 
@@ -351,7 +353,7 @@ class TEJLG_Export {
 
             wp_reset_postdata();
 
-            if (count($patterns_query->posts) < $batch_size) {
+            if ($current_batch_count < $batch_size) {
                 break;
             }
 
