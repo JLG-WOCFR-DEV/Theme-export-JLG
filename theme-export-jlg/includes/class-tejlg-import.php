@@ -1008,7 +1008,42 @@ class TEJLG_Import {
         if (is_array($storage) && isset($storage['type']) && 'file' === $storage['type']) {
             $path = isset($storage['path']) ? (string) $storage['path'] : '';
 
-            if ('' === $path || !is_readable($path)) {
+            if ('' === $path) {
+                return new WP_Error(
+                    'tejlg_import_storage_missing',
+                    __('Erreur : Le fichier temporaire de la session d\'importation est introuvable.', 'theme-export-jlg')
+                );
+            }
+
+            $temp_dir = '';
+
+            if (function_exists('get_temp_dir')) {
+                $temp_dir = get_temp_dir();
+            }
+
+            $normalized_path     = wp_normalize_path($path);
+            $normalized_temp_dir = '';
+
+            if (is_string($temp_dir) && '' !== $temp_dir) {
+                $normalized_temp_dir = wp_normalize_path(trailingslashit($temp_dir));
+            }
+
+            $path_basename = function_exists('wp_basename') ? wp_basename($normalized_path) : basename($normalized_path);
+
+            if (
+                '' === $normalized_temp_dir
+                || 0 !== strpos($normalized_path, $normalized_temp_dir)
+                || 0 !== strpos($path_basename, 'tejlg-patterns')
+            ) {
+                self::cleanup_patterns_storage($storage);
+
+                return new WP_Error(
+                    'tejlg_import_storage_invalid_path',
+                    __('Erreur : Les données temporaires de la session d\'importation ne sont pas valides.', 'theme-export-jlg')
+                );
+            }
+
+            if (!is_readable($path)) {
                 return new WP_Error(
                     'tejlg_import_storage_missing',
                     __('Erreur : Le fichier temporaire de la session d\'importation est introuvable.', 'theme-export-jlg')

@@ -177,4 +177,28 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
         wp_delete_post($imported_post->ID, true);
         TEJLG_Import::delete_patterns_storage($import_transient_id, $import_payload);
     }
+
+    public function test_retrieve_patterns_from_storage_rejects_path_outside_temp_dir() {
+        $malicious_dir = trailingslashit(WP_CONTENT_DIR) . 'uploads';
+
+        wp_mkdir_p($malicious_dir);
+
+        $malicious_path = trailingslashit($malicious_dir) . 'tejlg-patterns-malicious.json';
+
+        file_put_contents($malicious_path, '[]');
+
+        $storage = [
+            'type'     => 'file',
+            'path'     => $malicious_path,
+            'size'     => 2,
+            'checksum' => md5('[]'),
+            'count'    => 0,
+        ];
+
+        $result = TEJLG_Import::retrieve_patterns_from_storage($storage);
+
+        $this->assertWPError($result);
+        $this->assertSame('tejlg_import_storage_invalid_path', $result->get_error_code());
+        $this->assertFalse(file_exists($malicious_path));
+    }
 }
