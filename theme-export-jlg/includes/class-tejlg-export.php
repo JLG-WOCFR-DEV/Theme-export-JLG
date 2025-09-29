@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/class-tejlg-files.php';
+
 class TEJLG_Export {
 
     /**
@@ -282,7 +284,7 @@ class TEJLG_Export {
         $handle = fopen($temp_file, 'w');
 
         if (false === $handle) {
-            @unlink($temp_file);
+            TEJLG_Files::delete($temp_file);
             wp_die(esc_html__("Impossible de créer le flux de téléchargement pour l'export JSON.", 'theme-export-jlg'));
         }
 
@@ -325,7 +327,7 @@ class TEJLG_Export {
 
                 if (false === $encoded_pattern || (function_exists('json_last_error') && json_last_error() !== JSON_ERROR_NONE)) {
                     fclose($handle);
-                    @unlink($temp_file);
+                    TEJLG_Files::delete($temp_file);
 
                     $json_error_message = function_exists('json_last_error_msg')
                         ? json_last_error_msg()
@@ -440,7 +442,7 @@ class TEJLG_Export {
             return true;
         }
 
-        if (@unlink($file_path)) {
+        if (TEJLG_Files::delete($file_path)) {
             return true;
         }
 
@@ -546,7 +548,7 @@ class TEJLG_Export {
         $bytes = file_put_contents($temp_file, $json_data);
 
         if (false === $bytes) {
-            @unlink($temp_file);
+            TEJLG_Files::delete($temp_file);
 
             add_settings_error(
                 'tejlg_admin_messages',
@@ -807,7 +809,7 @@ class TEJLG_Export {
         $bytes = file_put_contents($temp_file, $json_data);
 
         if (false === $bytes) {
-            @unlink($temp_file);
+            TEJLG_Files::delete($temp_file);
             wp_die(esc_html__("Impossible d'écrire le fichier d'export JSON sur le disque.", 'theme-export-jlg'));
         }
 
@@ -837,7 +839,7 @@ class TEJLG_Export {
 
     private static function stream_json_file($file_path, $filename) {
         if (!@file_exists($file_path) || !is_readable($file_path)) {
-            @unlink($file_path);
+            TEJLG_Files::delete($file_path);
             wp_die(esc_html__("Le fichier d'export JSON est introuvable ou illisible.", 'theme-export-jlg'));
         }
 
@@ -845,7 +847,7 @@ class TEJLG_Export {
 
         if (!$should_stream) {
             $contents = @file_get_contents($file_path);
-            @unlink($file_path);
+            TEJLG_Files::delete($file_path);
 
             return false === $contents ? '' : $contents;
         }
@@ -865,7 +867,7 @@ class TEJLG_Export {
         $handle = fopen($file_path, 'rb');
 
         if (false === $handle) {
-            @unlink($file_path);
+            TEJLG_Files::delete($file_path);
             wp_die(esc_html__("Impossible de lire le fichier d'export JSON.", 'theme-export-jlg'));
         }
 
@@ -874,7 +876,7 @@ class TEJLG_Export {
         }
 
         fclose($handle);
-        @unlink($file_path);
+        TEJLG_Files::delete($file_path);
         flush();
         exit;
     }

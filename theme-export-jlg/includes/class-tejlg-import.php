@@ -1,10 +1,12 @@
 <?php
+require_once __DIR__ . '/class-tejlg-files.php';
+
 class TEJLG_Import {
 
     public static function import_theme($file) {
         if (!current_user_can('install_themes')) {
             if (isset($file['tmp_name'])) {
-                @unlink($file['tmp_name']);
+                TEJLG_Files::delete($file['tmp_name']);
             }
 
             add_settings_error(
@@ -22,7 +24,7 @@ class TEJLG_Import {
             (defined('DISALLOW_FILE_EDIT') && DISALLOW_FILE_EDIT)
         ) {
             if (isset($file['tmp_name'])) {
-                @unlink($file['tmp_name']);
+                TEJLG_Files::delete($file['tmp_name']);
             }
 
             add_settings_error(
@@ -118,7 +120,7 @@ class TEJLG_Import {
         }
 
         if (isset($file['error']) && UPLOAD_ERR_OK !== (int) $file['error']) {
-            @unlink($file['tmp_name']);
+            TEJLG_Files::delete($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
                 'global_styles_import_status',
@@ -142,7 +144,7 @@ class TEJLG_Import {
         }
 
         if ($file_size > $max_size) {
-            @unlink($file['tmp_name']);
+            TEJLG_Files::delete($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
                 'global_styles_import_status',
@@ -166,7 +168,7 @@ class TEJLG_Import {
         $type = isset($filetype['type']) ? (string) $filetype['type'] : '';
 
         if ('json' !== $ext || 'application/json' !== $type) {
-            @unlink($file['tmp_name']);
+            TEJLG_Files::delete($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
                 'global_styles_import_invalid_type',
@@ -178,7 +180,7 @@ class TEJLG_Import {
         }
 
         if (!is_readable($file['tmp_name'])) {
-            @unlink($file['tmp_name']);
+            TEJLG_Files::delete($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
                 'global_styles_import_status',
@@ -191,7 +193,7 @@ class TEJLG_Import {
 
         $json_content = file_get_contents($file['tmp_name']);
 
-        @unlink($file['tmp_name']);
+        TEJLG_Files::delete($file['tmp_name']);
 
         if (false === $json_content) {
             add_settings_error(
@@ -314,7 +316,7 @@ class TEJLG_Import {
         }
 
         if (isset($file['error']) && UPLOAD_ERR_OK !== (int) $file['error']) {
-            @unlink($file['tmp_name']);
+            TEJLG_Files::delete($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
                 'patterns_import_status',
@@ -336,7 +338,7 @@ class TEJLG_Import {
         }
 
         if ($file_size > $max_size) {
-            @unlink($file['tmp_name']);
+            TEJLG_Files::delete($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
                 'patterns_import_status',
@@ -360,7 +362,7 @@ class TEJLG_Import {
         $type = isset($filetype['type']) ? (string) $filetype['type'] : '';
 
         if ('json' !== $ext || 'application/json' !== $type) {
-            @unlink($file['tmp_name']);
+            TEJLG_Files::delete($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
                 'patterns_import_invalid_type',
@@ -372,7 +374,7 @@ class TEJLG_Import {
         }
 
         if (!is_readable($file['tmp_name'])) {
-            @unlink($file['tmp_name']);
+            TEJLG_Files::delete($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
                 'patterns_import_status',
@@ -386,7 +388,7 @@ class TEJLG_Import {
         $json_content = file_get_contents($file['tmp_name']);
 
         if (false === $json_content) {
-            @unlink($file['tmp_name']);
+            TEJLG_Files::delete($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
                 'patterns_import_status',
@@ -397,7 +399,7 @@ class TEJLG_Import {
             return;
         }
 
-        @unlink($file['tmp_name']);
+        TEJLG_Files::delete($file['tmp_name']);
 
         $patterns = json_decode($json_content, true);
 
@@ -1046,7 +1048,7 @@ class TEJLG_Import {
         $bytes_written = file_put_contents($temp_file, $encoded);
 
         if (false === $bytes_written) {
-            @unlink($temp_file);
+            TEJLG_Files::delete($temp_file);
 
             return new WP_Error(
                 'tejlg_import_temp_file_write_error',
@@ -1141,7 +1143,7 @@ class TEJLG_Import {
             $path = isset($storage['path']) ? (string) $storage['path'] : '';
 
             if ('' !== $path && @file_exists($path)) {
-                @unlink($path);
+                TEJLG_Files::delete($path);
             }
         }
     }
@@ -1208,7 +1210,7 @@ class TEJLG_Import {
                 continue;
             }
 
-            @unlink($file);
+            TEJLG_Files::delete($file);
         }
     }
 

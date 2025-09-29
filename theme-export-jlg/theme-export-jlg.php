@@ -24,6 +24,7 @@ define( 'TEJLG_PATH', plugin_dir_path( __FILE__ ) );
 define( 'TEJLG_URL', plugin_dir_url( __FILE__ ) );
 
 // Charger les classes nécessaires
+require_once TEJLG_PATH . 'includes/class-tejlg-files.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-import.php';

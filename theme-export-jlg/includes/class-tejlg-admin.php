@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/class-tejlg-files.php';
+
 class TEJLG_Admin {
 
     /**
@@ -248,7 +250,7 @@ class TEJLG_Admin {
         }
 
         if (!empty($theme_file['tmp_name']) && is_string($theme_file['tmp_name']) && file_exists($theme_file['tmp_name'])) {
-            @unlink($theme_file['tmp_name']);
+            TEJLG_Files::delete($theme_file['tmp_name']);
         }
 
         add_settings_error(
@@ -272,7 +274,7 @@ class TEJLG_Admin {
         }
 
         if (!empty($patterns_file['tmp_name']) && is_string($patterns_file['tmp_name']) && file_exists($patterns_file['tmp_name'])) {
-            @unlink($patterns_file['tmp_name']);
+            TEJLG_Files::delete($patterns_file['tmp_name']);
         }
 
         add_settings_error(
