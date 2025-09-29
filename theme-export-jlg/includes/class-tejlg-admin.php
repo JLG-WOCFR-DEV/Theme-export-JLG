@@ -962,10 +962,17 @@ class TEJLG_Admin {
                 <div style="margin-bottom:15px;">
                      <label><input type="checkbox" id="select-all-patterns" checked> <strong><?php esc_html_e('Tout sélectionner', 'theme-export-jlg'); ?></strong></label>
                 </div>
+                <?php
+                $encoding_failures = [];
+                ?>
                 <?php foreach ($prepared_patterns as $pattern_data): ?>
                     <?php
                     $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $pattern_data['rendered'] . '</body></html>';
                     $json_options = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+
+                    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+                        $json_options |= JSON_INVALID_UTF8_SUBSTITUTE;
+                    }
 
                     $iframe_json = wp_json_encode($iframe_content, $json_options);
 
@@ -974,6 +981,12 @@ class TEJLG_Admin {
 
                         if (false === $iframe_json) {
                             $iframe_json = '""';
+
+                            $encoding_failures[] = sprintf(
+                                /* translators: %s: pattern title. */
+                                __('Impossible d\'encoder l\'aperçu JSON pour « %s ». Le contenu a été remplacé par une valeur vide.', 'theme-export-jlg'),
+                                $pattern_data['title']
+                            );
                         }
                     }
                     ?>
@@ -1004,6 +1017,13 @@ class TEJLG_Admin {
 
                     </div>
                 <?php endforeach; ?>
+                <?php if (!empty($encoding_failures)): ?>
+                    <div class="notice notice-warning">
+                        <?php foreach ($encoding_failures as $failure_message): ?>
+                            <p><?php echo esc_html($failure_message); ?></p>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
             <p><button type="submit" name="tejlg_import_patterns_step2" class="button button-primary button-hero"><?php esc_html_e('Importer la sélection', 'theme-export-jlg'); ?></button></p>
         </form>

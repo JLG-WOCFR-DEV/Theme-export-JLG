@@ -195,6 +195,59 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
         TEJLG_Import::delete_patterns_storage($import_transient_id, $import_payload);
     }
 
+    public function test_preview_handles_invalid_utf8_bytes_in_rendered_content() {
+        $admin_id = self::factory()->user->create([
+            'role' => 'administrator',
+        ]);
+
+        wp_set_current_user($admin_id);
+
+        $invalid_byte = "\xC3";
+        $raw_block_content = '<!-- wp:paragraph --><p>Texte invalide ' . $invalid_byte . '</p><!-- /wp:paragraph -->';
+
+        $pattern = [
+            'title'   => 'Invalid UTF8 Pattern',
+            'slug'    => 'custom-patterns/invalid-utf8-pattern',
+            'name'    => 'invalid-utf8-pattern',
+            'content' => [
+                'raw'      => $raw_block_content,
+                'rendered' => '<p>Texte invalide ' . $invalid_byte . '</p>',
+            ],
+        ];
+
+        $create_payload = new ReflectionMethod(TEJLG_Import::class, 'create_patterns_storage_payload');
+        $create_payload->setAccessible(true);
+
+        $preview_transient_id = 'tejlg_' . md5(uniqid('preview-invalid', true));
+        $preview_payload      = $create_payload->invoke(null, [$pattern]);
+
+        set_transient($preview_transient_id, $preview_payload, HOUR_IN_SECONDS);
+
+        $admin_instance = new TEJLG_Admin();
+        $preview_method = new ReflectionMethod(TEJLG_Admin::class, 'render_patterns_preview_page');
+        $preview_method->setAccessible(true);
+
+        ob_start();
+        $preview_method->invoke($admin_instance, $preview_transient_id);
+        $preview_output = ob_get_clean();
+
+        $this->assertStringContainsString('pattern-preview-iframe', $preview_output);
+        $this->assertStringContainsString('Invalid UTF8 Pattern', $preview_output);
+        $this->assertStringNotContainsString('Impossible d\'encoder l\'aperçu JSON', $preview_output);
+
+        preg_match_all('/<script type="application\/json" class="pattern-preview-data">(.*?)<\/script>/s', $preview_output, $matches);
+
+        $this->assertNotEmpty($matches[1]);
+
+        $decoded_iframe = json_decode($matches[1][0], true);
+
+        $this->assertNotNull($decoded_iframe);
+        $this->assertIsString($decoded_iframe);
+        $this->assertStringContainsString('Texte invalide', $decoded_iframe);
+
+        TEJLG_Import::delete_patterns_storage($preview_transient_id, $preview_payload);
+    }
+
     public function filter_export_batch_size($size) {
         return $this->custom_batch_size;
     }
