@@ -80,6 +80,21 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
         $this->assertStringContainsString('href="/submarine-news"', $cleaned);
     }
 
+    public function test_clean_pattern_content_neutralizes_block_attribute_ids_without_touching_text() {
+        $content = '<!-- wp:paragraph {"id":123} -->'
+            . '<p>{"id":123}</p>'
+            . '<!-- /wp:paragraph -->';
+
+        $method = new ReflectionMethod(TEJLG_Export::class, 'clean_pattern_content');
+        $method->setAccessible(true);
+
+        $cleaned = $method->invoke(null, $content);
+
+        $this->assertStringContainsString('<!-- wp:paragraph {"id":0}', $cleaned);
+        $this->assertStringContainsString('<p>{"id":123}</p>', $cleaned);
+        $this->assertStringNotContainsString('<!-- wp:paragraph {"id":123}', $cleaned);
+    }
+
     public function test_export_patterns_json_keeps_subdirectory_prefix_for_media_urls() {
         update_option('home', 'https://example.com/subdir');
         update_option('siteurl', 'https://example.com/subdir');

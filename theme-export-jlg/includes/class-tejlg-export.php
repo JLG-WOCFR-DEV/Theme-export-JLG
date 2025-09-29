@@ -687,9 +687,6 @@ class TEJLG_Export {
             }
         }
 
-        // 2. Neutralise les IDs des médias pour éviter les dépendances
-        $content = preg_replace('/("id"\s*:\s*)\d+/', '${1}0', $content);
-
         return $content;
     }
 
@@ -697,8 +694,9 @@ class TEJLG_Export {
      * Supprime récursivement les métadonnées des blocs.
      */
     private static function clean_block_recursive($block) {
-        if (isset($block['attrs'])) {
+        if (isset($block['attrs']) && is_array($block['attrs'])) {
             $block['attrs'] = self::clean_metadata_recursive($block['attrs']);
+            $block['attrs'] = self::reset_block_ids_recursive($block['attrs']);
         }
 
         if (!empty($block['innerBlocks'])) {
@@ -726,6 +724,53 @@ class TEJLG_Export {
         }
 
         return $data;
+    }
+
+    /**
+     * Réinitialise récursivement les identifiants présents dans les attributs de blocs.
+     */
+    private static function reset_block_ids_recursive($data) {
+        if (!is_array($data)) {
+            return $data;
+        }
+
+        foreach ($data as $key => $value) {
+            if ('id' === $key) {
+                $data[$key] = self::neutralize_single_id_value($value);
+                continue;
+            }
+
+            if ('ids' === $key) {
+                $data[$key] = self::neutralize_ids_collection($value);
+                continue;
+            }
+
+            $data[$key] = self::reset_block_ids_recursive($value);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Normalise une valeur d'identifiant simple.
+     */
+    private static function neutralize_single_id_value($value) {
+        if (is_array($value)) {
+            return self::reset_block_ids_recursive($value);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Normalise une collection d'identifiants.
+     */
+    private static function neutralize_ids_collection($value) {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        return array_map([__CLASS__, 'neutralize_single_id_value'], $value);
     }
 
     /**
