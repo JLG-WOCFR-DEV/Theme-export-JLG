@@ -190,9 +190,6 @@ class TEJLG_Export {
         }
         $zip->close();
 
-        nocache_headers();
-        self::clear_output_buffers();
-
         $zip_file_size = filesize($zip_file_path);
         /**
          * Filters the computed ZIP file size before streaming the archive.
@@ -216,6 +213,39 @@ class TEJLG_Export {
 
             wp_die(esc_html__("Impossible de déterminer la taille de l'archive ZIP à télécharger.", 'theme-export-jlg'));
         }
+
+        /**
+         * Allows integrations to disable the direct streaming of the ZIP archive.
+         *
+         * When the filter returns false, the ZIP file is left on disk and the
+         * method returns an associative array containing the file path, name and
+         * size so it can be handled programmatically.
+         *
+         * @since 3.1.0
+         *
+         * @param bool   $should_stream Whether the archive should be streamed to the browser.
+         * @param string $zip_file_path Absolute path to the generated ZIP archive.
+         * @param string $zip_file_name Suggested filename for the archive.
+         * @param int    $zip_file_size Size of the archive in bytes.
+         */
+        $should_stream = apply_filters(
+            'tejlg_export_stream_zip_archive',
+            true,
+            $zip_file_path,
+            $zip_file_name,
+            (int) $zip_file_size
+        );
+
+        if (!$should_stream) {
+            return [
+                'path'     => $zip_file_path,
+                'filename' => $zip_file_name,
+                'size'     => (int) $zip_file_size,
+            ];
+        }
+
+        nocache_headers();
+        self::clear_output_buffers();
 
         header('Content-Type: application/zip');
         header('Content-Disposition: attachment; filename="' . $zip_file_name . '"');

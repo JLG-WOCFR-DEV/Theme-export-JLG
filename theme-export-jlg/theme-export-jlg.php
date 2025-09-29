@@ -29,6 +29,10 @@ require_once TEJLG_PATH . 'includes/class-tejlg-export.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-import.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-theme-tools.php';
 
+if (defined('WP_CLI') && WP_CLI) {
+    require_once TEJLG_PATH . 'includes/class-tejlg-cli.php';
+}
+
 /**
  * Fonction principale pour initialiser le plugin.
  */
