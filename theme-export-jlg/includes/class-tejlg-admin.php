@@ -54,6 +54,17 @@ class TEJLG_Admin {
                 'hideBlockCode' => __('Masquer le code du bloc', 'theme-export-jlg'),
                 /* translators: Warning shown before importing a theme zip file. */
                 'themeImportConfirm' => __("⚠️ ATTENTION ⚠️\n\nSi un thème avec le même nom de dossier existe déjà, il sera DÉFINITIVEMENT écrasé.\n\nÊtes-vous sûr de vouloir continuer ?", 'theme-export-jlg'),
+                'metrics' => [
+                    'locale'           => get_user_locale(),
+                    'fpsUnit'          => esc_html__('FPS', 'theme-export-jlg'),
+                    'latencyUnit'      => esc_html__('ms', 'theme-export-jlg'),
+                    'placeholder'      => esc_html__('--', 'theme-export-jlg'),
+                    'stopped'          => esc_html__('Arrêté', 'theme-export-jlg'),
+                    'loading'          => esc_html__('Initialisation…', 'theme-export-jlg'),
+                    'ariaLivePolite'   => 'polite',
+                    'ariaAtomic'       => 'true',
+                    'latencyPrecision' => 1,
+                ],
             ]
         );
     }
