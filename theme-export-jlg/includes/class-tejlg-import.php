@@ -1,6 +1,121 @@
 <?php
 class TEJLG_Import {
 
+    private const IMPORT_FILE_TYPES = [
+        'theme' => [
+            'extensions' => ['zip'],
+            'mime_types' => [
+                'zip' => 'application/zip',
+            ],
+        ],
+        'patterns' => [
+            'extensions' => ['json'],
+            'mime_types' => [
+                'json' => 'application/json',
+            ],
+        ],
+        'global_styles' => [
+            'extensions' => ['json'],
+            'mime_types' => [
+                'json' => 'application/json',
+            ],
+        ],
+    ];
+
+    public static function get_import_file_types() {
+        $types = apply_filters('tejlg_import_file_types', self::IMPORT_FILE_TYPES);
+
+        if (!is_array($types)) {
+            return self::IMPORT_FILE_TYPES;
+        }
+
+        foreach ($types as $key => $config) {
+            $types[$key] = self::normalize_file_type_config($config);
+        }
+
+        return $types;
+    }
+
+    public static function get_import_file_type($type) {
+        $types = self::get_import_file_types();
+
+        if (!isset($types[$type]) || !is_array($types[$type])) {
+            return [
+                'extensions' => [],
+                'mime_types' => [],
+            ];
+        }
+
+        return $types[$type];
+    }
+
+    public static function get_extensions_display_string($type, $glue = ', ') {
+        $config     = self::get_import_file_type($type);
+        $extensions = self::prefix_extensions($config['extensions']);
+
+        return implode($glue, $extensions);
+    }
+
+    public static function get_accept_attribute_value($type) {
+        $config     = self::get_import_file_type($type);
+        $extensions = self::prefix_extensions($config['extensions']);
+
+        return implode(',', $extensions);
+    }
+
+    private static function prefix_extensions($extensions) {
+        $prefixed = [];
+
+        foreach ($extensions as $extension) {
+            $extension = ltrim((string) $extension, '.');
+
+            if ('' === $extension) {
+                continue;
+            }
+
+            $prefixed[] = '.' . strtolower($extension);
+        }
+
+        return array_values(array_unique($prefixed));
+    }
+
+    private static function normalize_file_type_config($config) {
+        $extensions = [];
+        $mime_types = [];
+
+        if (isset($config['extensions']) && is_array($config['extensions'])) {
+            foreach ($config['extensions'] as $extension) {
+                $extension = ltrim(strtolower(trim((string) $extension)), '.');
+
+                if ('' === $extension) {
+                    continue;
+                }
+
+                $extensions[] = $extension;
+            }
+        }
+
+        if (isset($config['mime_types']) && is_array($config['mime_types'])) {
+            foreach ($config['mime_types'] as $extension => $mime) {
+                $extension = ltrim(strtolower(trim((string) $extension)), '.');
+                $mime      = trim((string) $mime);
+
+                if ('' === $extension || '' === $mime) {
+                    continue;
+                }
+
+                $mime_types[$extension] = $mime;
+            }
+        }
+
+        $extensions = array_values(array_unique($extensions));
+
+        return [
+            'extensions' => $extensions,
+            'mime_types' => $mime_types,
+        ];
+    }
+
     public static function import_theme($file) {
         if (!current_user_can('install_themes')) {
             if (isset($file['tmp_name'])) {
@@ -156,16 +271,21 @@ class TEJLG_Import {
             return;
         }
 
+        $file_type_config = self::get_import_file_type('global_styles');
+        $allowed_mime_map = $file_type_config['mime_types'];
+
         $filetype = wp_check_filetype_and_ext(
             $file['tmp_name'],
             isset($file['name']) ? (string) $file['name'] : '',
-            ['json' => 'application/json']
+            $allowed_mime_map
         );
 
         $ext  = isset($filetype['ext']) ? (string) $filetype['ext'] : '';
         $type = isset($filetype['type']) ? (string) $filetype['type'] : '';
 
-        if ('json' !== $ext || 'application/json' !== $type) {
+        $expected_mime = isset($allowed_mime_map[$ext]) ? (string) $allowed_mime_map[$ext] : '';
+
+        if ('' === $ext || '' === $type || '' === $expected_mime || $expected_mime !== $type) {
             @unlink($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
@@ -350,16 +470,21 @@ class TEJLG_Import {
             return;
         }
 
+        $file_type_config = self::get_import_file_type('patterns');
+        $allowed_mime_map = $file_type_config['mime_types'];
+
         $filetype = wp_check_filetype_and_ext(
             $file['tmp_name'],
             isset($file['name']) ? (string) $file['name'] : '',
-            ['json' => 'application/json']
+            $allowed_mime_map
         );
 
         $ext  = isset($filetype['ext']) ? (string) $filetype['ext'] : '';
         $type = isset($filetype['type']) ? (string) $filetype['type'] : '';
 
-        if ('json' !== $ext || 'application/json' !== $type) {
+        $expected_mime = isset($allowed_mime_map[$ext]) ? (string) $allowed_mime_map[$ext] : '';
+
+        if ('' === $ext || '' === $type || '' === $expected_mime || $expected_mime !== $type) {
             @unlink($file['tmp_name']);
             add_settings_error(
                 'tejlg_import_messages',
