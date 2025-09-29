@@ -24,6 +24,7 @@ define( 'TEJLG_PATH', plugin_dir_path( __FILE__ ) );
 define( 'TEJLG_URL', plugin_dir_url( __FILE__ ) );
 
 // Charger les classes nécessaires
+require_once TEJLG_PATH . 'includes/class-tejlg-theme-export-process.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-import.php';
@@ -42,3 +43,5 @@ function tejlg_load_textdomain() {
 
 add_action( 'plugins_loaded', 'tejlg_load_textdomain' );
 add_action( 'plugins_loaded', 'tejlg_run_plugin' );
+
+TEJLG_Theme_Export_Process::register_hooks();

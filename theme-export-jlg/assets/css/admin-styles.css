@@ -13,6 +13,47 @@
     box-shadow: 0 1px 1px rgba(0,0,0,.04);
 }
 
+.tejlg-theme-export-status {
+    margin-top: 1em;
+    padding: 12px 15px;
+    border: 1px solid #ccd0d4;
+    background: #f6f7f7;
+    border-radius: 4px;
+}
+
+.tejlg-theme-export-message {
+    margin: 0 0 8px;
+    font-weight: 600;
+}
+
+.tejlg-theme-export-progress {
+    position: relative;
+    height: 12px;
+    background: #e5e5e5;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.tejlg-theme-export-progress-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: #2271b1;
+    transition: width 0.4s ease;
+}
+
+.tejlg-theme-export-count {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: #50575e;
+}
+
+.tejlg-theme-export-download {
+    margin-top: 12px;
+}
+
 .metrics-badge {
     display: inline-flex;
     flex-direction: column;

@@ -220,4 +220,244 @@ document.addEventListener('DOMContentLoaded', function() {
         patternSearchInput.addEventListener('keyup', searchHandler);
     }
 
+    const exportConfig = (typeof window.tejlgThemeExportData === 'object' && window.tejlgThemeExportData !== null)
+        ? window.tejlgThemeExportData
+        : null;
+
+    const exportForm = document.getElementById('tejlg-theme-export-form');
+    const exportStatusWrapper = document.getElementById('tejlg-theme-export-status');
+    const exportMessage = exportStatusWrapper ? exportStatusWrapper.querySelector('.tejlg-theme-export-message') : null;
+    const exportCount = exportStatusWrapper ? exportStatusWrapper.querySelector('.tejlg-theme-export-count') : null;
+    const exportProgress = exportStatusWrapper ? exportStatusWrapper.querySelector('.tejlg-theme-export-progress') : null;
+    const exportProgressBar = exportStatusWrapper ? exportStatusWrapper.querySelector('.tejlg-theme-export-progress-bar') : null;
+    const downloadWrapper = exportStatusWrapper ? exportStatusWrapper.querySelector('.tejlg-theme-export-download') : null;
+    const downloadLink = document.getElementById('tejlg-theme-export-download');
+    const submitButton = document.getElementById('tejlg-theme-export-submit');
+
+    let currentJobId = null;
+    let pollTimer = null;
+
+    function setSubmitDisabled(isDisabled) {
+        if (!submitButton) {
+            return;
+        }
+
+        submitButton.disabled = !!isDisabled;
+
+        if (isDisabled) {
+            submitButton.classList.add('disabled');
+        } else {
+            submitButton.classList.remove('disabled');
+        }
+    }
+
+    function resetExportStatus() {
+        if (!exportStatusWrapper) {
+            return;
+        }
+
+        exportStatusWrapper.hidden = true;
+
+        if (exportMessage) {
+            exportMessage.textContent = '';
+        }
+
+        if (exportCount) {
+            exportCount.textContent = '';
+        }
+
+        if (exportProgress) {
+            exportProgress.setAttribute('aria-valuenow', '0');
+        }
+
+        if (exportProgressBar) {
+            exportProgressBar.style.width = '0%';
+        }
+
+        if (downloadWrapper) {
+            downloadWrapper.hidden = true;
+        }
+
+        if (downloadLink) {
+            downloadLink.removeAttribute('href');
+        }
+    }
+
+    function updateExportStatus(data) {
+        if (!exportStatusWrapper) {
+            return;
+        }
+
+        exportStatusWrapper.hidden = false;
+
+        const status = typeof data.status === 'string' ? data.status : 'queued';
+        const total = typeof data.total === 'number' ? data.total : 0;
+        const processed = typeof data.processed === 'number' ? data.processed : 0;
+        const messages = exportConfig && exportConfig.messages ? exportConfig.messages : {};
+
+        let messageText = '';
+
+        if (typeof data.message === 'string' && data.message.trim() !== '') {
+            messageText = data.message;
+        } else if (status && typeof messages[status] === 'string') {
+            messageText = messages[status];
+        }
+
+        if (exportMessage) {
+            exportMessage.textContent = messageText;
+        }
+
+        if (exportCount) {
+            if (total > 0) {
+                exportCount.textContent = processed + ' / ' + total;
+            } else {
+                exportCount.textContent = '';
+            }
+        }
+
+        const percentage = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+
+        if (exportProgress) {
+            exportProgress.setAttribute('aria-valuenow', String(percentage));
+        }
+
+        if (exportProgressBar) {
+            exportProgressBar.style.width = percentage + '%';
+        }
+
+        if (status === 'completed' && downloadWrapper && downloadLink && typeof data.downloadUrl === 'string') {
+            downloadLink.href = data.downloadUrl;
+            downloadWrapper.hidden = false;
+        }
+
+        if (status === 'failed') {
+            setSubmitDisabled(false);
+        }
+    }
+
+    function scheduleNextPoll() {
+        if (!exportConfig) {
+            return;
+        }
+
+        const interval = typeof exportConfig.pollInterval === 'number' ? exportConfig.pollInterval : 4000;
+
+        pollTimer = window.setTimeout(pollExportStatus, Math.max(1000, interval));
+    }
+
+    function pollExportStatus() {
+        if (!exportConfig || !currentJobId) {
+            return;
+        }
+
+        const params = new URLSearchParams();
+        params.append('action', 'tejlg_get_theme_export_status');
+        params.append('job_id', currentJobId);
+        if (exportConfig.statusNonce) {
+            params.append('nonce', exportConfig.statusNonce);
+        }
+
+        fetch(exportConfig.ajaxUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: params,
+        })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(function(payload) {
+                if (!payload || !payload.success) {
+                    throw new Error(payload && payload.data && payload.data.message ? payload.data.message : 'Export failed');
+                }
+
+                updateExportStatus(payload.data);
+
+                if (payload.data && payload.data.status === 'completed') {
+                    currentJobId = null;
+                    pollTimer = null;
+                    setSubmitDisabled(false);
+                    return;
+                }
+
+                if (payload.data && payload.data.status === 'failed') {
+                    currentJobId = null;
+                    pollTimer = null;
+                    return;
+                }
+
+                scheduleNextPoll();
+            })
+            .catch(function(error) {
+                if (exportMessage) {
+                    exportMessage.textContent = error && error.message ? error.message : 'Erreur inattendue.';
+                }
+                currentJobId = null;
+                pollTimer = null;
+                setSubmitDisabled(false);
+            });
+    }
+
+    if (exportForm && exportConfig && exportConfig.ajaxUrl) {
+        exportForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            if (!exportConfig.startNonce) {
+                return;
+            }
+
+            if (pollTimer) {
+                window.clearTimeout(pollTimer);
+                pollTimer = null;
+            }
+
+            setSubmitDisabled(true);
+            resetExportStatus();
+
+            if (exportStatusWrapper) {
+                exportStatusWrapper.hidden = false;
+            }
+
+            if (exportMessage) {
+                const messages = exportConfig.messages || {};
+                exportMessage.textContent = messages.starting || '';
+            }
+
+            const formData = new FormData(exportForm);
+            formData.append('action', 'tejlg_start_theme_export');
+            formData.append('nonce', exportConfig.startNonce);
+
+            fetch(exportConfig.ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                body: formData,
+            })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(function(payload) {
+                    if (!payload || !payload.success || !payload.data || !payload.data.jobId) {
+                        throw new Error(payload && payload.data && payload.data.message ? payload.data.message : 'Export failed');
+                    }
+
+                    currentJobId = payload.data.jobId;
+                    updateExportStatus({ status: 'queued', processed: 0, total: 0 });
+                    pollExportStatus();
+                })
+                .catch(function(error) {
+                    if (exportMessage) {
+                        exportMessage.textContent = error && error.message ? error.message : 'Erreur inattendue.';
+                    }
+                    currentJobId = null;
+                    pollTimer = null;
+                    setSubmitDisabled(false);
+                });
+        });
+    }
+
 });
