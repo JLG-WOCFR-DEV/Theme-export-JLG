@@ -448,7 +448,15 @@ class TEJLG_Admin {
     }
 
     private function render_export_tab() {
-        if (isset($_GET['action']) && $_GET['action'] === 'select_patterns') {
+        $action_param = filter_input(INPUT_GET, 'action', FILTER_DEFAULT);
+
+        if (null === $action_param && isset($_GET['action'])) {
+            $action_param = $_GET['action'];
+        }
+
+        $action = is_string($action_param) ? sanitize_key($action_param) : '';
+
+        if ('select_patterns' === $action) {
             $this->render_pattern_selection_page();
         } else {
             $this->render_export_default_page();
