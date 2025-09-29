@@ -156,6 +156,27 @@ class TEJLG_Import {
             return;
         }
 
+        $filetype = wp_check_filetype_and_ext(
+            $file['tmp_name'],
+            isset($file['name']) ? (string) $file['name'] : '',
+            ['json' => 'application/json']
+        );
+
+        $ext  = isset($filetype['ext']) ? (string) $filetype['ext'] : '';
+        $type = isset($filetype['type']) ? (string) $filetype['type'] : '';
+
+        if ('json' !== $ext || 'application/json' !== $type) {
+            @unlink($file['tmp_name']);
+            add_settings_error(
+                'tejlg_import_messages',
+                'global_styles_import_invalid_type',
+                esc_html__("Erreur : Le fichier téléchargé doit être un fichier JSON valide.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
         if (!is_readable($file['tmp_name'])) {
             @unlink($file['tmp_name']);
             add_settings_error(
@@ -323,6 +344,27 @@ class TEJLG_Import {
                     esc_html__("Erreur : Le fichier est trop volumineux. La taille maximale autorisée est de %s Mo.", 'theme-export-jlg'),
                     number_format_i18n($max_size / (1024 * 1024), 2)
                 ),
+                'error'
+            );
+
+            return;
+        }
+
+        $filetype = wp_check_filetype_and_ext(
+            $file['tmp_name'],
+            isset($file['name']) ? (string) $file['name'] : '',
+            ['json' => 'application/json']
+        );
+
+        $ext  = isset($filetype['ext']) ? (string) $filetype['ext'] : '';
+        $type = isset($filetype['type']) ? (string) $filetype['type'] : '';
+
+        if ('json' !== $ext || 'application/json' !== $type) {
+            @unlink($file['tmp_name']);
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_invalid_type',
+                esc_html__("Erreur : Le fichier téléchargé doit être un fichier JSON valide.", 'theme-export-jlg'),
                 'error'
             );
 
