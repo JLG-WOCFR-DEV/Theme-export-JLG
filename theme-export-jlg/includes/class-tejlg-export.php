@@ -607,8 +607,7 @@ class TEJLG_Export {
         $exclusions     = [];
 
         if ('' !== $raw_exclusions) {
-            $split = preg_split('/[
-,]+/', $raw_exclusions);
+            $split = preg_split('/[,\r\n]+/', $raw_exclusions);
 
             if (false !== $split) {
                 $exclusions = array_values(
