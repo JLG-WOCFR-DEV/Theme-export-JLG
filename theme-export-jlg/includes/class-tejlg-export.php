@@ -6,57 +6,168 @@ class TEJLG_Export {
      */
     public static function export_theme($exclusions = []) {
         if (!class_exists('ZipArchive')) {
-            wp_die(esc_html__('La classe ZipArchive n\'est pas disponible.', 'theme-export-jlg'));
+            return new WP_Error('tejlg_ziparchive_missing', esc_html__('La classe ZipArchive n\'est pas disponible.', 'theme-export-jlg'));
         }
 
-        $exclusions = array_values(array_filter(
-            array_map(
-                static function ($pattern) {
-                    if (!is_scalar($pattern)) {
-                        return '';
-                    }
-
-                    $pattern = trim((string) $pattern);
-
-                    if ('' === $pattern) {
-                        return '';
-                    }
-
-                    return ltrim($pattern, "\\/");
-                },
-                (array) $exclusions
-            ),
-            static function ($pattern) {
-                return '' !== $pattern;
-            }
-        ));
+        $exclusions = self::sanitize_exclusion_patterns($exclusions);
 
         $theme = wp_get_theme();
         $theme_dir_path = $theme->get_stylesheet_directory();
-        $theme_slug = $theme->get_stylesheet();
+
+        if (!is_dir($theme_dir_path) || !is_readable($theme_dir_path)) {
+            return new WP_Error('tejlg_theme_directory_unreadable', esc_html__("Impossible d'accéder au dossier du thème actif.", 'theme-export-jlg'));
+        }
+
+        $theme_slug    = $theme->get_stylesheet();
         $zip_file_name = $theme_slug . '.zip';
         $zip_file_path = wp_tempnam($zip_file_name);
 
         if (!$zip_file_path) {
-            wp_die(esc_html__('Impossible de créer le fichier temporaire pour l\'archive ZIP.', 'theme-export-jlg'));
+            return new WP_Error('tejlg_zip_temp_creation_failed', esc_html__("Impossible de créer le fichier temporaire pour l'archive ZIP.", 'theme-export-jlg'));
         }
 
         if (file_exists($zip_file_path) && !self::delete_temp_file($zip_file_path)) {
-            wp_die(esc_html__('Impossible de préparer le fichier temporaire pour l\'archive ZIP.', 'theme-export-jlg'));
+            return new WP_Error('tejlg_zip_temp_cleanup_failed', esc_html__("Impossible de préparer le fichier temporaire pour l'archive ZIP.", 'theme-export-jlg'));
         }
 
         $zip = new ZipArchive();
-        if ($zip->open($zip_file_path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            wp_die(esc_html__('Impossible de créer l\'archive ZIP.', 'theme-export-jlg'));
+
+        if (true !== $zip->open($zip_file_path, ZipArchive::CREATE | ZipArchive::OVERWRITE)) {
+            self::delete_temp_file($zip_file_path);
+            return new WP_Error('tejlg_zip_open_failed', esc_html__("Impossible de créer l'archive ZIP.", 'theme-export-jlg'));
         }
 
-        $normalized_theme_dir = self::normalize_path($theme_dir_path);
-        $files_added = 0;
+        $zip_root_directory = rtrim($theme_slug, '/') . '/';
 
-        $directory_iterator = new RecursiveDirectoryIterator(
-            $theme_dir_path,
-            FilesystemIterator::SKIP_DOTS
+        if (true !== $zip->addEmptyDir($zip_root_directory)) {
+            $zip->close();
+            self::delete_temp_file($zip_file_path);
+
+            return new WP_Error(
+                'tejlg_zip_root_dir_failed',
+                sprintf(
+                    /* translators: %s: slug of the theme used as the root directory of the ZIP archive. */
+                    esc_html__("Impossible d'ajouter le dossier racine « %s » à l'archive ZIP.", 'theme-export-jlg'),
+                    esc_html($zip_root_directory)
+                )
+            );
+        }
+
+        $zip->close();
+
+        $normalized_theme_dir = self::normalize_path($theme_dir_path);
+
+        try {
+            $queue = self::collect_theme_export_items(
+                $theme_dir_path,
+                $normalized_theme_dir,
+                $zip_root_directory,
+                $exclusions
+            );
+        } catch (RuntimeException $exception) {
+            self::delete_temp_file($zip_file_path);
+
+            return new WP_Error('tejlg_theme_export_queue_failed', $exception->getMessage());
+        }
+
+        $queue_items = isset($queue['items']) && is_array($queue['items']) ? $queue['items'] : [];
+        $files_count = isset($queue['files_count']) ? (int) $queue['files_count'] : 0;
+
+        if ($files_count < 1) {
+            self::delete_temp_file($zip_file_path);
+
+            return new WP_Error(
+                'tejlg_theme_export_no_files',
+                esc_html__("Erreur : tous les fichiers ont été exclus de l'export. Vérifiez vos motifs.", 'theme-export-jlg')
+            );
+        }
+
+        $job_id = self::generate_job_id();
+
+        $job = [
+            'id'                => $job_id,
+            'status'            => 'queued',
+            'progress'          => 0,
+            'processed_items'   => 0,
+            'total_items'       => count($queue_items),
+            'zip_path'          => $zip_file_path,
+            'zip_file_name'     => $zip_file_name,
+            'directories_added' => [
+                $zip_root_directory => true,
+            ],
+            'exclusions'        => $exclusions,
+            'created_at'        => time(),
+            'updated_at'        => time(),
+            'message'           => '',
+        ];
+
+        self::persist_job($job);
+
+        $process = self::get_export_process();
+
+        foreach ($queue_items as $item) {
+            $process->push_to_queue(
+                [
+                    'job_id'               => $job_id,
+                    'type'                 => isset($item['type']) ? $item['type'] : 'file',
+                    'real_path'            => isset($item['real_path']) ? $item['real_path'] : '',
+                    'relative_path_in_zip' => isset($item['relative_path_in_zip']) ? $item['relative_path_in_zip'] : '',
+                ]
+            );
+        }
+
+        $process->save();
+        $process->dispatch();
+
+        $should_run_immediately = apply_filters('tejlg_export_run_jobs_immediately', defined('WP_RUNNING_TESTS'));
+
+        if ($should_run_immediately) {
+            self::run_pending_export_jobs();
+        }
+
+        return $job_id;
+    }
+
+
+    private static function sanitize_exclusion_patterns($exclusions) {
+        return array_values(
+            array_filter(
+                array_map(
+                    static function ($pattern) {
+                        if (!is_scalar($pattern)) {
+                            return '';
+                        }
+
+                        $pattern = trim((string) $pattern);
+
+                        if ('' === $pattern) {
+                            return '';
+                        }
+
+                        return ltrim($pattern, "\/");
+                    },
+                    (array) $exclusions
+                ),
+                static function ($pattern) {
+                    return '' !== $pattern;
+                }
+            )
         );
+    }
+
+    private static function collect_theme_export_items($theme_dir_path, $normalized_theme_dir, $zip_root_directory, $exclusions) {
+        try {
+            $directory_iterator = new RecursiveDirectoryIterator(
+                $theme_dir_path,
+                FilesystemIterator::SKIP_DOTS
+            );
+        } catch (UnexpectedValueException $exception) {
+            throw new RuntimeException(
+                esc_html__("Impossible de parcourir les fichiers du thème pour l'export.", 'theme-export-jlg'),
+                0,
+                $exception
+            );
+        }
 
         $filter_iterator = new RecursiveCallbackFilterIterator(
             $directory_iterator,
@@ -71,23 +182,23 @@ class TEJLG_Export {
                     return false;
                 }
 
-                $normalized_file_path = self::normalize_path($real_path);
+                $normalized_file_path = TEJLG_Export::normalize_path($real_path);
 
-                if (!self::is_path_within_base($normalized_file_path, $normalized_theme_dir)) {
+                if (!TEJLG_Export::is_path_within_base($normalized_file_path, $normalized_theme_dir)) {
                     return false;
                 }
 
-                $relative_path = self::get_relative_path($normalized_file_path, $normalized_theme_dir);
+                $relative_path = TEJLG_Export::get_relative_path($normalized_file_path, $normalized_theme_dir);
 
                 if ($file->isDir()) {
-                    return '' === $relative_path || !self::should_exclude_file($relative_path, $exclusions);
+                    return '' === $relative_path || !TEJLG_Export::should_exclude_file($relative_path, $exclusions);
                 }
 
                 if ('' === $relative_path) {
                     return false;
                 }
 
-                return !self::should_exclude_file($relative_path, $exclusions);
+                return !TEJLG_Export::should_exclude_file($relative_path, $exclusions);
             }
         );
 
@@ -97,23 +208,8 @@ class TEJLG_Export {
             RecursiveIteratorIterator::CATCH_GET_CHILD
         );
 
-        $zip_root_directory = rtrim($theme_slug, '/') . '/';
-
-        if (true !== $zip->addEmptyDir($zip_root_directory)) {
-            self::abort_zip_export(
-                $zip,
-                $zip_file_path,
-                sprintf(
-                    /* translators: %s: slug of the theme used as the root directory of the ZIP archive. */
-                    esc_html__("Impossible d'ajouter le dossier racine « %s » à l'archive ZIP.", 'theme-export-jlg'),
-                    esc_html($zip_root_directory)
-                )
-            );
-        }
-
-        $directories_added = [
-            $zip_root_directory => true,
-        ];
+        $items       = [];
+        $files_count = 0;
 
         foreach ($iterator as $file) {
             $real_path = $file->getRealPath();
@@ -137,111 +233,298 @@ class TEJLG_Export {
             $relative_path_in_zip = $zip_root_directory . ltrim($relative_path, '/');
 
             if ($file->isDir()) {
-                $zip_path = rtrim($relative_path_in_zip, '/') . '/';
-
-                if (!isset($directories_added[$zip_path])) {
-                    if (true !== $zip->addEmptyDir($zip_path)) {
-                        self::abort_zip_export(
-                            $zip,
-                            $zip_file_path,
-                            sprintf(
-                                /* translators: %s: relative path of the directory that failed to be added to the ZIP archive. */
-                                esc_html__('Impossible d\'ajouter le dossier « %s » à l\'archive ZIP.', 'theme-export-jlg'),
-                                esc_html($zip_path)
-                            )
-                        );
-                    }
-
-                    $directories_added[$zip_path] = true;
-                }
+                $items[] = [
+                    'type'                 => 'dir',
+                    'real_path'            => $real_path,
+                    'relative_path_in_zip' => rtrim($relative_path_in_zip, '/') . '/',
+                ];
 
                 continue;
             }
 
-            if (true !== $zip->addFile($real_path, $relative_path_in_zip)) {
-                self::abort_zip_export(
-                    $zip,
-                    $zip_file_path,
-                    sprintf(
-                        /* translators: %s: relative path of the file that failed to be added to the ZIP archive. */
-                        esc_html__('Impossible d\'ajouter le fichier « %s » à l\'archive ZIP.', 'theme-export-jlg'),
-                        esc_html($relative_path_in_zip)
-                    )
-                );
-            }
-            $files_added++;
+            $items[] = [
+                'type'                 => 'file',
+                'real_path'            => $real_path,
+                'relative_path_in_zip' => $relative_path_in_zip,
+            ];
+
+            $files_count++;
         }
 
-        if (0 === $files_added) {
-            $zip->close();
+        return [
+            'items'       => $items,
+            'files_count' => $files_count,
+        ];
+    }
 
-            if (file_exists($zip_file_path)) {
-                self::delete_temp_file($zip_file_path);
-            }
+    private static function generate_job_id() {
+        if (function_exists('wp_generate_uuid4')) {
+            $raw_id = wp_generate_uuid4();
+        } else {
+            $raw_id = uniqid('tejlg_export_', true);
+        }
 
-            add_settings_error(
-                'tejlg_admin_messages',
-                'theme_export_all_excluded',
-                esc_html__("Erreur : tous les fichiers ont été exclus de l'export. Vérifiez vos motifs.", 'theme-export-jlg'),
-                'error'
-            );
+        $sanitized = strtolower(preg_replace('/[^a-z0-9_]/', '', (string) $raw_id));
 
+        if ('' === $sanitized) {
+            $sanitized = 'tejlg_export_' . wp_rand(1000, 9999);
+        }
+
+        return $sanitized;
+    }
+
+    private static function get_export_process() {
+        return new TEJLG_Export_Process();
+    }
+
+    private static function get_job_option_name($job_id) {
+        $job_id = trim((string) $job_id);
+
+        return 'tejlg_export_job_' . $job_id;
+    }
+
+    public static function persist_job($job) {
+        if (!is_array($job) || empty($job['id'])) {
             return;
         }
-        $zip->close();
 
-        $zip_file_size = filesize($zip_file_path);
-        /**
-         * Filters the computed ZIP file size before streaming the archive.
-         *
-         * This allows testing utilities or custom integrations to override the
-         * detected size when required.
-         *
-         * @since 1.0.0
-         *
-         * @param int|false $zip_file_size  The detected ZIP file size or false on failure.
-         * @param string    $zip_file_path  Absolute path to the ZIP file being exported.
-         */
-        $zip_file_size = apply_filters('tejlg_export_zip_file_size', $zip_file_size, $zip_file_path);
+        $job['updated_at'] = isset($job['updated_at']) ? (int) $job['updated_at'] : time();
+
+        update_option(self::get_job_option_name($job['id']), $job, false);
+    }
+
+    public static function get_job($job_id) {
+        $job = get_option(self::get_job_option_name($job_id), false);
+
+        if (!is_array($job) || empty($job['id'])) {
+            return null;
+        }
+
+        return $job;
+    }
+
+    public static function delete_job($job_id) {
+        $job = self::get_job($job_id);
+
+        if (null !== $job && !empty($job['zip_path']) && file_exists($job['zip_path'])) {
+            self::delete_temp_file($job['zip_path']);
+        }
+
+        delete_option(self::get_job_option_name($job_id));
+    }
+
+    public static function mark_job_failed($job_id, $message) {
+        $job = self::get_job($job_id);
+
+        if (null === $job) {
+            return;
+        }
+
+        $job['status']   = 'failed';
+        $job['message']  = is_string($message) ? $message : '';
+        $job['progress'] = isset($job['progress']) ? (int) $job['progress'] : 0;
+        $job['updated_at'] = time();
+
+        if (!empty($job['zip_path']) && file_exists($job['zip_path'])) {
+            self::delete_temp_file($job['zip_path']);
+        }
+
+        self::persist_job($job);
+    }
+
+    public static function finalize_job($job) {
+        if (!is_array($job) || empty($job['id'])) {
+            return;
+        }
+
+        $job_id  = $job['id'];
+        $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
+
+        if ('' === $zip_path || !file_exists($zip_path)) {
+            self::mark_job_failed($job_id, esc_html__("Impossible de finaliser l'archive d'export.", 'theme-export-jlg'));
+            return;
+        }
+
+        $zip_file_size = filesize($zip_path);
+
+        $zip_file_size = apply_filters('tejlg_export_zip_file_size', $zip_file_size, $zip_path);
 
         if (!is_numeric($zip_file_size)) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log(sprintf('[Theme Export JLG] Unable to determine ZIP size for download: %s (value: %s)', $zip_file_path, var_export($zip_file_size, true)));
+                error_log(sprintf('[Theme Export JLG] Unable to determine ZIP size for download: %s (value: %s)', $zip_path, var_export($zip_file_size, true)));
             }
 
-            self::delete_temp_file($zip_file_path);
-
-            wp_die(esc_html__("Impossible de déterminer la taille de l'archive ZIP à télécharger.", 'theme-export-jlg'));
+            self::mark_job_failed($job_id, esc_html__("Impossible de déterminer la taille de l'archive ZIP.", 'theme-export-jlg'));
+            return;
         }
 
-        /**
-         * Allows integrations to disable the direct streaming of the ZIP archive.
-         *
-         * When the filter returns false, the ZIP file is left on disk and the
-         * method returns an associative array containing the file path, name and
-         * size so it can be handled programmatically.
-         *
-         * @since 3.1.0
-         *
-         * @param bool   $should_stream Whether the archive should be streamed to the browser.
-         * @param string $zip_file_path Absolute path to the generated ZIP archive.
-         * @param string $zip_file_name Suggested filename for the archive.
-         * @param int    $zip_file_size Size of the archive in bytes.
-         */
-        $should_stream = apply_filters(
-            'tejlg_export_stream_zip_archive',
-            true,
-            $zip_file_path,
-            $zip_file_name,
-            (int) $zip_file_size
-        );
+        $job['status']            = 'completed';
+        $job['progress']          = 100;
+        $job['zip_file_size']     = (int) $zip_file_size;
+        $job['directories_added'] = [];
+        $job['completed_at']      = time();
+        $job['updated_at']        = time();
+
+        self::persist_job($job);
+    }
+
+    public static function run_pending_export_jobs() {
+        $process = self::get_export_process();
+        $process->handle();
+    }
+
+    public static function get_export_job_status($job_id) {
+        return self::get_job($job_id);
+    }
+
+
+    private static function prepare_job_response($job) {
+        if (!is_array($job)) {
+            return null;
+        }
+
+        $progress        = isset($job['progress']) ? max(0, min(100, (int) $job['progress'])) : 0;
+        $processed_items = isset($job['processed_items']) ? (int) $job['processed_items'] : 0;
+        $total_items     = isset($job['total_items']) ? (int) $job['total_items'] : 0;
+
+        return [
+            'id'               => isset($job['id']) ? (string) $job['id'] : '',
+            'status'           => isset($job['status']) ? (string) $job['status'] : 'queued',
+            'progress'         => $progress,
+            'processed_items'  => $processed_items,
+            'total_items'      => $total_items,
+            'message'          => isset($job['message']) && is_string($job['message']) ? $job['message'] : '',
+            'zip_file_size'    => isset($job['zip_file_size']) ? (int) $job['zip_file_size'] : 0,
+            'zip_file_name'    => isset($job['zip_file_name']) ? (string) $job['zip_file_name'] : '',
+            'created_at'       => isset($job['created_at']) ? (int) $job['created_at'] : 0,
+            'updated_at'       => isset($job['updated_at']) ? (int) $job['updated_at'] : 0,
+        ];
+    }
+
+    public static function ajax_start_theme_export() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => esc_html__('Accès refusé.', 'theme-export-jlg')], 403);
+        }
+
+        check_ajax_referer('tejlg_start_theme_export', 'nonce');
+
+        $raw_exclusions = isset($_POST['exclusions']) ? wp_unslash((string) $_POST['exclusions']) : '';
+        $exclusions     = [];
+
+        if ('' !== $raw_exclusions) {
+            $split = preg_split('/[
+,]+/', $raw_exclusions);
+
+            if (false !== $split) {
+                $exclusions = array_values(
+                    array_filter(
+                        array_map(
+                            static function ($pattern) {
+                                return trim((string) $pattern);
+                            },
+                            $split
+                        ),
+                        static function ($pattern) {
+                            return '' !== $pattern;
+                        }
+                    )
+                );
+            }
+        }
+
+        $result = self::export_theme($exclusions);
+
+        if (is_wp_error($result)) {
+            wp_send_json_error(['message' => $result->get_error_message()], 400);
+        }
+
+        $job_id = (string) $result;
+        $job    = self::get_job($job_id);
+
+        wp_send_json_success([
+            'job_id'        => $job_id,
+            'job'           => self::prepare_job_response($job),
+            'downloadNonce' => wp_create_nonce('tejlg_download_theme_export_' . $job_id),
+        ]);
+    }
+
+    public static function ajax_get_theme_export_status() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => esc_html__('Accès refusé.', 'theme-export-jlg')], 403);
+        }
+
+        check_ajax_referer('tejlg_theme_export_status', 'nonce');
+
+        $job_id = isset($_REQUEST['job_id']) ? sanitize_key(wp_unslash((string) $_REQUEST['job_id'])) : '';
+
+        if ('' === $job_id) {
+            wp_send_json_error(['message' => esc_html__('Identifiant de tâche manquant.', 'theme-export-jlg')], 400);
+        }
+
+        $job = self::get_job($job_id);
+
+        if (null === $job) {
+            wp_send_json_error(['message' => esc_html__('Tâche introuvable ou expirée.', 'theme-export-jlg')], 404);
+        }
+
+        $response = [
+            'job' => self::prepare_job_response($job),
+        ];
+
+        if (isset($job['status']) && 'completed' === $job['status']) {
+            $download_nonce = wp_create_nonce('tejlg_download_theme_export_' . $job_id);
+            $response['download_url'] = add_query_arg(
+                [
+                    'action'  => 'tejlg_download_theme_export',
+                    'job_id'  => rawurlencode($job_id),
+                    '_wpnonce' => $download_nonce,
+                ],
+                admin_url('admin-ajax.php')
+            );
+        }
+
+        wp_send_json_success($response);
+    }
+
+    public static function ajax_download_theme_export() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('Accès refusé.', 'theme-export-jlg')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        }
+
+        $job_id = isset($_REQUEST['job_id']) ? sanitize_key(wp_unslash((string) $_REQUEST['job_id'])) : '';
+
+        if ('' === $job_id) {
+            wp_die(esc_html__('Identifiant de tâche manquant.', 'theme-export-jlg'));
+        }
+
+        check_ajax_referer('tejlg_download_theme_export_' . $job_id);
+
+        $job = self::get_job($job_id);
+
+        if (null === $job || !isset($job['status']) || 'completed' !== $job['status']) {
+            wp_die(esc_html__("Cette archive n'est pas disponible.", 'theme-export-jlg'));
+        }
+
+        $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
+
+        if ('' === $zip_path || !file_exists($zip_path)) {
+            self::delete_job($job_id);
+            wp_die(esc_html__('Le fichier ZIP généré est introuvable.', 'theme-export-jlg'));
+        }
+
+        $zip_file_name = isset($job['zip_file_name']) && '' !== $job['zip_file_name']
+            ? $job['zip_file_name']
+            : basename($zip_path);
+        $zip_file_size = isset($job['zip_file_size']) ? (int) $job['zip_file_size'] : (int) filesize($zip_path);
+
+        $should_stream = apply_filters('tejlg_export_stream_zip_archive', true, $zip_path, $zip_file_name, $zip_file_size);
 
         if (!$should_stream) {
-            return [
-                'path'     => $zip_file_path,
+            wp_send_json_success([
+                'path'     => $zip_path,
                 'filename' => $zip_file_name,
-                'size'     => (int) $zip_file_size,
-            ];
+                'size'     => $zip_file_size,
+            ]);
         }
 
         nocache_headers();
@@ -249,14 +532,14 @@ class TEJLG_Export {
 
         header('Content-Type: application/zip');
         header('Content-Disposition: attachment; filename="' . $zip_file_name . '"');
-        header('Content-Length: ' . (string) (int) $zip_file_size);
-        readfile($zip_file_path);
+        header('Content-Length: ' . (string) $zip_file_size);
+
+        readfile($zip_path);
         flush();
 
-        self::delete_temp_file($zip_file_path);
+        self::delete_job($job_id);
         exit;
     }
-
     /**
      * Aborts the ZIP export, cleans up temporary files and stops execution.
      *

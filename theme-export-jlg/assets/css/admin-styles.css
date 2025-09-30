@@ -232,3 +232,34 @@
 .pattern-selection-list li.is-hidden {
     display: none;
 }
+
+
+.tejlg-theme-export-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tejlg-theme-export-actions .spinner {
+    float: none;
+    visibility: hidden;
+}
+
+.tejlg-theme-export-actions .spinner.is-active {
+    visibility: visible;
+}
+
+.tejlg-theme-export-feedback {
+    margin-top: 12px;
+    padding: 12px 15px;
+}
+
+.tejlg-theme-export-feedback progress {
+    width: 100%;
+    height: 16px;
+    margin: 8px 0;
+}
+
+.tejlg-theme-export-feedback [data-export-download] {
+    margin-top: 4px;
+}

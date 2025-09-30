@@ -12,6 +12,288 @@ document.addEventListener('DOMContentLoaded', function() {
         ? localization.hideBlockCode
         : '';
 
+    const exportAsync = (localization && typeof localization.exportAsync === 'object')
+        ? localization.exportAsync
+        : null;
+
+    if (exportAsync) {
+        const exportForm = document.querySelector('[data-export-form]');
+
+        if (exportForm && exportAsync.ajaxUrl && exportAsync.actions && exportAsync.nonces) {
+            const textarea = exportForm.querySelector('#tejlg_exclusion_patterns');
+            const startButton = exportForm.querySelector('[data-export-start]');
+            const feedback = exportForm.querySelector('[data-export-feedback]');
+            const statusText = exportForm.querySelector('[data-export-status-text]');
+            const messageEl = exportForm.querySelector('[data-export-message]');
+            const progressBar = exportForm.querySelector('[data-export-progress-bar]');
+            const downloadLink = exportForm.querySelector('[data-export-download]');
+            const spinner = exportForm.querySelector('[data-export-spinner]');
+            const strings = typeof exportAsync.strings === 'object' ? exportAsync.strings : {};
+            const pollInterval = typeof exportAsync.pollInterval === 'number' ? exportAsync.pollInterval : 4000;
+
+            let currentJobId = null;
+            let pollTimeout = null;
+
+            const formatString = function(template, replacements) {
+                if (typeof template !== 'string') {
+                    return '';
+                }
+
+                let formatted = template;
+
+                Object.keys(replacements).forEach(function(key) {
+                    const value = replacements[key];
+                    formatted = formatted.replace(new RegExp('%' + key + '[$][sd]', 'g'), value);
+                });
+
+                return formatted.replace(/%%/g, '%');
+            };
+
+            const setSpinner = function(isActive) {
+                if (!spinner) {
+                    return;
+                }
+
+                if (isActive) {
+                    spinner.classList.add('is-active');
+                } else {
+                    spinner.classList.remove('is-active');
+                }
+            };
+
+            const resetFeedback = function() {
+                if (!feedback) {
+                    return;
+                }
+
+                feedback.hidden = true;
+                feedback.classList.remove('notice-error', 'notice-success');
+                if (!feedback.classList.contains('notice-info')) {
+                    feedback.classList.add('notice-info');
+                }
+
+                if (statusText) {
+                    statusText.textContent = strings.initializing || '';
+                }
+
+                if (messageEl) {
+                    messageEl.textContent = '';
+                }
+
+                if (progressBar) {
+                    progressBar.value = 0;
+                }
+
+                if (downloadLink) {
+                    downloadLink.hidden = true;
+                    downloadLink.removeAttribute('href');
+                }
+            };
+
+            const stopPolling = function() {
+                if (pollTimeout) {
+                    window.clearTimeout(pollTimeout);
+                    pollTimeout = null;
+                }
+            };
+
+            const scheduleNextPoll = function(jobId) {
+                stopPolling();
+
+                pollTimeout = window.setTimeout(function() {
+                    fetchStatus(jobId);
+                }, pollInterval);
+            };
+
+            const updateFeedback = function(job, extra) {
+                if (!feedback || !job) {
+                    return;
+                }
+
+                feedback.hidden = false;
+                feedback.classList.remove('notice-error', 'notice-success', 'notice-info');
+
+                let statusLabel = strings.queued || '';
+                let description = '';
+                let progressValue = 0;
+
+                if (typeof job.progress === 'number') {
+                    progressValue = Math.max(0, Math.min(100, Math.round(job.progress)));
+                }
+
+                if (progressBar) {
+                    progressBar.value = progressValue;
+                }
+
+                if (job.status === 'completed') {
+                    feedback.classList.add('notice-success');
+                    statusLabel = strings.completed || '';
+                    if (downloadLink && extra && typeof extra.downloadUrl === 'string') {
+                        downloadLink.hidden = false;
+                        downloadLink.href = extra.downloadUrl;
+                        downloadLink.textContent = strings.downloadLabel || downloadLink.textContent;
+                    }
+                } else if (job.status === 'failed') {
+                    feedback.classList.add('notice-error');
+                    const failureMessage = job.message && job.message.length ? job.message : (strings.failed || '');
+                    statusLabel = strings.failed ? formatString(strings.failed, { '1': failureMessage }) : failureMessage;
+                } else {
+                    feedback.classList.add('notice-info');
+                    statusLabel = job.status === 'queued' && strings.queued
+                        ? strings.queued
+                        : strings.initializing || '';
+
+                    if (job.status === 'processing' || job.status === 'queued') {
+                        const processed = typeof job.processed_items === 'number' ? job.processed_items : 0;
+                        const total = typeof job.total_items === 'number' ? job.total_items : 0;
+                        if (strings.inProgress) {
+                            description = formatString(strings.inProgress, { '1': processed, '2': total });
+                        }
+                        if (strings.progressValue) {
+                            statusLabel = formatString(strings.progressValue, { '1': progressValue });
+                        }
+                    }
+                }
+
+                if (statusText) {
+                    if (strings.statusLabel && statusLabel) {
+                        statusText.textContent = formatString(strings.statusLabel, { '1': statusLabel });
+                    } else {
+                        statusText.textContent = statusLabel;
+                    }
+                }
+
+                if (messageEl) {
+                    if (job.status === 'failed') {
+                        const failureMessage = job.message && job.message.length ? job.message : (strings.unknownError || '');
+                        messageEl.textContent = failureMessage;
+                    } else {
+                        messageEl.textContent = description;
+                    }
+                }
+
+                if (job.status !== 'completed' && downloadLink) {
+                    downloadLink.hidden = true;
+                    downloadLink.removeAttribute('href');
+                }
+            };
+
+            const handleError = function(message) {
+                stopPolling();
+                if (feedback) {
+                    feedback.hidden = false;
+                    feedback.classList.remove('notice-info', 'notice-success');
+                    feedback.classList.add('notice-error');
+                }
+                if (statusText) {
+                    statusText.textContent = strings.failed ? formatString(strings.failed, { '1': message }) : message;
+                }
+                if (messageEl) {
+                    messageEl.textContent = message || strings.unknownError || '';
+                }
+            };
+
+            const fetchStatus = function(jobId) {
+                if (!jobId) {
+                    return;
+                }
+
+                const params = new URLSearchParams();
+                params.append('action', exportAsync.actions.status);
+                params.append('nonce', exportAsync.nonces.status);
+                params.append('job_id', jobId);
+
+                window.fetch(exportAsync.ajaxUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                    },
+                    body: params.toString(),
+                }).then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Request failed');
+                    }
+                    return response.json();
+                }).then(function(payload) {
+                    if (!payload || !payload.success || !payload.data || !payload.data.job) {
+                        throw new Error(strings.unknownError || '');
+                    }
+
+                    const job = payload.data.job;
+                    const extra = { downloadUrl: payload.data.download_url || '' };
+                    updateFeedback(job, extra);
+
+                    if (job.status === 'completed' || job.status === 'failed') {
+                        stopPolling();
+                        setSpinner(false);
+                        if (startButton) {
+                            startButton.disabled = false;
+                        }
+                    } else {
+                        scheduleNextPoll(jobId);
+                    }
+                }).catch(function(error) {
+                    setSpinner(false);
+                    if (startButton) {
+                        startButton.disabled = false;
+                    }
+                    handleError(error && error.message ? error.message : strings.unknownError || '');
+                });
+            };
+
+            if (startButton) {
+                startButton.addEventListener('click', function() {
+                    stopPolling();
+                    setSpinner(true);
+                    if (startButton) {
+                        startButton.disabled = true;
+                    }
+                    resetFeedback();
+                    currentJobId = null;
+
+                    const formData = new FormData();
+                    formData.append('action', exportAsync.actions.start);
+                    formData.append('nonce', exportAsync.nonces.start);
+                    if (textarea) {
+                        formData.append('exclusions', textarea.value || '');
+                    }
+
+                    window.fetch(exportAsync.ajaxUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        body: formData,
+                    }).then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('Request failed');
+                        }
+                        return response.json();
+                    }).then(function(payload) {
+                        if (!payload || !payload.success || !payload.data) {
+                            throw new Error(strings.unknownError || '');
+                        }
+
+                        const job = payload.data.job;
+                        currentJobId = payload.data.job_id || (job && job.id) || '';
+
+                        if (!currentJobId) {
+                            throw new Error(strings.unknownError || '');
+                        }
+
+                        updateFeedback(job || null, { downloadUrl: '' });
+                        scheduleNextPoll(currentJobId);
+                    }).catch(function(error) {
+                        setSpinner(false);
+                        if (startButton) {
+                            startButton.disabled = false;
+                        }
+                        handleError(error && error.message ? error.message : strings.unknownError || '');
+                    });
+                });
+            }
+        }
+    }
+
     const themeImportConfirmMessage = typeof localization.themeImportConfirm === 'string'
         ? localization.themeImportConfirm
         : '';
