@@ -21,54 +21,56 @@ class TEJLG_CLI {
         $default_filename = $this->get_theme_slug() . '.zip';
         $output_path = $this->resolve_output_path($assoc_args, $default_filename);
 
-        $result_data = null;
-        $stream_filter = static function ($should_stream, $zip_file_path, $zip_file_name, $zip_file_size) use (&$result_data) {
-            $result_data = [
-                'path'     => $zip_file_path,
-                'filename' => $zip_file_name,
-                'size'     => $zip_file_size,
-            ];
+        $job_id = TEJLG_Export::export_theme($exclusions, ['dispatch' => false]);
 
-            return false;
-        };
-
-        add_filter('tejlg_export_stream_zip_archive', $stream_filter, 10, 4);
-
-        try {
-            $result = $this->capture_wp_die(static function () use ($exclusions) {
-                return TEJLG_Export::export_theme($exclusions);
-            });
-        } catch (TEJLG_CLI_WPDie_Exception $exception) {
-            remove_filter('tejlg_export_stream_zip_archive', $stream_filter, 10);
-            WP_CLI::error($this->normalize_cli_message($exception->getMessage()));
+        if (is_wp_error($job_id)) {
+            WP_CLI::error($this->normalize_cli_message($job_id->get_error_message()));
             return;
         }
 
-        remove_filter('tejlg_export_stream_zip_archive', $stream_filter, 10);
+        while (true) {
+            $result = TEJLG_Export::process_theme_export_job($job_id);
 
-        if (is_array($result) && isset($result['path'])) {
-            $result_data = $result;
+            if (false === $result) {
+                break;
+            }
         }
 
-        if (empty($result_data) || empty($result_data['path'])) {
-            WP_CLI::error(__('Impossible de récupérer le fichier ZIP généré.', 'theme-export-jlg'));
+        $job = TEJLG_Export::get_theme_export_job($job_id);
+
+        if (null === $job) {
+            WP_CLI::error(__('Impossible de récupérer le statut du job d\'export.', 'theme-export-jlg'));
             return;
         }
 
-        $source_path = $result_data['path'];
+        if ('error' === $job['status']) {
+            $message = isset($job['message']) && '' !== $job['message'] ? $job['message'] : __('Une erreur inconnue est survenue pendant l\'export.', 'theme-export-jlg');
+            TEJLG_Export::cleanup_theme_export_job($job_id);
+            WP_CLI::error($this->normalize_cli_message($message));
+            return;
+        }
 
-        if (!file_exists($source_path)) {
-            WP_CLI::error(sprintf(__('Le fichier ZIP généré est introuvable : %s', 'theme-export-jlg'), $source_path));
+        if ('completed' !== $job['status']) {
+            TEJLG_Export::cleanup_theme_export_job($job_id);
+            WP_CLI::error(__('Le job d\'export ne s\'est pas terminé correctement.', 'theme-export-jlg'));
+            return;
+        }
+
+        $source_path = isset($job['zip_path']) ? $job['zip_path'] : '';
+
+        if ('' === $source_path || !file_exists($source_path)) {
+            TEJLG_Export::cleanup_theme_export_job($job_id);
+            WP_CLI::error(__('Le fichier ZIP généré est introuvable.', 'theme-export-jlg'));
             return;
         }
 
         if (!$this->copy_file($source_path, $output_path)) {
-            @unlink($source_path);
+            TEJLG_Export::cleanup_theme_export_job($job_id);
             WP_CLI::error(sprintf(__('Impossible de copier le fichier ZIP vers %s.', 'theme-export-jlg'), $output_path));
             return;
         }
 
-        @unlink($source_path);
+        TEJLG_Export::cleanup_theme_export_job($job_id);
 
         WP_CLI::success(sprintf(__('Archive du thème exportée vers %s', 'theme-export-jlg'), $output_path));
     }

@@ -1,6 +1,11 @@
 <?php
 
-require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
+if (!defined('TEJLG_PATH')) {
+    define('TEJLG_PATH', dirname(__DIR__) . '/theme-export-jlg/');
+}
+
+require_once TEJLG_PATH . 'includes/class-tejlg-theme-export-process.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-export.php';
 
 if (!defined('WP_CLI')) {
     define('WP_CLI', true);

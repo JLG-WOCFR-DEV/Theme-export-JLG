@@ -13,6 +13,56 @@
     box-shadow: 0 1px 1px rgba(0,0,0,.04);
 }
 
+.tejlg-theme-export-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tejlg-theme-export-status {
+    margin-top: 1em;
+    border-top: 1px solid #e0e0e0;
+    padding-top: 1em;
+}
+
+.tejlg-theme-export-status.is-hidden {
+    display: none;
+}
+
+.tejlg-theme-export-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 0.5em;
+}
+
+.tejlg-theme-export-progress progress {
+    width: 100%;
+    height: 16px;
+}
+
+.tejlg-theme-export-progress-text {
+    font-weight: 600;
+}
+
+.tejlg-theme-export-message {
+    margin: 0;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.tejlg-theme-export-status.is-error .tejlg-theme-export-message {
+    color: #b32d2e;
+}
+
+.tejlg-theme-export-status.is-complete .tejlg-theme-export-message {
+    color: #007017;
+}
+
+.tejlg-theme-export-download {
+    margin-top: 1em;
+}
+
 .metrics-badge {
     display: inline-flex;
     flex-direction: column;

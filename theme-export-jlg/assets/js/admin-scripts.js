@@ -220,6 +220,306 @@ document.addEventListener('DOMContentLoaded', function() {
         patternSearchInput.addEventListener('keyup', searchHandler);
     }
 
+    const themeExportConfig = (typeof localization.themeExport === 'object' && localization.themeExport !== null)
+        ? localization.themeExport
+        : null;
+
+    if (themeExportConfig && typeof themeExportConfig.ajaxUrl === 'string' && themeExportConfig.ajaxUrl !== '') {
+        const form = document.getElementById('tejlg-theme-export-form');
+        const startButton = document.getElementById('tejlg-start-theme-export');
+        const spinner = document.getElementById('tejlg-theme-export-spinner');
+        const statusBox = document.getElementById('tejlg-theme-export-status');
+        const messageEl = document.getElementById('tejlg-theme-export-message');
+        const progressEl = document.getElementById('tejlg-theme-export-progress');
+        const progressTextEl = document.getElementById('tejlg-theme-export-progress-text');
+        const downloadWrapper = document.getElementById('tejlg-theme-export-download-wrapper');
+        const downloadButton = document.getElementById('tejlg-theme-export-download-button');
+        const exclusionsField = document.getElementById('tejlg_exclusion_patterns');
+
+        const strings = typeof themeExportConfig.strings === 'object' && themeExportConfig.strings !== null
+            ? themeExportConfig.strings
+            : {};
+
+        const getString = function(key, fallback) {
+            if (strings && typeof strings[key] === 'string' && strings[key].trim() !== '') {
+                return strings[key];
+            }
+
+            return fallback;
+        };
+
+        const pollInterval = typeof themeExportConfig.pollInterval === 'number' && themeExportConfig.pollInterval > 0
+            ? themeExportConfig.pollInterval
+            : 4000;
+
+        let currentJobId = null;
+        let pollTimer = null;
+
+        const setSpinnerActive = function(isActive) {
+            if (!spinner) {
+                return;
+            }
+
+            if (isActive) {
+                spinner.classList.add('is-active');
+            } else {
+                spinner.classList.remove('is-active');
+            }
+        };
+
+        const resetStatus = function() {
+            if (!statusBox) {
+                return;
+            }
+
+            statusBox.hidden = true;
+            statusBox.classList.remove('is-error');
+            statusBox.classList.remove('is-complete');
+
+            if (messageEl) {
+                messageEl.textContent = '';
+            }
+
+            if (progressEl) {
+                progressEl.value = 0;
+            }
+
+            if (progressTextEl) {
+                progressTextEl.textContent = getString('progress', 'Progression : %s%%').replace('%s', '0');
+            }
+
+            if (downloadWrapper) {
+                downloadWrapper.hidden = true;
+            }
+
+            if (downloadButton) {
+                downloadButton.removeAttribute('href');
+            }
+        };
+
+        const stopPolling = function() {
+            if (pollTimer) {
+                window.clearTimeout(pollTimer);
+                pollTimer = null;
+            }
+        };
+
+        const renderStatus = function(status) {
+            if (!statusBox) {
+                return;
+            }
+
+            statusBox.hidden = false;
+            statusBox.classList.remove('is-error');
+            statusBox.classList.remove('is-complete');
+
+            var message = '';
+            var statusKey = status && typeof status.status === 'string' ? status.status : '';
+
+            if (status && typeof status.message === 'string' && status.message.trim() !== '') {
+                message = status.message;
+            } else if ('completed' === statusKey) {
+                message = getString('completed', 'Export terminé !');
+            } else if ('processing' === statusKey) {
+                message = getString('processing', 'Export du thème en cours…');
+            } else if ('queued' === statusKey) {
+                message = getString('queued', 'En file d\'attente…');
+            } else if ('error' === statusKey) {
+                message = getString('error', 'Une erreur est survenue lors de l\'export du thème.');
+            } else {
+                message = getString('start', "Initialisation de l'export…");
+            }
+
+            if (messageEl) {
+                messageEl.textContent = message;
+            }
+
+            var progressValue = 0;
+
+            if (status && typeof status.progress === 'number') {
+                progressValue = Math.max(0, Math.min(100, status.progress));
+            }
+
+            if (progressEl) {
+                progressEl.value = progressValue;
+            }
+
+            if (progressTextEl) {
+                var progressLabel = getString('progress', 'Progression : %s%%');
+                progressTextEl.textContent = progressLabel.replace('%s', progressValue.toString());
+            }
+
+            if (downloadWrapper) {
+                downloadWrapper.hidden = true;
+            }
+
+            if (downloadButton) {
+                downloadButton.removeAttribute('href');
+                downloadButton.textContent = getString('download', 'Télécharger le ZIP');
+            }
+
+            if ('error' === statusKey) {
+                statusBox.classList.add('is-error');
+                stopPolling();
+                return;
+            }
+
+            if (status && status.downloadReady && downloadWrapper && downloadButton && typeof status.downloadUrl === 'string') {
+                downloadButton.href = status.downloadUrl;
+                downloadButton.textContent = getString('download', 'Télécharger le ZIP');
+                downloadWrapper.hidden = false;
+                statusBox.classList.add('is-complete');
+                stopPolling();
+            }
+        };
+
+        const schedulePoll = function(jobId) {
+            stopPolling();
+
+            if (!jobId) {
+                return;
+            }
+
+            pollTimer = window.setTimeout(function() {
+                fetchStatus(jobId);
+            }, pollInterval);
+        };
+
+        const fetchStatus = function(jobId) {
+            if (!jobId) {
+                return;
+            }
+
+            var params = new window.URLSearchParams();
+            params.append('action', 'tejlg_theme_export_status');
+            if (themeExportConfig.nonces && themeExportConfig.nonces.status) {
+                params.append('nonce', themeExportConfig.nonces.status);
+            }
+            params.append('job_id', jobId);
+
+            window.fetch(themeExportConfig.ajaxUrl + '?' + params.toString(), {
+                method: 'GET',
+                credentials: 'same-origin',
+            })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Status request failed with code ' + response.status);
+                    }
+
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (!data || !data.success || !data.data || !data.data.status) {
+                        throw new Error('Unexpected status payload');
+                    }
+
+                    renderStatus(data.data.status);
+
+                    if (data.data.status && !data.data.status.downloadReady && data.data.status.status !== 'error') {
+                        schedulePoll(jobId);
+                    }
+                })
+                .catch(function() {
+                    if (statusBox) {
+                        statusBox.hidden = false;
+                        statusBox.classList.add('is-error');
+                    }
+                    if (messageEl) {
+                        messageEl.textContent = getString('error', 'Une erreur est survenue lors de l\'export du thème.');
+                    }
+                    stopPolling();
+                    setSpinnerActive(false);
+                    if (startButton) {
+                        startButton.disabled = false;
+                    }
+                });
+        };
+
+        const startExport = function() {
+            if (!startButton) {
+                return;
+            }
+
+            var startNonce = themeExportConfig.nonces && themeExportConfig.nonces.start
+                ? themeExportConfig.nonces.start
+                : '';
+
+            var formData = new window.URLSearchParams();
+            formData.append('action', 'tejlg_start_theme_export');
+            formData.append('nonce', startNonce);
+            formData.append('exclusions', exclusionsField ? exclusionsField.value : '');
+
+            startButton.disabled = true;
+            setSpinnerActive(true);
+            resetStatus();
+
+            window.fetch(themeExportConfig.ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                },
+                body: formData.toString(),
+            })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Start request failed with code ' + response.status);
+                    }
+
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (!data || !data.success || !data.data || !data.data.jobId) {
+                        throw new Error('Unexpected response');
+                    }
+
+                    currentJobId = data.data.jobId;
+                    renderStatus(data.data.status || {});
+                    schedulePoll(currentJobId);
+                })
+                .catch(function(error) {
+                    if (statusBox) {
+                        statusBox.hidden = false;
+                        statusBox.classList.add('is-error');
+                    }
+                    if (messageEl) {
+                        if (error && typeof error.message === 'string') {
+                            messageEl.textContent = error.message;
+                        } else {
+                            messageEl.textContent = getString('error', 'Une erreur est survenue lors de l\'export du thème.');
+                        }
+                    }
+                })
+                .finally(function() {
+                    setSpinnerActive(false);
+                    if (startButton) {
+                        startButton.disabled = false;
+                    }
+                });
+        };
+
+        if (form) {
+            form.addEventListener('submit', function(event) {
+                event.preventDefault();
+                stopPolling();
+                startExport();
+            });
+        }
+
+        if (downloadButton) {
+            downloadButton.addEventListener('click', function(event) {
+                if (!downloadButton.href) {
+                    event.preventDefault();
+                    return;
+                }
+
+                stopPolling();
+            });
+        }
+
+        window.addEventListener('beforeunload', stopPolling);
+    }
+
     // Mettre à jour en continu les métriques de performance dans le badge.
     const fpsElement = document.getElementById('tejlg-metric-fps');
     const latencyElement = document.getElementById('tejlg-metric-latency');

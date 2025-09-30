@@ -17,6 +17,9 @@ class TEJLG_Admin {
         add_action( 'admin_menu', [ $this, 'add_menu_page' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
         add_action( 'admin_init', [ $this, 'handle_form_requests' ] );
+        add_action( 'wp_ajax_tejlg_start_theme_export', [ $this, 'ajax_start_theme_export' ] );
+        add_action( 'wp_ajax_tejlg_theme_export_status', [ $this, 'ajax_theme_export_status' ] );
+        add_action( 'wp_ajax_tejlg_theme_export_download', [ $this, 'ajax_theme_export_download' ] );
     }
 
     public function add_menu_page() {
@@ -46,6 +49,24 @@ class TEJLG_Admin {
             wp_add_inline_style('tejlg-admin-styles', $inline_style);
         }
         wp_enqueue_script('tejlg-admin-scripts', TEJLG_URL . 'assets/js/admin-scripts.js', [], TEJLG_VERSION, true);
+        $theme_export_data = [
+            'ajaxUrl'      => admin_url('admin-ajax.php'),
+            'nonces'       => [
+                'start'  => wp_create_nonce('tejlg_start_theme_export'),
+                'status' => wp_create_nonce('tejlg_theme_export_status'),
+            ],
+            'pollInterval' => (int) apply_filters('tejlg_theme_export_poll_interval', 4000),
+            'strings'      => [
+                'start'       => esc_html__("Initialisation de l'export…", 'theme-export-jlg'),
+                'queued'      => esc_html__('En file d\'attente…', 'theme-export-jlg'),
+                'processing'  => esc_html__('Export du thème en cours…', 'theme-export-jlg'),
+                'completed'   => esc_html__('Export terminé !', 'theme-export-jlg'),
+                'error'       => esc_html__('Une erreur est survenue lors de l\'export du thème.', 'theme-export-jlg'),
+                'download'    => esc_html__('Télécharger le ZIP', 'theme-export-jlg'),
+                'retry'       => esc_html__('Réessayer', 'theme-export-jlg'),
+                'progress'    => esc_html__('Progression : %s%%', 'theme-export-jlg'),
+            ],
+        ];
         wp_localize_script(
             'tejlg-admin-scripts',
             'tejlgAdminL10n',
@@ -54,6 +75,7 @@ class TEJLG_Admin {
                 'hideBlockCode' => __('Masquer le code du bloc', 'theme-export-jlg'),
                 /* translators: Warning shown before importing a theme zip file. */
                 'themeImportConfirm' => __("⚠️ ATTENTION ⚠️\n\nSi un thème avec le même nom de dossier existe déjà, il sera DÉFINITIVEMENT écrasé.\n\nÊtes-vous sûr de vouloir continuer ?", 'theme-export-jlg'),
+                'themeExport' => $theme_export_data,
                 'metrics' => [
                     'locale'           => get_user_locale(),
                     'fpsUnit'          => esc_html__('FPS', 'theme-export-jlg'),
@@ -83,6 +105,114 @@ class TEJLG_Admin {
         $this->handle_patterns_import_step2_request();
         $this->handle_global_styles_import_request();
         $this->handle_child_theme_request();
+    }
+
+    public function ajax_start_theme_export() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => esc_html__('Accès refusé.', 'theme-export-jlg')], 403);
+        }
+
+        check_ajax_referer('tejlg_start_theme_export', 'nonce');
+
+        $raw_exclusions = isset($_POST['exclusions']) ? wp_unslash($_POST['exclusions']) : '';
+        $exclusions      = $this->parse_exclusion_patterns($raw_exclusions);
+
+        $job_id = TEJLG_Export::export_theme($exclusions);
+
+        if (is_wp_error($job_id)) {
+            wp_send_json_error([
+                'message' => $job_id->get_error_message(),
+                'code'    => $job_id->get_error_code(),
+            ], 400);
+        }
+
+        $status = TEJLG_Export::get_theme_export_status($job_id);
+
+        if (is_wp_error($status)) {
+            $status = [
+                'id'             => $job_id,
+                'status'         => 'queued',
+                'progress'       => 0,
+                'filesTotal'     => 0,
+                'filesProcessed' => 0,
+                'downloadReady'  => false,
+            ];
+        }
+
+        wp_send_json_success([
+            'jobId'  => $job_id,
+            'status' => $status,
+        ]);
+    }
+
+    public function ajax_theme_export_status() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => esc_html__('Accès refusé.', 'theme-export-jlg')], 403);
+        }
+
+        check_ajax_referer('tejlg_theme_export_status', 'nonce');
+
+        $job_id_param = isset($_REQUEST['job_id']) ? $_REQUEST['job_id'] : '';
+        $job_id       = is_scalar($job_id_param) ? sanitize_text_field(wp_unslash((string) $job_id_param)) : '';
+
+        if ('' === $job_id) {
+            wp_send_json_error(['message' => esc_html__('Identifiant de tâche manquant.', 'theme-export-jlg')], 400);
+        }
+
+        $status = TEJLG_Export::get_theme_export_status($job_id);
+
+        if (is_wp_error($status)) {
+            wp_send_json_error([
+                'message' => $status->get_error_message(),
+                'code'    => $status->get_error_code(),
+            ], 404);
+        }
+
+        if (!empty($status['downloadReady'])) {
+            $status['downloadUrl'] = wp_nonce_url(
+                add_query_arg(
+                    [
+                        'action' => 'tejlg_theme_export_download',
+                        'job_id' => $job_id,
+                    ],
+                    admin_url('admin-ajax.php')
+                ),
+                'tejlg_theme_export_download_' . $job_id
+            );
+        }
+
+        wp_send_json_success([
+            'status' => $status,
+        ]);
+    }
+
+    public function ajax_theme_export_download() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('Accès refusé.', 'theme-export-jlg'), 403);
+        }
+
+        $job_id_param = isset($_REQUEST['job_id']) ? $_REQUEST['job_id'] : '';
+        $job_id       = is_scalar($job_id_param) ? sanitize_text_field(wp_unslash((string) $job_id_param)) : '';
+
+        if ('' === $job_id) {
+            wp_die(esc_html__('Identifiant de tâche manquant.', 'theme-export-jlg'), 400);
+        }
+
+        check_ajax_referer('tejlg_theme_export_download_' . $job_id);
+
+        $result = TEJLG_Export::stream_theme_export_job($job_id);
+
+        if (is_wp_error($result)) {
+            wp_die($result->get_error_message(), 400);
+        }
+
+        if (is_array($result)) {
+            wp_send_json_success($result);
+        }
+
+        TEJLG_Export::cleanup_theme_export_job($job_id);
+
+        exit;
     }
 
     private function handle_metrics_settings_request() {
@@ -159,25 +289,25 @@ class TEJLG_Admin {
         }
 
         if (isset($_POST['tejlg_export_theme'])) {
-            $exclusions = [];
+            $raw_patterns = isset($_POST['tejlg_exclusion_patterns']) ? wp_unslash($_POST['tejlg_exclusion_patterns']) : '';
+            $exclusions   = $this->parse_exclusion_patterns($raw_patterns);
+            $job_result   = TEJLG_Export::export_theme($exclusions);
 
-            if (isset($_POST['tejlg_exclusion_patterns']) && is_string($_POST['tejlg_exclusion_patterns'])) {
-                $raw_patterns    = wp_unslash($_POST['tejlg_exclusion_patterns']);
-                $split_patterns  = preg_split('/[\r\n,]+/', $raw_patterns);
-
-                if (false !== $split_patterns) {
-                    $exclusions = array_values(
-                        array_filter(
-                            array_map('trim', $split_patterns),
-                            static function ($pattern) {
-                                return '' !== $pattern;
-                            }
-                        )
-                    );
-                }
+            if (is_wp_error($job_result)) {
+                add_settings_error(
+                    'tejlg_admin_messages',
+                    'theme_export_error',
+                    esc_html($job_result->get_error_message()),
+                    'error'
+                );
+            } else {
+                add_settings_error(
+                    'tejlg_admin_messages',
+                    'theme_export_job_started',
+                    esc_html__('Export du thème initialisé. Vous pouvez suivre la progression ci-dessous.', 'theme-export-jlg'),
+                    'updated'
+                );
             }
-
-            TEJLG_Export::export_theme($exclusions);
         }
 
         if (isset($_POST['tejlg_export_patterns'])) {
@@ -435,6 +565,33 @@ class TEJLG_Admin {
         return $sanitized;
     }
 
+    private function parse_exclusion_patterns($raw_patterns) {
+        if (is_array($raw_patterns)) {
+            $raw_patterns = implode("\n", $raw_patterns);
+        }
+
+        if (!is_scalar($raw_patterns)) {
+            return [];
+        }
+
+        $split_patterns = preg_split('/[\r\n,]+/', (string) $raw_patterns);
+
+        if (false === $split_patterns) {
+            return [];
+        }
+
+        $sanitized = array_map('trim', $split_patterns);
+
+        return array_values(
+            array_filter(
+                $sanitized,
+                static function ($pattern) {
+                    return '' !== $pattern;
+                }
+            )
+        );
+    }
+
     public function render_admin_page() {
         $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'export';
         ?>
@@ -502,14 +659,29 @@ class TEJLG_Admin {
                     $exclusion_patterns_value = wp_unslash($_POST['tejlg_exclusion_patterns']);
                 }
                 ?>
-                <form method="post" action="">
+                <form method="post" action="" id="tejlg-theme-export-form">
                     <?php wp_nonce_field('tejlg_export_action', 'tejlg_nonce'); ?>
                     <p>
                         <label for="tejlg_exclusion_patterns"><?php esc_html_e('Motifs d\'exclusion (optionnel) :', 'theme-export-jlg'); ?></label><br>
                         <textarea name="tejlg_exclusion_patterns" id="tejlg_exclusion_patterns" class="large-text code" rows="4" placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"><?php echo esc_textarea($exclusion_patterns_value); ?></textarea>
                         <span class="description"><?php esc_html_e('Indiquez un motif par ligne ou séparez-les par des virgules (joker * accepté).', 'theme-export-jlg'); ?></span>
                     </p>
-                    <p><button type="submit" name="tejlg_export_theme" class="button button-primary"><?php esc_html_e('Exporter le Thème Actif', 'theme-export-jlg'); ?></button></p>
+                    <p class="tejlg-theme-export-actions">
+                        <button type="submit" name="tejlg_export_theme" class="button button-primary" id="tejlg-start-theme-export"><?php esc_html_e('Lancer l\'export du thème', 'theme-export-jlg'); ?></button>
+                        <span class="spinner" id="tejlg-theme-export-spinner" aria-hidden="true"></span>
+                    </p>
+                    <div id="tejlg-theme-export-status" class="tejlg-theme-export-status" hidden>
+                        <p id="tejlg-theme-export-message" class="tejlg-theme-export-message" role="status" aria-live="polite"></p>
+                        <div class="tejlg-theme-export-progress">
+                            <progress id="tejlg-theme-export-progress" value="0" max="100"></progress>
+                            <span class="tejlg-theme-export-progress-text" id="tejlg-theme-export-progress-text">0%</span>
+                        </div>
+                        <p class="tejlg-theme-export-download" id="tejlg-theme-export-download-wrapper" hidden>
+                            <a href="#" class="button button-secondary" id="tejlg-theme-export-download-button">
+                                <?php esc_html_e('Télécharger le ZIP', 'theme-export-jlg'); ?>
+                            </a>
+                        </p>
+                    </div>
                 </form>
             </div>
             <div class="tejlg-card">

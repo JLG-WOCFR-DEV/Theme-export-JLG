@@ -2,9 +2,14 @@
 
 use RuntimeException;
 
-require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin.php';
-require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
-require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-import.php';
+if (!defined('TEJLG_PATH')) {
+    define('TEJLG_PATH', dirname(__DIR__) . '/theme-export-jlg/');
+}
+
+require_once TEJLG_PATH . 'includes/class-tejlg-theme-export-process.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-admin.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-export.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-import.php';
 
 /**
  * @group admin
