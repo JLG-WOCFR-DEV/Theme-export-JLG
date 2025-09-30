@@ -35,6 +35,16 @@ $wpdb->query(
     )
 );
 
+$job_option_prefix      = 'tejlg_export_job_';
+$escaped_job_option     = $wpdb->esc_like( $job_option_prefix ) . '%';
+
+$wpdb->query(
+    $wpdb->prepare(
+        "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+        $escaped_job_option
+    )
+);
+
 // Supprimer l'option stockant la taille des icônes de métriques (mono et multisites).
 delete_option( 'tejlg_metrics_icon_size' );
 delete_site_option( 'tejlg_metrics_icon_size' );

@@ -62,4 +62,36 @@ class Test_Export_Theme extends WP_UnitTestCase {
 
         TEJLG_Export::delete_job($job_id);
     }
+
+    public function test_cleanup_stale_jobs_removes_completed_job_and_file() {
+        $job_id = sanitize_key('test_cleanup_' . wp_generate_uuid4());
+        $temp_file = wp_tempnam('tejlg-export-cleanup');
+
+        $this->assertIsString($temp_file, 'Temporary file path should be generated.');
+        $this->assertNotEmpty($temp_file, 'Temporary file path should not be empty.');
+
+        file_put_contents($temp_file, 'temporary export data');
+
+        $this->assertTrue(file_exists($temp_file), 'Temporary ZIP file should exist before cleanup.');
+
+        $job_payload = [
+            'id'            => $job_id,
+            'status'        => 'completed',
+            'zip_path'      => $temp_file,
+            'zip_file_name' => basename($temp_file),
+            'completed_at'  => time() - (2 * HOUR_IN_SECONDS),
+            'updated_at'    => time() - (2 * HOUR_IN_SECONDS),
+        ];
+
+        TEJLG_Export::persist_job($job_payload);
+
+        $stored_job = TEJLG_Export::get_job($job_id);
+
+        $this->assertIsArray($stored_job, 'The job should be stored before cleanup runs.');
+
+        TEJLG_Export::cleanup_stale_jobs(HOUR_IN_SECONDS);
+
+        $this->assertNull(TEJLG_Export::get_job($job_id), 'The job should be removed once it becomes stale.');
+        $this->assertFalse(file_exists($temp_file), 'Cleanup should delete the associated temporary ZIP file.');
+    }
 }

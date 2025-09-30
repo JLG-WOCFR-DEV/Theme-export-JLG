@@ -50,5 +50,6 @@ function tejlg_load_textdomain() {
 add_action('wp_ajax_tejlg_start_theme_export', ['TEJLG_Export', 'ajax_start_theme_export']);
 add_action('wp_ajax_tejlg_theme_export_status', ['TEJLG_Export', 'ajax_get_theme_export_status']);
 add_action('wp_ajax_tejlg_download_theme_export', ['TEJLG_Export', 'ajax_download_theme_export']);
+add_action('admin_init', ['TEJLG_Export', 'cleanup_stale_jobs']);
 add_action( 'plugins_loaded', 'tejlg_load_textdomain' );
 add_action( 'plugins_loaded', 'tejlg_run_plugin' );
