@@ -37,10 +37,13 @@ Chaque commande renvoie un message de réussite structuré ou un message d’err
 ## Support & ressources
 
 ### FAQ
-**Pourquoi l’export du thème échoue-t-il immédiatement ?**  
+**Pourquoi l’export du thème échoue-t-il immédiatement ?**
 L’extension vérifie la présence de `ZipArchive` avant de créer l’archive ZIP. Activez ou installez l’extension côté serveur, puis contrôlez son statut dans l’onglet Débogage.【F:theme-export-jlg/includes/class-tejlg-export.php†L7-L37】【F:theme-export-jlg/includes/class-tejlg-admin.php†L214-L236】
 
-**Puis-je réimporter un fichier de compositions sans créer de doublon ?**  
+**Et si WP-Cron est désactivé par mon hébergeur ?**
+Le plugin détecte automatiquement l’absence d’évènements planifiés ou la constante `DISABLE_WP_CRON` pour traiter immédiatement l’export, sans dépendre de WP-Cron. Vous obtenez ainsi le même comportement que sur un environnement professionnel où un cron serveur prendrait le relais.【F:theme-export-jlg/includes/class-tejlg-export.php†L103-L133】
+
+**Puis-je réimporter un fichier de compositions sans créer de doublon ?**
 Oui. Lors de la seconde étape d’import, le plugin ignore les compositions dont le slug est déjà enregistré afin d’éviter les duplications inutiles.【F:theme-export-jlg/includes/class-tejlg-import.php†L41-L70】
 
 **Que faire si la prévisualisation d’import affiche “session expirée” ?**  
