@@ -747,6 +747,48 @@ class TEJLG_Admin {
             : sprintf('<span style="color:red; font-weight: bold;">%s</span>', esc_html__('Manquante (CRITIQUE pour la fiabilité des exports JSON)', 'theme-export-jlg'));
 
         $metrics_icon_size = $this->get_metrics_icon_size();
+
+        $is_cron_disabled   = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
+        $is_alternate_cron  = defined('ALTERNATE_WP_CRON') && ALTERNATE_WP_CRON;
+        $next_cron_timestamp = wp_next_scheduled('wp_version_check');
+
+        if ($is_cron_disabled) {
+            $cron_status = sprintf(
+                '<span style="color:red; font-weight:bold;">%s</span>',
+                esc_html__(
+                    'Désactivé : DISABLE_WP_CRON est défini. Configurez une tâche cron système pour exécuter wp-cron.php manuellement.',
+                    'theme-export-jlg'
+                )
+            );
+        } else {
+            $next_cron_text = false !== $next_cron_timestamp
+                ? sprintf(
+                    /* translators: %s: formatted date of the next scheduled WP-Cron event. */
+                    __('Prochain événement planifié : %s.', 'theme-export-jlg'),
+                    wp_date(
+                        get_option('date_format') . ' ' . get_option('time_format'),
+                        $next_cron_timestamp
+                    )
+                )
+                : __('Aucun événement planifié actuellement.', 'theme-export-jlg');
+
+            $status_text = $is_alternate_cron
+                ? sprintf(
+                    /* translators: %s: information about the next scheduled WP-Cron event. */
+                    __('Actif (mode alternatif). %s', 'theme-export-jlg'),
+                    $next_cron_text
+                )
+                : sprintf(
+                    /* translators: %s: information about the next scheduled WP-Cron event. */
+                    __('Actif. %s', 'theme-export-jlg'),
+                    $next_cron_text
+                );
+
+            $cron_status = sprintf(
+                '<span style="color:green;">%s</span>',
+                esc_html($status_text)
+            );
+        }
         ?>
         <?php settings_errors('tejlg_debug_messages'); ?>
 
@@ -807,6 +849,10 @@ class TEJLG_Admin {
                             <tr>
                                 <td><?php echo wp_kses_post(__('Extension PHP <code>mbstring</code>', 'theme-export-jlg')); ?></td>
                                 <td><?php echo wp_kses_post($mbstring_status); ?></td>
+                            </tr>
+                            <tr>
+                                <td><?php esc_html_e('Statut WP-Cron', 'theme-export-jlg'); ?></td>
+                                <td><?php echo wp_kses_post($cron_status); ?></td>
                             </tr>
                             <tr>
                                 <td><?php esc_html_e('Limite de mémoire WP', 'theme-export-jlg'); ?></td>
