@@ -559,6 +559,30 @@ document.addEventListener('DOMContentLoaded', function() {
         const maxSampleSize = 120;
         const maxFrameGap = 1500;
 
+        const hasPerformanceNow = typeof window.performance === 'object' && typeof window.performance.now === 'function';
+        const now = hasPerformanceNow
+            ? function() { return window.performance.now(); }
+            : function() { return Date.now ? Date.now() : new Date().getTime(); };
+
+        const hasNativeRequestAnimationFrame = typeof window.requestAnimationFrame === 'function';
+        const scheduleFrame = hasNativeRequestAnimationFrame
+            ? function(callback) {
+                return window.requestAnimationFrame(callback);
+            }
+            : function(callback) {
+                return window.setTimeout(function() {
+                    callback(now());
+                }, idealFrameDuration);
+            };
+
+        const cancelFrame = hasNativeRequestAnimationFrame
+            ? function(handle) {
+                window.cancelAnimationFrame(handle);
+            }
+            : function(handle) {
+                window.clearTimeout(handle);
+            };
+
         const fpsSamples = [];
         const latencySamplesFromRaf = [];
         const latencySamplesFromObserver = [];
@@ -654,7 +678,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             lastFrameTime = timestamp;
             updateDisplay();
-            animationFrameId = window.requestAnimationFrame(onAnimationFrame);
+            scheduleNextFrame();
+        };
+
+        const scheduleNextFrame = function() {
+            animationFrameId = scheduleFrame(onAnimationFrame);
         };
 
         const setupPerformanceObserver = function() {
@@ -723,7 +751,7 @@ document.addEventListener('DOMContentLoaded', function() {
             monitoringActive = false;
 
             if (animationFrameId !== null) {
-                window.cancelAnimationFrame(animationFrameId);
+                cancelFrame(animationFrameId);
                 animationFrameId = null;
             }
 
@@ -746,8 +774,11 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         setupPerformanceObserver();
-        animationFrameId = window.requestAnimationFrame(onAnimationFrame);
-        window.addEventListener('beforeunload', stopMonitoring, { once: true });
+        scheduleNextFrame();
+
+        ['beforeunload', 'pagehide'].forEach(function(eventName) {
+            window.addEventListener(eventName, stopMonitoring, { once: true });
+        });
     }
 
 });
