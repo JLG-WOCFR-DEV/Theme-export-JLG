@@ -233,14 +233,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     }).then(function(payload) {
                         if (!response.ok) {
                             const message = extractResponseMessage(payload) || strings.unknownError || '';
-                            throw new Error(message || strings.unknownError || '');
+                            return Promise.reject(message || strings.unknownError || '');
                         }
                         return payload;
                     });
                 }).then(function(payload) {
                     if (!payload || !payload.success || !payload.data || !payload.data.job) {
                         const message = extractResponseMessage(payload) || strings.unknownError || '';
-                        throw new Error(message || strings.unknownError || '');
+                        return Promise.reject(message || strings.unknownError || '');
                     }
 
                     const job = payload.data.job;
@@ -261,7 +261,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (startButton) {
                         startButton.disabled = false;
                     }
-                    handleError(error && error.message ? error.message : strings.unknownError || '');
+                    const message = (typeof error === 'string' && error.length)
+                        ? error
+                        : (error && typeof error.message === 'string' && error.message.length)
+                            ? error.message
+                            : strings.unknownError || '';
+                    handleError(message || strings.unknownError || '');
                 });
             };
 
@@ -292,21 +297,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         }).then(function(payload) {
                             if (!response.ok) {
                                 const message = extractResponseMessage(payload) || strings.unknownError || '';
-                                throw new Error(message || strings.unknownError || '');
+                                return Promise.reject(message || strings.unknownError || '');
                             }
                             return payload;
                         });
                     }).then(function(payload) {
                         if (!payload || !payload.success || !payload.data) {
                             const message = extractResponseMessage(payload) || strings.unknownError || '';
-                            throw new Error(message || strings.unknownError || '');
+                            return Promise.reject(message || strings.unknownError || '');
                         }
 
                         const job = payload.data.job;
                         currentJobId = payload.data.job_id || (job && job.id) || '';
 
                         if (!currentJobId) {
-                            throw new Error(strings.unknownError || '');
+                            return Promise.reject(strings.unknownError || '');
                         }
 
                         updateFeedback(job || null, { downloadUrl: '' });
@@ -316,7 +321,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (startButton) {
                             startButton.disabled = false;
                         }
-                        handleError(error && error.message ? error.message : strings.unknownError || '');
+                        const message = (typeof error === 'string' && error.length)
+                            ? error
+                            : (error && typeof error.message === 'string' && error.message.length)
+                                ? error.message
+                                : strings.unknownError || '';
+                        handleError(message || strings.unknownError || '');
                     });
                 });
             }
