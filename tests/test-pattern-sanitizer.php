@@ -4,6 +4,8 @@ require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin.ph
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-import.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
 
+class TEJLG_WPDie_Exception extends Exception {}
+
 /**
  * @group pattern-sanitizer
  */
@@ -12,6 +14,28 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
     protected $previous_home_url;
     protected $previous_site_url;
     protected $custom_batch_size = 3;
+
+    public static function get_wp_die_handler() {
+        return [self::class, 'handle_wp_die'];
+    }
+
+    public static function handle_wp_die($message, $title = '', $args = []) {
+        throw new TEJLG_WPDie_Exception($message);
+    }
+
+    public static function replace_patterns_file_handle($handle, $temp_file) {
+        $failing_handle = fopen('/dev/full', 'w');
+
+        if (false === $failing_handle) {
+            return $handle;
+        }
+
+        if (is_resource($handle)) {
+            fclose($handle);
+        }
+
+        return $failing_handle;
+    }
 
     public function setUp(): void {
         parent::setUp();
@@ -128,6 +152,21 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
         $this->assertCount(1, $decoded);
         $this->assertArrayHasKey('content', $decoded[0]);
         $this->assertStringContainsString('/subdir/wp-content/uploads/2024/05/test.png', $decoded[0]['content']);
+    }
+
+    public function test_export_patterns_json_aborts_when_write_fails() {
+        add_filter('wp_die_handler', [self::class, 'get_wp_die_handler']);
+        add_filter('tejlg_export_patterns_file_handle', [self::class, 'replace_patterns_file_handle'], 10, 2);
+
+        $this->expectException(TEJLG_WPDie_Exception::class);
+        $this->expectExceptionMessage("Une erreur critique est survenue lors de l&#039;écriture du fichier JSON d&#039;export.");
+
+        try {
+            TEJLG_Export::export_patterns_json();
+        } finally {
+            remove_filter('tejlg_export_patterns_file_handle', [self::class, 'replace_patterns_file_handle'], 10);
+            remove_filter('wp_die_handler', [self::class, 'get_wp_die_handler'], 10);
+        }
     }
 
     public function test_preview_and_import_succeeds_with_array_content() {
