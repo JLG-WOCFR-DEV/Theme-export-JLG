@@ -30,6 +30,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const spinner = exportForm.querySelector('[data-export-spinner]');
             const strings = typeof exportAsync.strings === 'object' ? exportAsync.strings : {};
             const pollInterval = typeof exportAsync.pollInterval === 'number' ? exportAsync.pollInterval : 4000;
+            const extractResponseMessage = function(payload) {
+                if (!payload || typeof payload !== 'object') {
+                    return '';
+                }
+
+                if (typeof payload.message === 'string' && payload.message.length) {
+                    return payload.message;
+                }
+
+                if (payload.data && typeof payload.data === 'object' && payload.data !== null) {
+                    if (typeof payload.data.message === 'string' && payload.data.message.length) {
+                        return payload.data.message;
+                    }
+                }
+
+                return '';
+            };
 
             let currentJobId = null;
             let pollTimeout = null;
@@ -211,13 +228,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: params.toString(),
                 }).then(function(response) {
-                    if (!response.ok) {
-                        throw new Error('Request failed');
-                    }
-                    return response.json();
+                    return response.json().catch(function() {
+                        return null;
+                    }).then(function(payload) {
+                        if (!response.ok) {
+                            const message = extractResponseMessage(payload) || strings.unknownError || '';
+                            throw new Error(message || strings.unknownError || '');
+                        }
+                        return payload;
+                    });
                 }).then(function(payload) {
                     if (!payload || !payload.success || !payload.data || !payload.data.job) {
-                        throw new Error(strings.unknownError || '');
+                        const message = extractResponseMessage(payload) || strings.unknownError || '';
+                        throw new Error(message || strings.unknownError || '');
                     }
 
                     const job = payload.data.job;
@@ -264,13 +287,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         credentials: 'same-origin',
                         body: formData,
                     }).then(function(response) {
-                        if (!response.ok) {
-                            throw new Error('Request failed');
-                        }
-                        return response.json();
+                        return response.json().catch(function() {
+                            return null;
+                        }).then(function(payload) {
+                            if (!response.ok) {
+                                const message = extractResponseMessage(payload) || strings.unknownError || '';
+                                throw new Error(message || strings.unknownError || '');
+                            }
+                            return payload;
+                        });
                     }).then(function(payload) {
                         if (!payload || !payload.success || !payload.data) {
-                            throw new Error(strings.unknownError || '');
+                            const message = extractResponseMessage(payload) || strings.unknownError || '';
+                            throw new Error(message || strings.unknownError || '');
                         }
 
                         const job = payload.data.job;
