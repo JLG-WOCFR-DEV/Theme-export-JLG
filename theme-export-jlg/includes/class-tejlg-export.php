@@ -6,7 +6,12 @@ class TEJLG_Export {
      *
      * Les jobs sont traités immédiatement lorsque WP-Cron est indisponible ou
      * lorsqu'aucun évènement n'a pu être planifié, afin d'imiter le
-     * comportement attendu dans les environnements professionnels.
+     * comportement attendu dans les environnements professionnels :
+     *
+     * - la constante DISABLE_WP_CRON (ou tout autre flag équivalent) force
+     *   l'exécution immédiate du job ;
+     * - l'absence d'évènement planifié après la tentative de `dispatch`
+     *   déclenche également l'exécution immédiate.
      */
     public static function export_theme($exclusions = []) {
         if (!class_exists('ZipArchive')) {
@@ -125,16 +130,24 @@ class TEJLG_Export {
 
         $should_run_immediately = apply_filters('tejlg_export_run_jobs_immediately', defined('WP_RUNNING_TESTS'));
 
-        if (!$should_run_immediately) {
-            $cron_disabled = defined('DISABLE_WP_CRON') && wp_validate_boolean(DISABLE_WP_CRON);
-            $cron_hook_identifier = method_exists($process, 'get_cron_hook_identifier')
-                ? $process->get_cron_hook_identifier()
-                : '';
-            $event_scheduled = '' !== $cron_hook_identifier && false !== wp_next_scheduled($cron_hook_identifier);
+        $cron_disabled = false;
 
-            if ($cron_disabled || !$event_scheduled) {
-                $should_run_immediately = true;
-            }
+        if (defined('DISABLE_WP_CRON')) {
+            $cron_disabled = function_exists('wp_validate_boolean')
+                ? wp_validate_boolean(DISABLE_WP_CRON)
+                : (bool) DISABLE_WP_CRON;
+        }
+
+        $cron_hook_identifier = method_exists($process, 'get_cron_hook_identifier')
+            ? (string) $process->get_cron_hook_identifier()
+            : '';
+
+        $event_scheduled = '' !== $cron_hook_identifier
+            && function_exists('wp_next_scheduled')
+            && false !== wp_next_scheduled($cron_hook_identifier);
+
+        if (!$should_run_immediately && ($cron_disabled || !$event_scheduled)) {
+            $should_run_immediately = true;
         }
 
         if ($should_run_immediately) {
