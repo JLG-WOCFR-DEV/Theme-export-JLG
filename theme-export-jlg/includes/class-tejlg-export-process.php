@@ -148,5 +148,13 @@ class TEJLG_Export_Process extends WP_Background_Process {
 
         return false;
     }
+
+    public function is_locked() {
+        return $this->is_processing();
+    }
+
+    public function unlock() {
+        $this->unlock_process();
+    }
 }
 

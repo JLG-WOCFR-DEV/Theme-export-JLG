@@ -123,23 +123,7 @@ class TEJLG_Export {
         $process->save();
         $process->dispatch();
 
-        $should_run_immediately = apply_filters('tejlg_export_run_jobs_immediately', defined('WP_RUNNING_TESTS'));
-
-        if (!$should_run_immediately) {
-            $cron_disabled = defined('DISABLE_WP_CRON') && wp_validate_boolean(DISABLE_WP_CRON);
-            $cron_hook_identifier = method_exists($process, 'get_cron_hook_identifier')
-                ? $process->get_cron_hook_identifier()
-                : '';
-            $event_scheduled = '' !== $cron_hook_identifier && false !== wp_next_scheduled($cron_hook_identifier);
-
-            if ($cron_disabled || !$event_scheduled) {
-                $should_run_immediately = true;
-            }
-        }
-
-        if ($should_run_immediately) {
-            self::run_pending_export_jobs();
-        }
+        self::maybe_run_jobs_immediately($process, $job_id);
 
         return $job_id;
     }
@@ -389,6 +373,37 @@ class TEJLG_Export {
         $process->handle();
     }
 
+    private static function maybe_run_jobs_immediately($process, $job_id = '') {
+        if (!is_object($process)) {
+            return false;
+        }
+
+        $force_sync = (bool) apply_filters('tejlg_export_force_sync', false, $process, $job_id);
+
+        $should_run_immediately = apply_filters(
+            'tejlg_export_run_jobs_immediately',
+            defined('WP_RUNNING_TESTS'),
+            $process,
+            $job_id
+        );
+
+        $cron_disabled = defined('DISABLE_WP_CRON') && wp_validate_boolean(DISABLE_WP_CRON);
+
+        $cron_hook_identifier = method_exists($process, 'get_cron_hook_identifier')
+            ? (string) $process->get_cron_hook_identifier()
+            : '';
+
+        $event_scheduled = '' === $cron_hook_identifier ? true : (false !== wp_next_scheduled($cron_hook_identifier));
+
+        if ($force_sync || $should_run_immediately || $cron_disabled || !$event_scheduled) {
+            self::run_pending_export_jobs();
+
+            return true;
+        }
+
+        return false;
+    }
+
     public static function get_export_job_status($job_id) {
         return self::get_job($job_id);
     }
@@ -455,7 +470,11 @@ class TEJLG_Export {
         }
 
         $job_id = (string) $result;
-        $job    = self::get_job($job_id);
+
+        $process = self::get_export_process();
+        self::maybe_run_jobs_immediately($process, $job_id);
+
+        $job = self::get_job($job_id);
 
         wp_send_json_success([
             'job_id'        => $job_id,
@@ -483,11 +502,43 @@ class TEJLG_Export {
             wp_send_json_error(['message' => esc_html__('Tâche introuvable ou expirée.', 'theme-export-jlg')], 404);
         }
 
+        $process = self::get_export_process();
+        $ran_jobs = self::maybe_run_jobs_immediately($process, $job_id);
+
+        $job_status = isset($job['status']) ? (string) $job['status'] : '';
+
+        if (!$ran_jobs && in_array($job_status, ['queued', 'processing'], true)) {
+            $updated_at = isset($job['updated_at']) ? (int) $job['updated_at'] : 0;
+            $threshold  = (int) apply_filters('tejlg_export_stalled_job_retry_threshold', 15, $job, $job_id);
+            $is_stalled = $updated_at > 0 && (time() - $updated_at) > max(1, $threshold);
+
+            $force_sync = (bool) apply_filters('tejlg_export_force_sync', false, $process, $job_id);
+
+            if ($force_sync || $is_stalled) {
+                $is_locked = method_exists($process, 'is_locked') ? $process->is_locked() : false;
+
+                if (!$is_locked) {
+                    self::run_pending_export_jobs();
+                    $ran_jobs = true;
+                }
+            }
+        }
+
+        if ($ran_jobs) {
+            $job = self::get_job($job_id);
+
+            if (null === $job) {
+                wp_send_json_error(['message' => esc_html__('Tâche introuvable ou expirée.', 'theme-export-jlg')], 404);
+            }
+
+            $job_status = isset($job['status']) ? (string) $job['status'] : '';
+        }
+
         $response = [
             'job' => self::prepare_job_response($job),
         ];
 
-        if (isset($job['status']) && 'completed' === $job['status']) {
+        if ('completed' === $job_status) {
             $download_nonce = wp_create_nonce('tejlg_download_theme_export_' . $job_id);
             $response['download_url'] = add_query_arg(
                 [
