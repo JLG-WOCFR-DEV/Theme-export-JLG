@@ -686,13 +686,26 @@ class TEJLG_Export {
 
         $handle = fopen($temp_file, 'w');
 
-        if (false === $handle) {
+        if (false !== $handle) {
+            /**
+             * Filters the file handle used to write the exported patterns JSON file.
+             *
+             * This filter can be used to provide a custom stream resource when generating
+             * the export, for instance in tests.
+             *
+             * @param resource|false $handle    File handle returned by `fopen()`.
+             * @param string         $temp_file Absolute path to the temporary JSON file.
+             */
+            $handle = apply_filters('tejlg_export_patterns_file_handle', $handle, $temp_file);
+        }
+
+        if (false === $handle || !is_resource($handle)) {
             @unlink($temp_file);
             wp_die(esc_html__("Impossible de créer le flux de téléchargement pour l'export JSON.", 'theme-export-jlg'));
         }
 
         $has_written_items = false;
-        fwrite($handle, "[\n");
+        self::write_to_handle_or_fail($handle, $temp_file, "[\n");
 
         $page = 1;
 
@@ -749,9 +762,9 @@ class TEJLG_Export {
                 $formatted_pattern = self::indent_json_fragment($encoded_pattern);
 
                 if ($has_written_items) {
-                    fwrite($handle, ",\n" . $formatted_pattern);
+                    self::write_to_handle_or_fail($handle, $temp_file, ",\n" . $formatted_pattern);
                 } else {
-                    fwrite($handle, $formatted_pattern);
+                    self::write_to_handle_or_fail($handle, $temp_file, $formatted_pattern);
                     $has_written_items = true;
                 }
             }
@@ -765,11 +778,32 @@ class TEJLG_Export {
             $page++;
         }
 
-        fwrite($handle, $has_written_items ? "\n]\n" : "]\n");
+        self::write_to_handle_or_fail($handle, $temp_file, $has_written_items ? "\n]\n" : "]\n");
         fclose($handle);
 
         $filename = empty($sanitized_ids) ? 'exported-patterns.json' : 'selected-patterns.json';
         return self::stream_json_file($temp_file, $filename);
+    }
+
+    private static function write_to_handle_or_fail($handle, $temp_file, $data) {
+        $bytes_written = fwrite($handle, $data);
+
+        if (false === $bytes_written) {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+
+            if (file_exists($temp_file)) {
+                @unlink($temp_file);
+            }
+
+            wp_die(
+                esc_html__(
+                    "Une erreur critique est survenue lors de l'écriture du fichier JSON d'export.",
+                    'theme-export-jlg'
+                )
+            );
+        }
     }
 
     private static function normalize_path($path) {
