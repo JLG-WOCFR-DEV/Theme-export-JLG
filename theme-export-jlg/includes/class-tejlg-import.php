@@ -172,18 +172,10 @@ class TEJLG_Import {
         );
 
         if (false === $filesystem_credentials) {
-            if ($file_upload instanceof File_Upload_Upgrader) {
-                $file_upload->cleanup();
-            }
-
             return;
         }
 
         if (!WP_Filesystem($filesystem_credentials, $theme_root)) {
-            if ($file_upload instanceof File_Upload_Upgrader) {
-                $file_upload->cleanup();
-            }
-
             request_filesystem_credentials($page_url, '', true, $theme_root, [$package_param]);
 
             return;
