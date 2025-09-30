@@ -204,6 +204,15 @@ abstract class WP_Background_Process {
     }
 
     /**
+     * Determine if the process is currently locked.
+     *
+     * @return bool
+     */
+    public function is_process_locked() {
+        return $this->is_processing();
+    }
+
+    /**
      * Lock the process to prevent concurrent execution.
      */
     protected function lock_process() {

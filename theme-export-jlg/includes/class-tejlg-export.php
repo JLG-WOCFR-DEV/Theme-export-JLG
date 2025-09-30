@@ -123,23 +123,7 @@ class TEJLG_Export {
         $process->save();
         $process->dispatch();
 
-        $should_run_immediately = apply_filters('tejlg_export_run_jobs_immediately', defined('WP_RUNNING_TESTS'));
-
-        if (!$should_run_immediately) {
-            $cron_disabled = defined('DISABLE_WP_CRON') && wp_validate_boolean(DISABLE_WP_CRON);
-            $cron_hook_identifier = method_exists($process, 'get_cron_hook_identifier')
-                ? $process->get_cron_hook_identifier()
-                : '';
-            $event_scheduled = '' !== $cron_hook_identifier && false !== wp_next_scheduled($cron_hook_identifier);
-
-            if ($cron_disabled || !$event_scheduled) {
-                $should_run_immediately = true;
-            }
-        }
-
-        if ($should_run_immediately) {
-            self::run_pending_export_jobs();
-        }
+        self::maybe_run_jobs_synchronously($process);
 
         return $job_id;
     }
@@ -389,6 +373,88 @@ class TEJLG_Export {
         $process->handle();
     }
 
+    private static function maybe_run_jobs_synchronously($process = null, $job = null, $respect_immediate_filter = true) {
+        if (null === $process) {
+            $process = self::get_export_process();
+        }
+
+        if (self::should_force_synchronous_execution($process, $respect_immediate_filter)) {
+            self::run_pending_export_jobs();
+
+            return true;
+        }
+
+        if (null !== $job && self::should_retry_stalled_job($job, $process)) {
+            self::run_pending_export_jobs();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function should_force_synchronous_execution($process, $respect_immediate_filter) {
+        $force_sync = apply_filters('tejlg_export_force_sync', false, $process);
+
+        if (wp_validate_boolean($force_sync)) {
+            return true;
+        }
+
+        if ($respect_immediate_filter) {
+            $should_run_immediately = apply_filters('tejlg_export_run_jobs_immediately', defined('WP_RUNNING_TESTS'), $process);
+
+            if (wp_validate_boolean($should_run_immediately)) {
+                return true;
+            }
+        }
+
+        $cron_disabled = defined('DISABLE_WP_CRON') && wp_validate_boolean(DISABLE_WP_CRON);
+
+        if ($cron_disabled) {
+            return true;
+        }
+
+        $cron_hook_identifier = method_exists($process, 'get_cron_hook_identifier')
+            ? (string) $process->get_cron_hook_identifier()
+            : '';
+
+        if ('' === $cron_hook_identifier) {
+            return false;
+        }
+
+        return false === wp_next_scheduled($cron_hook_identifier);
+    }
+
+    private static function should_retry_stalled_job($job, $process) {
+        if ( ! is_array($job) ) {
+            return false;
+        }
+
+        $status = isset($job['status']) ? (string) $job['status'] : '';
+
+        if ( ! in_array($status, ['queued', 'processing'], true) ) {
+            return false;
+        }
+
+        $last_activity = isset($job['updated_at']) ? (int) $job['updated_at'] : 0;
+
+        if ($last_activity <= 0) {
+            $last_activity = isset($job['created_at']) ? (int) $job['created_at'] : 0;
+        }
+
+        $threshold = defined('MINUTE_IN_SECONDS') ? (int) MINUTE_IN_SECONDS : 60;
+
+        if ($last_activity > 0 && (time() - $last_activity) < $threshold) {
+            return false;
+        }
+
+        if (method_exists($process, 'is_process_locked') && $process->is_process_locked()) {
+            return false;
+        }
+
+        return true;
+    }
+
     public static function get_export_job_status($job_id) {
         return self::get_job($job_id);
     }
@@ -455,6 +521,9 @@ class TEJLG_Export {
         }
 
         $job_id = (string) $result;
+
+        self::maybe_run_jobs_synchronously();
+
         $job    = self::get_job($job_id);
 
         wp_send_json_success([
@@ -481,6 +550,16 @@ class TEJLG_Export {
 
         if (null === $job) {
             wp_send_json_error(['message' => esc_html__('Tâche introuvable ou expirée.', 'theme-export-jlg')], 404);
+        }
+
+        $process = self::get_export_process();
+
+        if (self::maybe_run_jobs_synchronously($process, $job, false)) {
+            $job = self::get_job($job_id);
+
+            if (null === $job) {
+                wp_send_json_error(['message' => esc_html__('Tâche introuvable ou expirée.', 'theme-export-jlg')], 404);
+            }
         }
 
         $response = [
