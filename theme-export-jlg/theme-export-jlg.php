@@ -25,6 +25,8 @@ define( 'TEJLG_URL', plugin_dir_url( __FILE__ ) );
 
 // Charger les classes nécessaires
 require_once TEJLG_PATH . 'includes/class-tejlg-admin.php';
+require_once TEJLG_PATH . 'includes/class-wp-background-process.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-export-process.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-import.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-theme-tools.php';
@@ -44,5 +46,9 @@ function tejlg_load_textdomain() {
     load_plugin_textdomain( 'theme-export-jlg', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 }
 
+
+add_action('wp_ajax_tejlg_start_theme_export', ['TEJLG_Export', 'ajax_start_theme_export']);
+add_action('wp_ajax_tejlg_theme_export_status', ['TEJLG_Export', 'ajax_get_theme_export_status']);
+add_action('wp_ajax_tejlg_download_theme_export', ['TEJLG_Export', 'ajax_download_theme_export']);
 add_action( 'plugins_loaded', 'tejlg_load_textdomain' );
 add_action( 'plugins_loaded', 'tejlg_run_plugin' );
