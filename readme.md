@@ -32,7 +32,7 @@ Le plugin enregistre la commande `wp theme-export-jlg` dès que WP-CLI est dispo
 - `wp theme-export-jlg theme [--exclusions=<motifs>] [--output=<chemin>]` exporte le thème actif au format ZIP. Utilisez l’option `--exclusions` pour ignorer des fichiers ou dossiers (séparateur virgule ou retour à la ligne) et `--output` pour définir le chemin du fichier généré (par défaut dans le dossier courant, avec le slug du thème).【F:theme-export-jlg/includes/class-tejlg-cli.php†L17-L98】
 - `wp theme-export-jlg patterns [--portable] [--output=<chemin>]` crée un export JSON des compositions (`wp_block`). L’option `--portable` active le nettoyage portable déjà proposé dans l’interface graphique et `--output` contrôle l’emplacement du fichier généré.【F:theme-export-jlg/includes/class-tejlg-cli.php†L100-L160】
 
-Chaque commande renvoie un message de réussite structuré ou un message d’erreur explicite en cas de problème (dossier non accessible, erreur `wp_die`, etc.), pour s’intégrer facilement dans des scripts d’automatisation.【F:theme-export-jlg/includes/class-tejlg-cli.php†L40-L160】
+Chaque commande renvoie un objet JSON contenant le statut (`success`/`error`), le message et les métadonnées utiles (chemin du fichier, taille, drapeau `portable`, etc.), ce qui facilite l’analyse dans un script d’automatisation ou un pipeline CI.【F:theme-export-jlg/includes/class-tejlg-cli.php†L60-L133】【F:theme-export-jlg/includes/class-tejlg-cli.php†L205-L307】
 
 ## Support & ressources
 

@@ -40,7 +40,7 @@ class TEJLG_CLI {
             });
         } catch (TEJLG_CLI_WPDie_Exception $exception) {
             remove_filter('tejlg_export_stream_zip_archive', $stream_filter, 10);
-            WP_CLI::error($this->normalize_cli_message($exception->getMessage()));
+            $this->cli_error($exception->getMessage());
             return;
         }
 
@@ -51,26 +51,38 @@ class TEJLG_CLI {
         }
 
         if (empty($result_data) || empty($result_data['path'])) {
-            WP_CLI::error(__('Impossible de récupérer le fichier ZIP généré.', 'theme-export-jlg'));
+            $this->cli_error(__('Impossible de récupérer le fichier ZIP généré.', 'theme-export-jlg'));
             return;
         }
 
         $source_path = $result_data['path'];
 
         if (!file_exists($source_path)) {
-            WP_CLI::error(sprintf(__('Le fichier ZIP généré est introuvable : %s', 'theme-export-jlg'), $source_path));
+            $this->cli_error(
+                sprintf(__('Le fichier ZIP généré est introuvable : %s', 'theme-export-jlg'), $source_path),
+                ['path' => $source_path]
+            );
             return;
         }
 
         if (!$this->copy_file($source_path, $output_path)) {
             @unlink($source_path);
-            WP_CLI::error(sprintf(__('Impossible de copier le fichier ZIP vers %s.', 'theme-export-jlg'), $output_path));
+            $this->cli_error(
+                sprintf(__('Impossible de copier le fichier ZIP vers %s.', 'theme-export-jlg'), $output_path),
+                ['path' => $output_path]
+            );
             return;
         }
 
         @unlink($source_path);
 
-        WP_CLI::success(sprintf(__('Archive du thème exportée vers %s', 'theme-export-jlg'), $output_path));
+        $this->cli_success(
+            sprintf(__('Archive du thème exportée vers %s', 'theme-export-jlg'), $output_path),
+            [
+                'path' => $output_path,
+                'size' => isset($result_data['size']) ? (int) $result_data['size'] : null,
+            ]
+        );
     }
 
     public function patterns($args, $assoc_args) {
@@ -90,23 +102,36 @@ class TEJLG_CLI {
             });
         } catch (TEJLG_CLI_WPDie_Exception $exception) {
             remove_filter('tejlg_export_stream_json_file', $stream_filter, 10);
-            WP_CLI::error($this->normalize_cli_message($exception->getMessage()));
+            $this->cli_error($exception->getMessage());
             return;
         }
 
         remove_filter('tejlg_export_stream_json_file', $stream_filter, 10);
 
         if (!is_string($contents)) {
-            WP_CLI::error(__('Le contenu JSON généré est invalide.', 'theme-export-jlg'));
+            $this->cli_error(__('Le contenu JSON généré est invalide.', 'theme-export-jlg'));
             return;
         }
 
         if (false === file_put_contents($output_path, $contents)) {
-            WP_CLI::error(sprintf(__('Impossible d\'écrire le fichier JSON vers %s.', 'theme-export-jlg'), $output_path));
+            $this->cli_error(
+                sprintf(__('Impossible d\'écrire le fichier JSON vers %s.', 'theme-export-jlg'), $output_path),
+                ['path' => $output_path]
+            );
             return;
         }
 
-        WP_CLI::success(sprintf(__('Fichier JSON des compositions exporté vers %s', 'theme-export-jlg'), $output_path));
+        $file_size = filesize($output_path);
+        $file_size = false === $file_size ? null : (int) $file_size;
+
+        $this->cli_success(
+            sprintf(__('Fichier JSON des compositions exporté vers %s', 'theme-export-jlg'), $output_path),
+            [
+                'path'      => $output_path,
+                'portable'  => $is_portable,
+                'file_size' => $file_size,
+            ]
+        );
     }
 
     private function parse_exclusions($assoc_args) {
@@ -184,17 +209,34 @@ class TEJLG_CLI {
 
         if (!file_exists($directory)) {
             if (!wp_mkdir_p($directory)) {
-                WP_CLI::error(sprintf(__('Impossible de créer le dossier cible : %s', 'theme-export-jlg'), $directory));
+                $this->cli_error(
+                    sprintf(__('Impossible de créer le dossier cible : %s', 'theme-export-jlg'), $directory),
+                    ['path' => $directory]
+                );
             }
         }
 
         if (!is_dir($directory)) {
-            WP_CLI::error(sprintf(__('Le chemin cible n\'est pas un dossier valide : %s', 'theme-export-jlg'), $directory));
+            $this->cli_error(
+                sprintf(__('Le chemin cible n\'est pas un dossier valide : %s', 'theme-export-jlg'), $directory),
+                ['path' => $directory]
+            );
         }
 
         if (!is_writable($directory)) {
-            WP_CLI::error(sprintf(__('Le dossier cible n\'est pas accessible en écriture : %s', 'theme-export-jlg'), $directory));
+            $this->cli_error(
+                sprintf(__('Le dossier cible n\'est pas accessible en écriture : %s', 'theme-export-jlg'), $directory),
+                ['path' => $directory]
+            );
         }
+    }
+
+    private function cli_error($message, array $data = []) {
+        WP_CLI::error($this->format_cli_message('error', $message, $data));
+    }
+
+    private function cli_success($message, array $data = []) {
+        WP_CLI::success($this->format_cli_message('success', $message, $data));
     }
 
     private function copy_file($source, $destination) {
@@ -229,6 +271,39 @@ class TEJLG_CLI {
         }
 
         return trim(wp_strip_all_tags((string) $message));
+    }
+
+    private function format_cli_message($status, $message, array $data = []) {
+        $normalized_message = $this->normalize_cli_message($message);
+
+        $payload = [
+            'status'  => $status,
+            'message' => $normalized_message,
+        ];
+
+        if (!empty($data)) {
+            $filtered_data = [];
+
+            foreach ($data as $key => $value) {
+                if (null === $value) {
+                    continue;
+                }
+
+                $filtered_data[$key] = $value;
+            }
+
+            if (!empty($filtered_data)) {
+                $payload['data'] = $filtered_data;
+            }
+        }
+
+        $json = wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if (false === $json) {
+            return sprintf('[%s] %s', strtoupper($status), $normalized_message);
+        }
+
+        return $json;
     }
 
     private function get_bool_flag($assoc_args, $key) {

@@ -78,7 +78,12 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
         $decoded = json_decode($contents, true);
         $this->assertNotNull($decoded, 'JSON should decode even if empty array.');
         $this->assertNotSame('', WP_CLI::$success_message, 'CLI should return a success message.');
-        $this->assertStringContainsString($target, WP_CLI::$success_message);
+
+        $cli_output = json_decode(WP_CLI::$success_message, true);
+        $this->assertIsArray($cli_output, 'CLI message should be JSON encoded.');
+        $this->assertSame('success', $cli_output['status']);
+        $this->assertSame($target, $cli_output['data']['path']);
+        $this->assertSame(true, $cli_output['data']['portable']);
     }
 
     private function remove_directory($directory) {
