@@ -329,6 +329,67 @@ class TEJLG_Export {
         delete_option(self::get_job_option_name($job_id));
     }
 
+    public static function cleanup_stale_jobs($max_age = null) {
+        global $wpdb;
+
+        $max_age = null === $max_age ? HOUR_IN_SECONDS : (int) $max_age;
+
+        if ($max_age <= 0) {
+            $max_age = HOUR_IN_SECONDS;
+        }
+
+        $threshold = time() - $max_age;
+        $option_prefix = 'tejlg_export_job_';
+        $options_table = $wpdb->options;
+        $like_pattern  = $wpdb->esc_like($option_prefix) . '%';
+
+        $option_names = (array) $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT option_name FROM {$options_table} WHERE option_name LIKE %s",
+                $like_pattern
+            )
+        );
+
+        if (empty($option_names)) {
+            return;
+        }
+
+        foreach ($option_names as $option_name) {
+            if (!is_string($option_name) || '' === $option_name) {
+                continue;
+            }
+
+            $job_id = substr($option_name, strlen($option_prefix));
+
+            if ('' === $job_id) {
+                continue;
+            }
+
+            $job = self::get_job($job_id);
+
+            if (null === $job) {
+                delete_option($option_name);
+                continue;
+            }
+
+            $status = isset($job['status']) ? (string) $job['status'] : '';
+
+            if (!in_array($status, ['completed', 'failed'], true)) {
+                continue;
+            }
+
+            $completed_at = isset($job['completed_at']) ? (int) $job['completed_at'] : 0;
+            $updated_at   = isset($job['updated_at']) ? (int) $job['updated_at'] : 0;
+            $reference    = $completed_at > 0 ? $completed_at : $updated_at;
+
+            if ($reference <= 0 || $reference > $threshold) {
+                continue;
+            }
+
+            self::delete_job($job_id);
+        }
+    }
+
     public static function mark_job_failed($job_id, $message) {
         $job = self::get_job($job_id);
 
@@ -476,6 +537,8 @@ class TEJLG_Export {
         if ('' === $job_id) {
             wp_send_json_error(['message' => esc_html__('Identifiant de tâche manquant.', 'theme-export-jlg')], 400);
         }
+
+        self::cleanup_stale_jobs();
 
         $job = self::get_job($job_id);
 
