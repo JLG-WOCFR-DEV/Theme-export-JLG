@@ -253,6 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (startButton) {
                             startButton.disabled = false;
                         }
+                        currentJobId = null;
                     } else {
                         scheduleNextPoll(jobId);
                     }
@@ -269,6 +270,59 @@ document.addEventListener('DOMContentLoaded', function() {
                     handleError(message || strings.unknownError || '');
                 });
             };
+
+            const resumePersistedJob = function(snapshot) {
+                if (!snapshot || typeof snapshot !== 'object') {
+                    return;
+                }
+
+                const job = (typeof snapshot.job === 'object' && snapshot.job !== null)
+                    ? snapshot.job
+                    : null;
+
+                const persistedJobId = typeof snapshot.job_id === 'string' && snapshot.job_id.length
+                    ? snapshot.job_id
+                    : (job && typeof job.id === 'string')
+                        ? job.id
+                        : '';
+
+                if (!persistedJobId) {
+                    return;
+                }
+
+                currentJobId = persistedJobId;
+
+                if (job) {
+                    updateFeedback(job, { downloadUrl: '' });
+                }
+
+                const statusFromSnapshot = typeof snapshot.status === 'string' && snapshot.status.length
+                    ? snapshot.status
+                    : (job && typeof job.status === 'string')
+                        ? job.status
+                        : '';
+
+                const normalizedStatus = statusFromSnapshot.toLowerCase();
+
+                const shouldFetch = ['queued', 'processing', 'completed', 'failed'].indexOf(normalizedStatus) !== -1;
+
+                if (!shouldFetch) {
+                    return;
+                }
+
+                if (normalizedStatus === 'queued' || normalizedStatus === 'processing') {
+                    setSpinner(true);
+                    if (startButton) {
+                        startButton.disabled = true;
+                    }
+                }
+
+                fetchStatus(persistedJobId);
+            };
+
+            if (exportAsync.previousJob) {
+                resumePersistedJob(exportAsync.previousJob);
+            }
 
             if (startButton) {
                 startButton.addEventListener('click', function(event) {

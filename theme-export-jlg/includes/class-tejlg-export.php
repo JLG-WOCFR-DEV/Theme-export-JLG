@@ -111,6 +111,7 @@ class TEJLG_Export {
         ];
 
         self::persist_job($job);
+        self::remember_job_for_current_user($job_id);
 
         $process = self::get_export_process();
 
@@ -304,6 +305,110 @@ class TEJLG_Export {
 
     private static function get_export_process() {
         return new TEJLG_Export_Process();
+    }
+
+    private static function get_user_job_meta_key() {
+        return '_tejlg_last_theme_export_job_id';
+    }
+
+    private static function remember_job_for_current_user($job_id) {
+        if (!function_exists('get_current_user_id')) {
+            return;
+        }
+
+        $job_id = sanitize_key((string) $job_id);
+
+        if ('' === $job_id) {
+            return;
+        }
+
+        $user_id = get_current_user_id();
+
+        if ($user_id <= 0) {
+            return;
+        }
+
+        update_user_meta($user_id, self::get_user_job_meta_key(), $job_id);
+    }
+
+    public static function get_user_job_reference($user_id = 0) {
+        if (!function_exists('get_current_user_id')) {
+            return '';
+        }
+
+        $user_id = (int) $user_id;
+
+        if ($user_id <= 0) {
+            $user_id = (int) get_current_user_id();
+        }
+
+        if ($user_id <= 0) {
+            return '';
+        }
+
+        $stored = get_user_meta($user_id, self::get_user_job_meta_key(), true);
+
+        if (!is_string($stored) || '' === $stored) {
+            return '';
+        }
+
+        return sanitize_key($stored);
+    }
+
+    public static function clear_user_job_reference($job_id, $user_id = 0) {
+        if (!function_exists('get_current_user_id')) {
+            return;
+        }
+
+        $job_id = sanitize_key((string) $job_id);
+
+        if ('' === $job_id) {
+            return;
+        }
+
+        $user_id = (int) $user_id;
+
+        if ($user_id <= 0) {
+            $user_id = (int) get_current_user_id();
+        }
+
+        if ($user_id <= 0) {
+            return;
+        }
+
+        $stored = get_user_meta($user_id, self::get_user_job_meta_key(), true);
+
+        if (!is_string($stored) || '' === $stored) {
+            return;
+        }
+
+        if (sanitize_key($stored) !== $job_id) {
+            return;
+        }
+
+        delete_user_meta($user_id, self::get_user_job_meta_key());
+    }
+
+    public static function get_current_user_job_snapshot() {
+        $job_id = self::get_user_job_reference();
+
+        if ('' === $job_id) {
+            return null;
+        }
+
+        $job = self::get_job($job_id);
+
+        if (null === $job) {
+            self::clear_user_job_reference($job_id);
+
+            return null;
+        }
+
+        return [
+            'job_id' => $job_id,
+            'job'    => self::prepare_job_response($job),
+            'status' => isset($job['status']) ? (string) $job['status'] : '',
+        ];
     }
 
     private static function get_job_option_name($job_id) {
@@ -556,12 +661,15 @@ class TEJLG_Export {
         $job = self::get_job($job_id);
 
         if (null === $job) {
+            self::clear_user_job_reference($job_id);
             wp_send_json_error(['message' => esc_html__('Tâche introuvable ou expirée.', 'theme-export-jlg')], 404);
         }
 
         $response = [
             'job' => self::prepare_job_response($job),
         ];
+
+        $job_status = isset($job['status']) ? (string) $job['status'] : '';
 
         if (isset($job['status']) && 'completed' === $job['status']) {
             $download_nonce = wp_create_nonce('tejlg_download_theme_export_' . $job_id);
@@ -573,6 +681,10 @@ class TEJLG_Export {
                 ],
                 admin_url('admin-ajax.php')
             );
+        }
+
+        if (in_array($job_status, ['completed', 'failed'], true)) {
+            self::clear_user_job_reference($job_id);
         }
 
         wp_send_json_success($response);

@@ -88,6 +88,7 @@ class TEJLG_Admin {
                         'unknownError'    => esc_html__('Une erreur inattendue est survenue.', 'theme-export-jlg'),
                         'statusLabel'     => esc_html__('Statut de la tâche : %1$s', 'theme-export-jlg'),
                     ],
+                    'previousJob' => TEJLG_Export::get_current_user_job_snapshot(),
                 ],
             ]
         );
