@@ -35,15 +35,55 @@ $wpdb->query(
     )
 );
 
-$job_option_prefix      = 'tejlg_export_job_';
-$escaped_job_option     = $wpdb->esc_like( $job_option_prefix ) . '%';
+$job_option_prefix  = 'tejlg_export_job_';
+$escaped_job_option = $wpdb->esc_like( $job_option_prefix ) . '%';
 
-$wpdb->query(
+$job_options = $wpdb->get_results(
     $wpdb->prepare(
-        "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+        "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
         $escaped_job_option
     )
 );
+
+if ( ! empty( $job_options ) ) {
+    foreach ( $job_options as $job_option ) {
+        if ( empty( $job_option->option_name ) ) {
+            continue;
+        }
+
+        $job_data = maybe_unserialize( $job_option->option_value );
+
+        if ( is_array( $job_data ) && ! empty( $job_data['zip_path'] ) ) {
+            $zip_path = (string) $job_data['zip_path'];
+
+            if ( '' !== $zip_path && @is_file( $zip_path ) ) {
+                @unlink( $zip_path );
+            }
+        }
+
+        delete_option( $job_option->option_name );
+    }
+}
+
+if ( function_exists( 'get_temp_dir' ) ) {
+    $temp_dir = get_temp_dir();
+
+    if ( is_string( $temp_dir ) && '' !== $temp_dir ) {
+        $temp_dir = trailingslashit( $temp_dir );
+
+        if ( @is_dir( $temp_dir ) && @is_readable( $temp_dir ) ) {
+            $pattern_files = @glob( $temp_dir . 'tejlg-patterns*' );
+
+            if ( is_array( $pattern_files ) ) {
+                foreach ( $pattern_files as $pattern_file ) {
+                    if ( @is_file( $pattern_file ) ) {
+                        @unlink( $pattern_file );
+                    }
+                }
+            }
+        }
+    }
+}
 
 // Supprimer l'option stockant la taille des icônes de métriques (mono et multisites).
 delete_option( 'tejlg_metrics_icon_size' );
