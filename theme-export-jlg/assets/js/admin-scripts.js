@@ -271,7 +271,11 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             if (startButton) {
-                startButton.addEventListener('click', function() {
+                startButton.addEventListener('click', function(event) {
+                    if (event && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                    }
+
                     stopPolling();
                     setSpinner(true);
                     if (startButton) {
