@@ -572,6 +572,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const patternItems = patternList ? Array.from(patternList.querySelectorAll('.pattern-selection-item')) : [];
     const selectAllExportCheckbox = document.getElementById('select-all-export-patterns');
     const patternSearchInput = document.getElementById('pattern-search');
+    const patternSelectionStatus = document.getElementById('pattern-selection-status');
+    const patternSelectionStatusStrings = (typeof localization.patternSelectionStatus === 'object' && localization.patternSelectionStatus !== null)
+        ? localization.patternSelectionStatus
+        : {};
+    const patternSelectionNumberFormatter = (function() {
+        const locale = typeof patternSelectionStatusStrings.numberLocale === 'string' && patternSelectionStatusStrings.numberLocale
+            ? patternSelectionStatusStrings.numberLocale
+            : undefined;
+
+        if (typeof Intl === 'object' && typeof Intl.NumberFormat === 'function') {
+            try {
+                return new Intl.NumberFormat(locale);
+            } catch (error) {
+                return new Intl.NumberFormat();
+            }
+        }
+
+        return null;
+    })();
 
     function getVisiblePatternItems() {
         return patternItems.filter(function(item) {
@@ -579,12 +598,62 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function updateSelectAllExportCheckbox() {
-        if (!selectAllExportCheckbox) {
+    function setPatternSelectionBusy(isBusy) {
+        if (!patternSelectionStatus) {
             return;
         }
 
+        patternSelectionStatus.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+    }
+
+    function formatPatternSelectionCount(count) {
+        if (patternSelectionNumberFormatter) {
+            return patternSelectionNumberFormatter.format(count);
+        }
+
+        return String(count);
+    }
+
+    function updatePatternSelectionStatus() {
+        if (!patternSelectionStatus) {
+            return;
+        }
+
+        const visibleCount = getVisiblePatternItems().length;
+        let message = '';
+
+        if (visibleCount === 0) {
+            message = typeof patternSelectionStatusStrings.empty === 'string'
+                ? patternSelectionStatusStrings.empty
+                : '';
+        } else if (visibleCount === 1) {
+            const template = typeof patternSelectionStatusStrings.countSingular === 'string'
+                ? patternSelectionStatusStrings.countSingular
+                : (typeof patternSelectionStatusStrings.countPlural === 'string'
+                    ? patternSelectionStatusStrings.countPlural
+                    : '%s');
+            message = template.replace('%s', formatPatternSelectionCount(visibleCount));
+        } else {
+            const template = typeof patternSelectionStatusStrings.countPlural === 'string'
+                ? patternSelectionStatusStrings.countPlural
+                : (typeof patternSelectionStatusStrings.countSingular === 'string'
+                    ? patternSelectionStatusStrings.countSingular
+                    : '%s');
+            message = template.replace('%s', formatPatternSelectionCount(visibleCount));
+        }
+
+        patternSelectionStatus.textContent = message;
+        setPatternSelectionBusy(false);
+    }
+
+    function updateSelectAllExportCheckbox() {
         const visibleItems = getVisiblePatternItems();
+
+        if (!selectAllExportCheckbox) {
+            updatePatternSelectionStatus();
+            return;
+        }
+
         const visibleCheckboxes = visibleItems
             .map(function(item) {
                 return item.querySelector('input[type="checkbox"]');
@@ -616,14 +685,18 @@ document.addEventListener('DOMContentLoaded', function() {
             selectAllExportCheckbox.checked = false;
             selectAllExportCheckbox.indeterminate = true;
         }
+
+        updatePatternSelectionStatus();
     }
 
     function filterPatternItems(query) {
         if (!patternItems.length) {
+            setPatternSelectionBusy(true);
             updateSelectAllExportCheckbox();
             return;
         }
 
+        setPatternSelectionBusy(true);
         const normalizedQuery = query.trim().toLowerCase();
 
         patternItems.forEach(function(item) {
@@ -638,6 +711,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         updateSelectAllExportCheckbox();
+    }
+
+    if (patternSelectionStatus) {
+        setPatternSelectionBusy(false);
     }
 
     if (selectAllExportCheckbox) {

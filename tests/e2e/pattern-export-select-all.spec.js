@@ -26,6 +26,7 @@ test.describe('Pattern export selection screen', () => {
     const selectAll = page.locator('#select-all-export-patterns');
     const searchInput = page.locator('#pattern-search');
     const visibleItems = page.locator('.pattern-selection-item:not(.is-hidden)');
+    const statusLiveRegion = page.locator('#pattern-selection-status');
     const alphaCheckbox = page.locator('.pattern-selection-item', { hasText: 'Alpha Pattern' }).locator('input[type="checkbox"]');
     const betaCheckbox = page.locator('.pattern-selection-item', { hasText: 'Beta Pattern' }).locator('input[type="checkbox"]');
     const gammaCheckbox = page.locator('.pattern-selection-item', { hasText: 'Gamma Pattern' }).locator('input[type="checkbox"]');
@@ -33,6 +34,9 @@ test.describe('Pattern export selection screen', () => {
     await expect(visibleItems).toHaveCount(patterns.length);
     await expect(selectAll).not.toBeChecked();
     await expect(selectAll).toHaveJSProperty('indeterminate', false);
+    await expect(statusLiveRegion).toHaveText('3 compositions visibles.');
+    await expect(statusLiveRegion).toHaveAttribute('aria-live', 'polite');
+    await expect(statusLiveRegion).toHaveAttribute('aria-busy', 'false');
 
     await alphaCheckbox.check();
 
@@ -46,6 +50,8 @@ test.describe('Pattern export selection screen', () => {
     await expect(page.locator('.pattern-selection-item.is-hidden')).toHaveCount(patterns.length - 1);
     await expect(selectAll).not.toBeChecked();
     await expect(selectAll).toHaveJSProperty('indeterminate', false);
+    await expect(statusLiveRegion).toHaveText('1 composition visible.');
+    await expect(statusLiveRegion).toHaveAttribute('aria-busy', 'false');
 
     await selectAll.check();
 
@@ -59,6 +65,8 @@ test.describe('Pattern export selection screen', () => {
     await expect(page.locator('.pattern-selection-item.is-hidden')).toHaveCount(0);
     await expect(selectAll).not.toBeChecked();
     await expect(selectAll).toHaveJSProperty('indeterminate', true);
+    await expect(statusLiveRegion).toHaveText('3 compositions visibles.');
+    await expect(statusLiveRegion).toHaveAttribute('aria-busy', 'false');
 
     await selectAll.check();
 
@@ -75,6 +83,8 @@ test.describe('Pattern export selection screen', () => {
     await expect(page.locator('.pattern-selection-item.is-hidden')).toHaveCount(patterns.length - 1);
     await expect(selectAll).toBeChecked();
     await expect(selectAll).toHaveJSProperty('indeterminate', false);
+    await expect(statusLiveRegion).toHaveText('1 composition visible.');
+    await expect(statusLiveRegion).toHaveAttribute('aria-busy', 'false');
 
     await selectAll.uncheck();
 
@@ -93,6 +103,8 @@ test.describe('Pattern export selection screen', () => {
     await expect(gammaCheckbox).not.toBeChecked();
     await expect(selectAll).not.toBeChecked();
     await expect(selectAll).toHaveJSProperty('indeterminate', true);
+    await expect(statusLiveRegion).toHaveText('3 compositions visibles.');
+    await expect(statusLiveRegion).toHaveAttribute('aria-busy', 'false');
   });
 
   test('displays fallback title for untitled patterns and allows searching with it', async ({ admin, page, requestUtils }) => {
