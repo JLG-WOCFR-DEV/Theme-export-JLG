@@ -3,6 +3,7 @@
 use RuntimeException;
 
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin.php';
+require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin-export-page.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-import.php';
 
@@ -12,7 +13,7 @@ require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-import.p
 class Test_Admin_Export_Tab extends WP_UnitTestCase {
 
     public function test_render_export_tab_handles_array_action_without_warning() {
-        $admin = new TEJLG_Admin();
+        $export_page = new TEJLG_Admin_Export_Page();
 
         $_GET['action'] = ['select_patterns'];
 
@@ -29,11 +30,8 @@ class Test_Admin_Export_Tab extends WP_UnitTestCase {
         $output = '';
 
         try {
-            $reflection = new ReflectionMethod(TEJLG_Admin::class, 'render_export_tab');
-            $reflection->setAccessible(true);
-
             ob_start();
-            $reflection->invoke($admin);
+            $export_page->render();
             $output = ob_get_clean();
         } finally {
             restore_error_handler();
@@ -55,13 +53,10 @@ class Test_Admin_Export_Tab extends WP_UnitTestCase {
     }
 
     public function test_export_progress_has_accessible_label() {
-        $admin = new TEJLG_Admin();
-
-        $reflection = new ReflectionMethod(TEJLG_Admin::class, 'render_export_tab');
-        $reflection->setAccessible(true);
+        $export_page = new TEJLG_Admin_Export_Page();
 
         ob_start();
-        $reflection->invoke($admin);
+        $export_page->render();
         $output = ob_get_clean();
 
         $this->assertStringContainsString(
