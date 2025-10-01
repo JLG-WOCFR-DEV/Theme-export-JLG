@@ -84,41 +84,66 @@
         <h3 class="accordion-section-title"><?php esc_html_e('Compositions personnalisées enregistrées', 'theme-export-jlg'); ?></h3>
         <div class="accordion-section-content">
             <?php
-            if (class_exists('WP_Block_Patterns_Registry')) {
-                $patterns = WP_Block_Patterns_Registry::get_instance()->get_all_registered();
-                $custom_patterns = array_filter(
-                    $patterns,
-                    function ($pattern) {
-                        return ! (isset($pattern['source']) && $pattern['source'] === 'core');
-                    }
-                );
+            $current_user_id = get_current_user_id();
+            $custom_patterns_query = new WP_Query(
+                array(
+                    'post_type'      => 'wp_block',
+                    'post_status'    => 'publish',
+                    'posts_per_page' => -1,
+                    'orderby'        => 'title',
+                    'order'          => 'ASC',
+                    'meta_query'     => array(
+                        'relation' => 'OR',
+                        array(
+                            'key'     => 'wp_block_type',
+                            'value'   => 'pattern',
+                            'compare' => '=',
+                        ),
+                        array(
+                            'key'     => 'wp_block_type',
+                            'compare' => 'NOT EXISTS',
+                        ),
+                    ),
+                )
+            );
 
-                if (empty($custom_patterns)) {
-                    echo '<p>' . esc_html__('Aucune composition personnalisée n\'a été trouvée.', 'theme-export-jlg') . '</p>';
-                } else {
-                    $count = count($custom_patterns);
-                    printf(
-                        '<p>%s</p>',
-                        esc_html(
-                            sprintf(
-                                _n('%d composition personnalisée trouvée :', '%d compositions personnalisées trouvées :', $count, 'theme-export-jlg'),
-                                $count
-                            )
-                        )
-                    );
-                    echo '<ul>';
-                    foreach ($custom_patterns as $pattern) {
-                        printf(
-                            '<li><strong>%1$s</strong> (%2$s <code>%3$s</code>)</li>',
-                            esc_html($pattern['title']),
-                            esc_html__('Slug :', 'theme-export-jlg'),
-                            esc_html($pattern['name'])
-                        );
+            $custom_patterns = array();
+
+            if ($custom_patterns_query->have_posts()) {
+                foreach ($custom_patterns_query->posts as $pattern_post) {
+                    $wp_block_type = get_post_meta($pattern_post->ID, 'wp_block_type', true);
+
+                    if ((int) $pattern_post->post_author === (int) $current_user_id || 'pattern' === $wp_block_type) {
+                        $custom_patterns[] = $pattern_post;
                     }
-                    echo '</ul>';
                 }
+            }
+
+            wp_reset_postdata();
+
+            if (empty($custom_patterns)) {
+                echo '<p>' . esc_html__('Aucune composition personnalisée n\'a été trouvée.', 'theme-export-jlg') . '</p>';
             } else {
-                echo '<p>' . esc_html__('Cette version de WordPress ne prend pas en charge les compositions personnalisées enregistrées via le registre. Mettez à jour WordPress pour afficher cette liste.', 'theme-export-jlg') . '</p>';
+                $count = count($custom_patterns);
+                printf(
+                    '<p>%s</p>',
+                    esc_html(
+                        sprintf(
+                            _n('%d composition personnalisée trouvée :', '%d compositions personnalisées trouvées :', $count, 'theme-export-jlg'),
+                            $count
+                        )
+                    )
+                );
+                echo '<ul>';
+                foreach ($custom_patterns as $pattern_post) {
+                    printf(
+                        '<li><strong>%1$s</strong> (%2$s <code>%3$s</code>)</li>',
+                        esc_html(get_the_title($pattern_post)),
+                        esc_html__('Slug :', 'theme-export-jlg'),
+                        esc_html($pattern_post->post_name)
+                    );
+                }
+                echo '</ul>';
             }
             ?>
         </div>
