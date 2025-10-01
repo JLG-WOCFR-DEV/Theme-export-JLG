@@ -196,12 +196,13 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
 
         set_transient($preview_transient_id, $preview_payload, HOUR_IN_SECONDS);
 
-        $admin_instance = new TEJLG_Admin();
-        $preview_method = new ReflectionMethod(TEJLG_Admin::class, 'render_patterns_preview_page');
+        $template_dir   = dirname(__DIR__) . '/theme-export-jlg/templates/admin/';
+        $import_page    = new TEJLG_Admin_Import_Page($template_dir, 'theme-export-jlg');
+        $preview_method = new ReflectionMethod(TEJLG_Admin_Import_Page::class, 'render_patterns_preview_page');
         $preview_method->setAccessible(true);
 
         ob_start();
-        $preview_method->invoke($admin_instance, $preview_transient_id);
+        $preview_method->invoke($import_page, $preview_transient_id);
         $preview_output = ob_get_clean();
 
         $this->assertStringContainsString('pattern-preview-iframe', $preview_output);
@@ -262,12 +263,13 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
 
         set_transient($preview_transient_id, $preview_payload, HOUR_IN_SECONDS);
 
-        $admin_instance = new TEJLG_Admin();
-        $preview_method = new ReflectionMethod(TEJLG_Admin::class, 'render_patterns_preview_page');
+        $template_dir   = dirname(__DIR__) . '/theme-export-jlg/templates/admin/';
+        $import_page    = new TEJLG_Admin_Import_Page($template_dir, 'theme-export-jlg');
+        $preview_method = new ReflectionMethod(TEJLG_Admin_Import_Page::class, 'render_patterns_preview_page');
         $preview_method->setAccessible(true);
 
         ob_start();
-        $preview_method->invoke($admin_instance, $preview_transient_id);
+        $preview_method->invoke($import_page, $preview_transient_id);
         $preview_output = ob_get_clean();
 
         $this->assertStringContainsString('pattern-preview-iframe', $preview_output);
