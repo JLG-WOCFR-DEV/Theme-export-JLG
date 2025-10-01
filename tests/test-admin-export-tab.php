@@ -53,4 +53,27 @@ class Test_Admin_Export_Tab extends WP_UnitTestCase {
             'Pattern selection page should not be rendered when action is invalid.'
         );
     }
+
+    public function test_export_progress_has_accessible_label() {
+        $admin = new TEJLG_Admin();
+
+        $reflection = new ReflectionMethod(TEJLG_Admin::class, 'render_export_tab');
+        $reflection->setAccessible(true);
+
+        ob_start();
+        $reflection->invoke($admin);
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString(
+            'id="tejlg-theme-export-status"',
+            $output,
+            'The status element should expose an id for accessibility.'
+        );
+
+        $this->assertStringContainsString(
+            'aria-labelledby="tejlg-theme-export-status"',
+            $output,
+            'The progress bar should reference the status text for screen readers.'
+        );
+    }
 }
