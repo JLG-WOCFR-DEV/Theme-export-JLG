@@ -602,9 +602,11 @@ document.addEventListener('DOMContentLoaded', function() {
         patternSearchInput.addEventListener('keyup', searchHandler);
     }
 
-    // Mettre à jour en continu les métriques de performance dans le badge.
+    // Mettre à jour les métriques de performance uniquement lorsque l'utilisateur active la mesure.
     const fpsElement = document.getElementById('tejlg-metric-fps');
     const latencyElement = document.getElementById('tejlg-metric-latency');
+    const metricsToggleButton = document.querySelector('[data-metrics-toggle]');
+    const metricsStatusElement = document.querySelector('[data-metrics-status]');
 
     if (fpsElement && latencyElement) {
         const metricsLocalization = (typeof localization.metrics === 'object' && localization.metrics !== null)
@@ -647,13 +649,87 @@ document.addEventListener('DOMContentLoaded', function() {
             ? metricsLocalization.latencyPrecision
             : 1;
 
+        const startLabel = typeof metricsLocalization.startLabel === 'string' && metricsLocalization.startLabel !== ''
+            ? metricsLocalization.startLabel
+            : 'Démarrer la mesure';
+
+        const stopLabel = typeof metricsLocalization.stopLabel === 'string' && metricsLocalization.stopLabel !== ''
+            ? metricsLocalization.stopLabel
+            : 'Arrêter la mesure';
+
+        const tapToMeasureText = typeof metricsLocalization.tapToMeasure === 'string' && metricsLocalization.tapToMeasure !== ''
+            ? metricsLocalization.tapToMeasure
+            : 'Appuyez pour mesurer';
+
+        const runningLabel = typeof metricsLocalization.runningLabel === 'string' && metricsLocalization.runningLabel !== ''
+            ? metricsLocalization.runningLabel
+            : 'Mesure en cours…';
+
+        const stoppedLabel = typeof metricsLocalization.stoppedLabel === 'string' && metricsLocalization.stoppedLabel !== ''
+            ? metricsLocalization.stoppedLabel
+            : 'Mesure arrêtée.';
+
+        const autoStopNotice = typeof metricsLocalization.autoStopNotice === 'string'
+            ? metricsLocalization.autoStopNotice
+            : '';
+
+        const autoStopSeconds = typeof metricsLocalization.autoStopSeconds === 'number' && metricsLocalization.autoStopSeconds > 0
+            ? metricsLocalization.autoStopSeconds
+            : 60;
+
+        const maxMonitoringDuration = autoStopSeconds * 1000;
+
+        const lowResourceDevice = (function() {
+            const deviceMemory = typeof navigator !== 'undefined' && typeof navigator.deviceMemory === 'number'
+                ? navigator.deviceMemory
+                : 0;
+            const hardwareThreads = typeof navigator !== 'undefined' && typeof navigator.hardwareConcurrency === 'number'
+                ? navigator.hardwareConcurrency
+                : 0;
+
+            return (deviceMemory && deviceMemory <= 2) || (hardwareThreads && hardwareThreads <= 2);
+        }());
+
         fpsElement.setAttribute('aria-live', ariaLiveValue);
         fpsElement.setAttribute('aria-atomic', ariaAtomicValue);
         latencyElement.setAttribute('aria-live', ariaLiveValue);
         latencyElement.setAttribute('aria-atomic', ariaAtomicValue);
 
-        fpsElement.textContent = loadingText;
-        latencyElement.textContent = loadingText;
+        fpsElement.textContent = placeholderText;
+        latencyElement.textContent = placeholderText;
+
+        const setStatusText = function(text) {
+            if (metricsStatusElement) {
+                metricsStatusElement.textContent = text;
+            }
+        };
+
+        const updateStatusToIdle = function(extraText) {
+            const parts = [tapToMeasureText];
+            if (typeof extraText === 'string' && extraText.trim() !== '') {
+                parts.push(extraText);
+            }
+            setStatusText(parts.join(' '));
+        };
+
+        const updateStatusToRunning = function() {
+            const parts = [runningLabel];
+            if (autoStopNotice) {
+                parts.push(autoStopNotice);
+            }
+            setStatusText(parts.join(' '));
+        };
+
+        if (metricsToggleButton) {
+            metricsToggleButton.textContent = startLabel;
+            metricsToggleButton.setAttribute('aria-pressed', 'false');
+        }
+
+        if (metricsStatusElement) {
+            metricsStatusElement.setAttribute('data-low-resource', lowResourceDevice ? 'true' : 'false');
+        }
+
+        updateStatusToIdle('');
 
         const idealFrameDuration = 1000 / 60;
         const maxSampleSize = 120;
@@ -689,8 +765,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let animationFrameId = null;
         let lastFrameTime;
-        let monitoringActive = true;
+        let monitoringActive = false;
         let performanceObserverInstance = null;
+        let measurementTimeoutId = null;
 
         const hasIntl = typeof window.Intl === 'object' && typeof window.Intl.NumberFormat === 'function';
         const fpsFormatter = hasIntl
@@ -758,6 +835,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         };
 
+        const scheduleNextFrame = function() {
+            if (!monitoringActive) {
+                return;
+            }
+
+            animationFrameId = scheduleFrame(onAnimationFrame);
+        };
+
         const onAnimationFrame = function(timestamp) {
             if (!monitoringActive) {
                 return;
@@ -781,12 +866,15 @@ document.addEventListener('DOMContentLoaded', function() {
             scheduleNextFrame();
         };
 
-        const scheduleNextFrame = function() {
-            animationFrameId = scheduleFrame(onAnimationFrame);
+        const clearMeasurementTimeout = function() {
+            if (measurementTimeoutId) {
+                window.clearTimeout(measurementTimeoutId);
+                measurementTimeoutId = null;
+            }
         };
 
         const setupPerformanceObserver = function() {
-            if (typeof window.PerformanceObserver !== 'function') {
+            if (performanceObserverInstance || typeof window.PerformanceObserver !== 'function') {
                 return;
             }
 
@@ -843,12 +931,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         };
 
-        const stopMonitoring = function() {
-            if (!monitoringActive) {
+        const resetSamples = function() {
+            lastFrameTime = undefined;
+            fpsSamples.length = 0;
+            latencySamplesFromRaf.length = 0;
+            latencySamplesFromObserver.length = 0;
+        };
+
+        const updateButtonState = function(isActive) {
+            if (!metricsToggleButton) {
                 return;
             }
 
+            metricsToggleButton.textContent = isActive ? stopLabel : startLabel;
+            metricsToggleButton.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        };
+
+        const stopMonitoring = function(triggeredAutomatically) {
+            const wasActive = monitoringActive;
             monitoringActive = false;
+            clearMeasurementTimeout();
 
             if (animationFrameId !== null) {
                 cancelFrame(animationFrameId);
@@ -864,20 +966,59 @@ document.addEventListener('DOMContentLoaded', function() {
                 performanceObserverInstance = null;
             }
 
-            lastFrameTime = undefined;
-            fpsSamples.length = 0;
-            latencySamplesFromRaf.length = 0;
-            latencySamplesFromObserver.length = 0;
+            resetSamples();
 
-            fpsElement.textContent = stoppedText;
-            latencyElement.textContent = stoppedText;
+            if (wasActive) {
+                fpsElement.textContent = stoppedText;
+                latencyElement.textContent = stoppedText;
+            }
+
+            updateButtonState(false);
+
+            if (triggeredAutomatically) {
+                updateStatusToIdle('');
+            } else {
+                updateStatusToIdle(stoppedLabel);
+            }
         };
 
-        setupPerformanceObserver();
-        scheduleNextFrame();
+        const startMonitoring = function() {
+            if (monitoringActive) {
+                return;
+            }
+
+            monitoringActive = true;
+            resetSamples();
+
+            fpsElement.textContent = loadingText;
+            latencyElement.textContent = loadingText;
+
+            updateButtonState(true);
+            updateStatusToRunning();
+
+            setupPerformanceObserver();
+            scheduleNextFrame();
+
+            clearMeasurementTimeout();
+            measurementTimeoutId = window.setTimeout(function() {
+                stopMonitoring(true);
+            }, maxMonitoringDuration);
+        };
+
+        if (metricsToggleButton) {
+            metricsToggleButton.addEventListener('click', function() {
+                if (monitoringActive) {
+                    stopMonitoring(false);
+                } else {
+                    startMonitoring();
+                }
+            });
+        }
 
         ['beforeunload', 'pagehide'].forEach(function(eventName) {
-            window.addEventListener(eventName, stopMonitoring, { once: true });
+            window.addEventListener(eventName, function() {
+                stopMonitoring(true);
+            }, { once: true });
         });
     }
 

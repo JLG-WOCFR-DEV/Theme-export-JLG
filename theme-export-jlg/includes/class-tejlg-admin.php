@@ -64,6 +64,13 @@ class TEJLG_Admin {
                     'ariaLivePolite'   => 'polite',
                     'ariaAtomic'       => 'true',
                     'latencyPrecision' => 1,
+                    'startLabel'       => esc_html__('Démarrer la mesure', 'theme-export-jlg'),
+                    'stopLabel'        => esc_html__('Arrêter la mesure', 'theme-export-jlg'),
+                    'tapToMeasure'     => esc_html__('Appuyez pour mesurer', 'theme-export-jlg'),
+                    'runningLabel'     => esc_html__('Mesure en cours…', 'theme-export-jlg'),
+                    'stoppedLabel'     => esc_html__('Mesure arrêtée.', 'theme-export-jlg'),
+                    'autoStopNotice'   => esc_html__('Arrêt automatique après une minute.', 'theme-export-jlg'),
+                    'autoStopSeconds'  => 60,
                 ],
                 'exportAsync' => [
                     'ajaxUrl' => admin_url('admin-ajax.php'),
@@ -956,6 +963,27 @@ class TEJLG_Admin {
                 <?php esc_html_e('La barre de menu des métriques utilisera cette taille pour aligner les icônes.', 'theme-export-jlg'); ?>
             </p>
         </form>
+        <div class="metrics-controls">
+            <button
+                type="button"
+                class="button button-primary metrics-toggle"
+                data-metrics-toggle
+                aria-pressed="false"
+            >
+                <?php esc_html_e('Démarrer la mesure', 'theme-export-jlg'); ?>
+            </button>
+            <p
+                class="metrics-status"
+                id="tejlg-metrics-status"
+                data-metrics-status
+                role="status"
+            >
+                <?php esc_html_e('Appuyez pour mesurer', 'theme-export-jlg'); ?>
+            </p>
+        </div>
+        <p class="description metrics-help-text">
+            <?php esc_html_e('La collecte reste inactive tant que vous ne la lancez pas afin d’économiser les ressources. Une fois démarrée, elle s’arrêtera automatiquement après une minute.', 'theme-export-jlg'); ?>
+        </p>
         <div class="metrics-badge" role="group" aria-label="<?php esc_attr_e('Indicateurs de performance', 'theme-export-jlg'); ?>">
             <div class="metric metric-fps">
                 <span class="metric-icon metric-icon-fps dashicons dashicons-dashboard" aria-hidden="true"></span>
