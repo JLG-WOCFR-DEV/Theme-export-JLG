@@ -1,5 +1,20 @@
 <?php
 
+if (!class_exists('TEJLG_Redirect_Exception')) {
+    class TEJLG_Redirect_Exception extends RuntimeException {
+        private $redirect_url;
+
+        public function __construct($redirect_url) {
+            parent::__construct('tejlg_redirect');
+            $this->redirect_url = (string) $redirect_url;
+        }
+
+        public function get_redirect_url() {
+            return $this->redirect_url;
+        }
+    }
+}
+
 class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
     private $page_slug;
 
@@ -205,7 +220,11 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         }
 
         if (is_wp_error($result)) {
-            wp_die(esc_html($result->get_error_message()));
+            $this->notify_and_redirect(
+                'error',
+                'theme_export_error',
+                esc_html($result->get_error_message())
+            );
         }
 
         $job_id = (string) $result;
@@ -215,21 +234,33 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $job = TEJLG_Export::get_job($job_id);
 
         if (!is_array($job)) {
-            wp_die(esc_html__("Erreur : la tâche d'export générée est introuvable.", 'theme-export-jlg'));
+            $this->notify_and_redirect(
+                'error',
+                'theme_export_job_missing',
+                esc_html__("Erreur : la tâche d'export générée est introuvable.", 'theme-export-jlg')
+            );
         }
 
         if (!isset($job['status']) || 'completed' !== $job['status']) {
             $message = isset($job['message']) && is_string($job['message']) && '' !== $job['message']
                 ? $job['message']
                 : esc_html__("L'export du thème n'a pas pu être finalisé.", 'theme-export-jlg');
-            wp_die(esc_html($message));
+            $this->notify_and_redirect(
+                'error',
+                'theme_export_job_incomplete',
+                esc_html($message)
+            );
         }
 
         $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
 
         if ('' === $zip_path || !file_exists($zip_path)) {
             TEJLG_Export::delete_job($job_id);
-            wp_die(esc_html__('Le fichier ZIP généré est introuvable.', 'theme-export-jlg'));
+            $this->notify_and_redirect(
+                'error',
+                'theme_export_zip_missing',
+                esc_html__('Le fichier ZIP généré est introuvable.', 'theme-export-jlg')
+            );
         }
 
         $zip_file_name = isset($job['zip_file_name']) && '' !== $job['zip_file_name']
@@ -243,12 +274,17 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $should_stream = apply_filters('tejlg_export_stream_zip_archive', true, $zip_path, $zip_file_name, $zip_file_size);
 
         if (!$should_stream) {
-            return [
-                'job_id'   => $job_id,
-                'path'     => $zip_path,
-                'filename' => $zip_file_name,
-                'size'     => $zip_file_size,
-            ];
+            $message = sprintf(
+                /* translators: %s: generated ZIP file path. */
+                esc_html__("Export du thème réussi. Archive générée : %s", 'theme-export-jlg'),
+                esc_html($zip_path)
+            );
+
+            $this->notify_and_redirect(
+                'success',
+                'theme_export_success',
+                $message
+            );
         }
 
         nocache_headers();
@@ -268,7 +304,11 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         if (false === $handle) {
             TEJLG_Export::delete_job($job_id);
-            wp_die(esc_html__("Impossible de lire l'archive ZIP générée.", 'theme-export-jlg'));
+            $this->notify_and_redirect(
+                'error',
+                'theme_export_zip_unreadable',
+                esc_html__("Impossible de lire l'archive ZIP générée.", 'theme-export-jlg')
+            );
         }
 
         while (!feof($handle)) {
@@ -280,6 +320,37 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         TEJLG_Export::delete_job($job_id);
 
         flush();
+        exit;
+    }
+
+    private function notify_and_redirect($type, $code, $message) {
+        add_settings_error(
+            'tejlg_admin_messages',
+            $code,
+            $message,
+            $type
+        );
+
+        $errors = get_settings_errors('tejlg_admin_messages');
+
+        if (!empty($errors)) {
+            set_transient('settings_errors', $errors, 30);
+        }
+
+        $redirect_url = add_query_arg(
+            [
+                'page' => $this->page_slug,
+                'tab'  => 'export',
+            ],
+            admin_url('admin.php')
+        );
+
+        wp_safe_redirect($redirect_url);
+
+        if (defined('TEJLG_BYPASS_REDIRECT_EXIT') && TEJLG_BYPASS_REDIRECT_EXIT) {
+            throw new TEJLG_Redirect_Exception($redirect_url);
+        }
+
         exit;
     }
 

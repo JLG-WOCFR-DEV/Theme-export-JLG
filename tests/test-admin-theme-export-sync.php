@@ -38,7 +38,20 @@ class Test_Admin_Theme_Export_Sync extends WP_UnitTestCase {
             4
         );
 
-        $result = $export_page->handle_theme_export_form_submission();
+        if (!defined('TEJLG_BYPASS_REDIRECT_EXIT')) {
+            define('TEJLG_BYPASS_REDIRECT_EXIT', true);
+        }
+
+        try {
+            $export_page->handle_theme_export_form_submission();
+            $this->fail('Expected a redirect after synchronous export handling.');
+        } catch (TEJLG_Redirect_Exception $exception) {
+            $redirect_url = $exception->get_redirect_url();
+
+            $this->assertNotEmpty($redirect_url);
+            $this->assertStringContainsString('admin.php', $redirect_url);
+            $this->assertStringContainsString('tab=export', $redirect_url);
+        }
 
         remove_all_filters('tejlg_export_stream_zip_archive');
 
@@ -50,23 +63,42 @@ class Test_Admin_Theme_Export_Sync extends WP_UnitTestCase {
             $_SERVER['REQUEST_METHOD'] = $original_method;
         }
 
-        $this->assertIsArray($result, 'Expected the handler to return zip metadata when streaming is disabled.');
+        $job_id = TEJLG_Export::get_user_job_reference();
 
-        $this->assertArrayHasKey('job_id', $result);
-        $this->assertArrayHasKey('path', $result);
-        $this->assertArrayHasKey('filename', $result);
-        $this->assertArrayHasKey('size', $result);
+        $this->assertNotEmpty($job_id, 'Expected the job id to be stored for the current user.');
 
-        $this->assertNotEmpty($result['job_id']);
-        $this->assertNotEmpty($result['filename']);
-        $this->assertGreaterThan(0, $result['size']);
-        $this->assertFileExists($result['path']);
+        $job = TEJLG_Export::get_job($job_id);
+
+        $this->assertIsArray($job);
+        $this->assertSame('completed', isset($job['status']) ? $job['status'] : '', 'Expected the export job to be completed.');
+
+        $zip_path = isset($job['zip_path']) ? $job['zip_path'] : '';
+        $zip_file_name = isset($job['zip_file_name']) ? $job['zip_file_name'] : '';
+        $zip_file_size = isset($job['zip_file_size']) ? (int) $job['zip_file_size'] : 0;
+
+        $this->assertNotEmpty($zip_path);
+        $this->assertNotEmpty($zip_file_name);
+        $this->assertGreaterThan(0, $zip_file_size);
+        $this->assertFileExists($zip_path);
 
         $this->assertIsArray($captured);
-        $this->assertSame($captured['path'], $result['path']);
-        $this->assertSame($captured['filename'], $result['filename']);
-        $this->assertSame($captured['size'], $result['size']);
+        $this->assertSame($captured['path'], $zip_path);
+        $this->assertSame($captured['filename'], $zip_file_name);
+        $this->assertSame($captured['size'], $zip_file_size);
 
-        TEJLG_Export::delete_job($result['job_id']);
+        $notices = get_transient('settings_errors');
+
+        $this->assertIsArray($notices);
+        $this->assertNotEmpty($notices);
+
+        $notice = $notices[0];
+
+        $this->assertSame('tejlg_admin_messages', isset($notice['setting']) ? $notice['setting'] : '');
+        $this->assertSame('success', isset($notice['type']) ? $notice['type'] : '');
+        $this->assertStringContainsString(basename($zip_path), isset($notice['message']) ? $notice['message'] : '');
+
+        TEJLG_Export::delete_job($job_id);
+
+        delete_transient('settings_errors');
     }
 }
