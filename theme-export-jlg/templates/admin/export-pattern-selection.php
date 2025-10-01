@@ -27,6 +27,7 @@ $back_url = add_query_arg([
                 <label class="screen-reader-text" for="pattern-search"><?php esc_html_e('Rechercher une composition', 'theme-export-jlg'); ?></label>
                 <input type="search" id="pattern-search" placeholder="<?php echo esc_attr__('Rechercher…', 'theme-export-jlg'); ?>" aria-controls="pattern-selection-items">
             </p>
+            <p id="pattern-selection-status" aria-live="polite" class="screen-reader-text"></p>
             <ul class="pattern-selection-items" id="pattern-selection-items" aria-live="polite" data-searchable="true">
                 <?php
                 $pattern_counter = $per_page > 0 ? (($current_page - 1) * $per_page) : 0;

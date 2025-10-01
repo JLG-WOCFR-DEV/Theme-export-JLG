@@ -82,6 +82,12 @@ class TEJLG_Admin {
                     'ariaAtomic'       => 'true',
                     'latencyPrecision' => 1,
                 ],
+                'patternSelectionStatus' => [
+                    'numberLocale'   => get_user_locale(),
+                    'empty'          => esc_html__('Aucune composition visible.', 'theme-export-jlg'),
+                    'countSingular'  => esc_html__('%s composition visible.', 'theme-export-jlg'),
+                    'countPlural'    => esc_html__('%s compositions visibles.', 'theme-export-jlg'),
+                ],
                 'exportAsync' => [
                     'ajaxUrl' => admin_url('admin-ajax.php'),
                     'actions' => [
