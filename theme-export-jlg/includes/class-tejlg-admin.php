@@ -972,8 +972,23 @@ class TEJLG_Admin {
         <p><?php esc_html_e('Ces informations peuvent vous aider à diagnostiquer des problèmes liés à votre configuration ou à vos données.', 'theme-export-jlg'); ?></p>
         <div id="debug-accordion">
             <div class="accordion-section">
-                <h3 class="accordion-section-title"><?php esc_html_e('Informations Système & WordPress', 'theme-export-jlg'); ?></h3>
-                <div class="accordion-section-content">
+                <h3 class="accordion-section-title">
+                    <button
+                        type="button"
+                        class="accordion-section-trigger"
+                        id="tejlg-debug-section-system-trigger"
+                        aria-expanded="false"
+                        aria-controls="tejlg-debug-section-system"
+                    >
+                        <?php esc_html_e('Informations Système & WordPress', 'theme-export-jlg'); ?>
+                    </button>
+                </h3>
+                <div
+                    class="accordion-section-content"
+                    id="tejlg-debug-section-system"
+                    aria-labelledby="tejlg-debug-section-system-trigger"
+                    hidden
+                >
                     <table class="widefat striped">
                         <tbody>
                             <tr>
@@ -1009,8 +1024,23 @@ class TEJLG_Admin {
                 </div>
             </div>
             <div class="accordion-section">
-                <h3 class="accordion-section-title"><?php esc_html_e('Compositions personnalisées enregistrées', 'theme-export-jlg'); ?></h3>
-                <div class="accordion-section-content">
+                <h3 class="accordion-section-title">
+                    <button
+                        type="button"
+                        class="accordion-section-trigger"
+                        id="tejlg-debug-section-patterns-trigger"
+                        aria-expanded="false"
+                        aria-controls="tejlg-debug-section-patterns"
+                    >
+                        <?php esc_html_e('Compositions personnalisées enregistrées', 'theme-export-jlg'); ?>
+                    </button>
+                </h3>
+                <div
+                    class="accordion-section-content"
+                    id="tejlg-debug-section-patterns"
+                    aria-labelledby="tejlg-debug-section-patterns-trigger"
+                    hidden
+                >
                     <?php
                     if (class_exists('WP_Block_Patterns_Registry')) {
                         $patterns = WP_Block_Patterns_Registry::get_instance()->get_all_registered();

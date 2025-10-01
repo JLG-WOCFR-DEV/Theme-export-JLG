@@ -408,12 +408,41 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gérer l'accordéon sur la page de débogage
     const accordionContainer = document.getElementById('debug-accordion');
     if (accordionContainer) {
-        const accordionTitles = accordionContainer.querySelectorAll('.accordion-section-title');
-        accordionTitles.forEach(function(title) {
-            title.addEventListener('click', function() {
-                const parentSection = this.closest('.accordion-section');
-                if (parentSection) {
-                    parentSection.classList.toggle('open');
+        const accordionSections = accordionContainer.querySelectorAll('.accordion-section');
+        accordionSections.forEach(function(section) {
+            const trigger = section.querySelector('.accordion-section-trigger');
+            const content = section.querySelector('.accordion-section-content');
+
+            if (!trigger || !content) {
+                return;
+            }
+
+            const syncState = function(isOpen) {
+                trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                content.hidden = !isOpen;
+            };
+
+            const toggleSection = function() {
+                const isOpen = section.classList.toggle('open');
+                syncState(isOpen);
+            };
+
+            syncState(section.classList.contains('open') || trigger.getAttribute('aria-expanded') === 'true');
+
+            trigger.addEventListener('click', function() {
+                if (trigger.dataset.skipClick === 'true') {
+                    trigger.dataset.skipClick = 'false';
+                    return;
+                }
+
+                toggleSection();
+            });
+
+            trigger.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+                    event.preventDefault();
+                    trigger.dataset.skipClick = 'true';
+                    toggleSection();
                 }
             });
         });
