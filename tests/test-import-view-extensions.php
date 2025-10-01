@@ -11,12 +11,11 @@ class Test_Import_View_Extensions extends WP_UnitTestCase {
     public function test_import_tab_lists_configured_extensions(): void {
         $config = TEJLG_Import::get_import_file_types();
 
-        $admin  = new TEJLG_Admin();
-        $method = new ReflectionMethod(TEJLG_Admin::class, 'render_import_tab');
-        $method->setAccessible(true);
+        $template_dir = dirname(__DIR__) . '/theme-export-jlg/templates/admin/';
+        $import_page  = new TEJLG_Admin_Import_Page($template_dir, 'theme-export-jlg');
 
         ob_start();
-        $method->invoke($admin);
+        $import_page->render();
         $output = ob_get_clean();
 
         $this->assertIsString($output);

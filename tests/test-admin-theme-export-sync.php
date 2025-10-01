@@ -11,7 +11,8 @@ class Test_Admin_Theme_Export_Sync extends WP_UnitTestCase {
     public function test_theme_export_form_submission_streams_zip_when_nonce_is_valid() {
         wp_set_current_user(self::factory()->user->create(['role' => 'administrator']));
 
-        $admin = new TEJLG_Admin();
+        $template_dir = dirname(__DIR__) . '/theme-export-jlg/templates/admin/';
+        $export_page  = new TEJLG_Admin_Export_Page($template_dir, 'theme-export-jlg');
 
         $original_post   = $_POST;
         $original_method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : null;
@@ -37,10 +38,7 @@ class Test_Admin_Theme_Export_Sync extends WP_UnitTestCase {
             4
         );
 
-        $reflection = new ReflectionMethod(TEJLG_Admin::class, 'handle_theme_export_form_submission');
-        $reflection->setAccessible(true);
-
-        $result = $reflection->invoke($admin);
+        $result = $export_page->handle_theme_export_form_submission();
 
         remove_all_filters('tejlg_export_stream_zip_archive');
 
