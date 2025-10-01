@@ -69,6 +69,7 @@ class TEJLG_Admin {
             [
                 'showBlockCode' => __('Afficher le code du bloc', 'theme-export-jlg'),
                 'hideBlockCode' => __('Masquer le code du bloc', 'theme-export-jlg'),
+                'previewFallbackWarning' => esc_html__("Avertissement : l'aperçu est chargé via un mode de secours (sans Blob). Le rendu peut être limité.", 'theme-export-jlg'),
                 /* translators: Warning shown before importing a theme zip file. */
                 'themeImportConfirm' => __("⚠️ ATTENTION ⚠️\n\nSi un thème avec le même nom de dossier existe déjà, il sera DÉFINITIVEMENT écrasé.\n\nÊtes-vous sûr de vouloir continuer ?", 'theme-export-jlg'),
                 'metrics' => [
