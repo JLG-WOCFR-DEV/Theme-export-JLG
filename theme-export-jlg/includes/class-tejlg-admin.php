@@ -1196,6 +1196,17 @@ class TEJLG_Admin {
                             );
                         }
                     }
+
+                    $pattern_title = isset($pattern_data['title']) ? (string) $pattern_data['title'] : '';
+
+                    if ('' !== $pattern_title) {
+                        $iframe_title_text = sprintf(
+                            __('Aperçu : %s', 'theme-export-jlg'),
+                            $pattern_title
+                        );
+                    } else {
+                        $iframe_title_text = __('Aperçu de la composition', 'theme-export-jlg');
+                    }
                     ?>
                     <div class="pattern-item">
                         <div class="pattern-selector">
@@ -1205,7 +1216,7 @@ class TEJLG_Admin {
                             </label>
                         </div>
                         <div class="pattern-preview-wrapper">
-                            <iframe class="pattern-preview-iframe" sandbox="allow-same-origin"></iframe>
+                            <iframe class="pattern-preview-iframe" title="<?php echo esc_attr($iframe_title_text); ?>" sandbox="allow-same-origin"></iframe>
                             <script type="application/json" class="pattern-preview-data"><?php echo $iframe_json; ?></script>
                         </div>
 
