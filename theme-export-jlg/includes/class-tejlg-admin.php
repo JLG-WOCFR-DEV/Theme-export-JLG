@@ -647,8 +647,18 @@ class TEJLG_Admin {
                         <span class="spinner" aria-hidden="true" data-export-spinner></span>
                     </p>
                     <div class="tejlg-theme-export-feedback notice notice-info" data-export-feedback hidden>
-                        <p class="tejlg-theme-export-status" role="status" data-export-status-text><?php esc_html_e('En attente de démarrage…', 'theme-export-jlg'); ?></p>
-                        <progress value="0" max="100" data-export-progress-bar></progress>
+                        <p
+                            id="tejlg-theme-export-status"
+                            class="tejlg-theme-export-status"
+                            role="status"
+                            data-export-status-text
+                        ><?php esc_html_e('En attente de démarrage…', 'theme-export-jlg'); ?></p>
+                        <progress
+                            value="0"
+                            max="100"
+                            aria-labelledby="tejlg-theme-export-status"
+                            data-export-progress-bar
+                        ></progress>
                         <p class="description" data-export-message></p>
                         <p><a href="#" class="button button-secondary" data-export-download hidden target="_blank" rel="noopener"><?php esc_html_e("Télécharger l'archive ZIP", 'theme-export-jlg'); ?></a></p>
                     </div>
