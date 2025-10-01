@@ -1210,10 +1210,21 @@ class TEJLG_Admin {
                         </div>
 
                         <div class="pattern-controls">
-                            <button type="button" class="button-link toggle-code-view"><?php esc_html_e('Afficher le code du bloc', 'theme-export-jlg'); ?></button>
+                            <button
+                                type="button"
+                                class="button-link toggle-code-view"
+                                aria-controls="pattern-code-view-<?php echo esc_attr($pattern_data['index']); ?>"
+                                aria-expanded="false"
+                            >
+                                <?php esc_html_e('Afficher le code du bloc', 'theme-export-jlg'); ?>
+                            </button>
                         </div>
 
-                        <div class="pattern-code-view" style="display: none;">
+                        <div
+                            class="pattern-code-view"
+                            id="pattern-code-view-<?php echo esc_attr($pattern_data['index']); ?>"
+                            hidden
+                        >
                             <pre><code><?php echo esc_html($pattern_data['content']); ?></code></pre>
 
                             <details class="css-accordion">

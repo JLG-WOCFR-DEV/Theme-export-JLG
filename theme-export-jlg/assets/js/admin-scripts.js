@@ -426,19 +426,22 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target.classList.contains('toggle-code-view')) {
                 const button = e.target;
                 const patternItem = button.closest('.pattern-item');
-                const codeView = patternItem.querySelector('.pattern-code-view');
+                const codeView = patternItem ? patternItem.querySelector('.pattern-code-view') : null;
 
                 if (codeView) {
-                    const isVisible = codeView.style.display !== 'none';
-                    if (isVisible) {
-                        codeView.style.display = 'none';
-                        if (showBlockCodeText) {
-                            button.textContent = showBlockCodeText;
-                        }
-                    } else {
-                        codeView.style.display = 'block';
+                    const isHidden = codeView.hasAttribute('hidden');
+
+                    if (isHidden) {
+                        codeView.hidden = false;
+                        button.setAttribute('aria-expanded', 'true');
                         if (hideBlockCodeText) {
                             button.textContent = hideBlockCodeText;
+                        }
+                    } else {
+                        codeView.hidden = true;
+                        button.setAttribute('aria-expanded', 'false');
+                        if (showBlockCodeText) {
+                            button.textContent = showBlockCodeText;
                         }
                     }
                 }
