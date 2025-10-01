@@ -12,6 +12,10 @@ document.addEventListener('DOMContentLoaded', function() {
         ? localization.hideBlockCode
         : '';
 
+    const previewFallbackWarning = typeof localization.previewFallbackWarning === 'string'
+        ? localization.previewFallbackWarning
+        : 'La prévisualisation a été chargée via un mode de secours. Certaines fonctionnalités peuvent être limitées.';
+
     const exportAsync = (localization && typeof localization.exportAsync === 'object')
         ? localization.exportAsync
         : null;
@@ -450,14 +454,35 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const previewWrappers = document.querySelectorAll('.pattern-preview-wrapper');
-    if (previewWrappers.length && typeof URL === 'object' && typeof URL.createObjectURL === 'function') {
+    if (previewWrappers.length) {
+        const blobSupported = typeof URL !== 'undefined' && URL !== null && typeof URL.createObjectURL === 'function';
         const blobUrls = [];
+
+        const hidePreviewMessage = function(element) {
+            if (!element) {
+                return;
+            }
+
+            element.textContent = '';
+            element.hidden = true;
+        };
+
+        const showPreviewMessage = function(element, text) {
+            if (!element) {
+                return;
+            }
+
+            element.textContent = text;
+            element.hidden = false;
+        };
 
         previewWrappers.forEach(function(wrapper) {
             const dataElement = wrapper.querySelector('.pattern-preview-data');
             const iframe = wrapper.querySelector('.pattern-preview-iframe');
+            const messageElement = wrapper.querySelector('.pattern-preview-message');
 
             if (!dataElement || !iframe) {
+                hidePreviewMessage(messageElement);
                 return;
             }
 
@@ -469,20 +494,67 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (typeof htmlContent !== 'string' || htmlContent === '') {
+                hidePreviewMessage(messageElement);
                 return;
             }
 
-            const blob = new Blob([htmlContent], { type: 'text/html' });
-            const blobUrl = URL.createObjectURL(blob);
-            iframe.src = blobUrl;
-            blobUrls.push(blobUrl);
+            let previewLoaded = false;
+
+            if (blobSupported) {
+                try {
+                    const blob = new Blob([htmlContent], { type: 'text/html' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    iframe.src = blobUrl;
+                    blobUrls.push(blobUrl);
+                    previewLoaded = true;
+                    hidePreviewMessage(messageElement);
+                } catch (error) {
+                    previewLoaded = false;
+                }
+            }
+
+            if (!previewLoaded) {
+                let fallbackLoaded = false;
+
+                if (typeof iframe.removeAttribute === 'function') {
+                    iframe.removeAttribute('src');
+                }
+
+                if ('srcdoc' in iframe) {
+                    try {
+                        iframe.srcdoc = htmlContent;
+                        fallbackLoaded = true;
+                    } catch (error) {
+                        fallbackLoaded = false;
+                    }
+                }
+
+                if (!fallbackLoaded) {
+                    const iframeDocument = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+
+                    if (iframeDocument) {
+                        try {
+                            iframeDocument.open();
+                            iframeDocument.write(htmlContent);
+                            iframeDocument.close();
+                            fallbackLoaded = true;
+                        } catch (error) {
+                            fallbackLoaded = false;
+                        }
+                    }
+                }
+
+                showPreviewMessage(messageElement, previewFallbackWarning);
+            }
         });
 
-        window.addEventListener('beforeunload', function() {
-            blobUrls.forEach(function(blobUrl) {
-                URL.revokeObjectURL(blobUrl);
+        if (blobSupported && blobUrls.length) {
+            window.addEventListener('beforeunload', function() {
+                blobUrls.forEach(function(blobUrl) {
+                    URL.revokeObjectURL(blobUrl);
+                });
             });
-        });
+        }
     }
 
     // Gérer la confirmation d'importation de thème
