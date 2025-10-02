@@ -6,10 +6,11 @@
 /** @var array  $warnings */
 /** @var string $global_styles */
 
-$import_tab_url = add_query_arg([
+$import_tab_url    = add_query_arg([
     'page' => $page_slug,
     'tab'  => 'import',
 ], admin_url('admin.php'));
+$has_global_styles = '' !== trim($global_styles);
 ?>
 <h2><?php esc_html_e('Étape 2 : Choisir les compositions à importer', 'theme-export-jlg'); ?></h2>
 <p><?php esc_html_e('Cochez les compositions à importer. Vous pouvez prévisualiser le rendu et inspecter le code du bloc (le code CSS du thème est masqué par défaut).', 'theme-export-jlg'); ?></p>
@@ -55,15 +56,29 @@ $import_tab_url = add_query_arg([
                     hidden
                 >
                     <pre><code><?php echo esc_html($pattern_data['content']); ?></code></pre>
-
-                    <details class="css-accordion">
-                        <summary><?php esc_html_e('Afficher le CSS global du thème', 'theme-export-jlg'); ?></summary>
-                        <pre><code><?php echo esc_html($global_styles); ?></code></pre>
-                    </details>
+                    <?php if ($has_global_styles): ?>
+                        <p class="pattern-global-css-link">
+                            <button
+                                type="button"
+                                class="button-link global-css-trigger"
+                                data-target="#tejlg-global-css"
+                            >
+                                <?php esc_html_e('Afficher le CSS global du thème', 'theme-export-jlg'); ?>
+                            </button>
+                        </p>
+                    <?php endif; ?>
                 </div>
 
             </div>
         <?php endforeach; ?>
+        <?php if ($has_global_styles): ?>
+            <div class="global-css-container">
+                <details class="css-accordion" id="tejlg-global-css">
+                    <summary><?php esc_html_e('Afficher le CSS global du thème', 'theme-export-jlg'); ?></summary>
+                    <pre><code><?php echo esc_html($global_styles); ?></code></pre>
+                </details>
+            </div>
+        <?php endif; ?>
         <?php if (!empty($encoding_failures)): ?>
             <div class="notice notice-warning">
                 <?php foreach ($encoding_failures as $failure_message): ?>
