@@ -30,8 +30,15 @@ $select_patterns_url = add_query_arg([
             <?php wp_nonce_field('tejlg_theme_export_action', 'tejlg_theme_export_nonce'); ?>
             <p>
                 <label for="tejlg_exclusion_patterns"><?php esc_html_e('Motifs d\'exclusion (optionnel) :', 'theme-export-jlg'); ?></label><br>
-                <textarea name="tejlg_exclusion_patterns" id="tejlg_exclusion_patterns" class="large-text code" rows="4" placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"><?php echo esc_textarea($exclusion_patterns_value); ?></textarea>
-                <span class="description"><?php esc_html_e('Indiquez un motif par ligne ou séparez-les par des virgules (joker * accepté).', 'theme-export-jlg'); ?></span>
+                <textarea
+                    name="tejlg_exclusion_patterns"
+                    id="tejlg_exclusion_patterns"
+                    class="large-text code"
+                    rows="4"
+                    placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"
+                    aria-describedby="tejlg_exclusion_patterns_description"
+                ><?php echo esc_textarea($exclusion_patterns_value); ?></textarea>
+                <span id="tejlg_exclusion_patterns_description" class="description"><?php esc_html_e('Indiquez un motif par ligne ou séparez-les par des virgules (joker * accepté).', 'theme-export-jlg'); ?></span>
             </p>
             <p class="tejlg-theme-export-actions">
                 <button type="submit" class="button button-primary" data-export-start><?php esc_html_e("Lancer l'export du thème", 'theme-export-jlg'); ?></button>
