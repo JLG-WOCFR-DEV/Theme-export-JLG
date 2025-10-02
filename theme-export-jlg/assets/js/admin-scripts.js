@@ -425,12 +425,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Gérer l'affichage/masquage du code des compositions
     const previewList = document.getElementById('patterns-preview-list');
+    const globalCssDetails = document.getElementById('tejlg-global-css');
     if (previewList) {
         previewList.addEventListener('click', function(e) {
-            if (e.target.classList.contains('toggle-code-view')) {
-                const button = e.target;
-                const patternItem = button.closest('.pattern-item');
-                const codeView = patternItem ? patternItem.querySelector('.pattern-code-view') : null;
+            const button = e.target.closest('.toggle-code-view');
+            if (button) {
+                if (!button.dataset.showLabel) {
+                    button.dataset.showLabel = button.textContent.trim();
+                }
+
+                const controlledId = button.getAttribute('aria-controls');
+                let codeView = null;
+
+                if (controlledId) {
+                    codeView = document.getElementById(controlledId);
+                }
+
+                if (!codeView) {
+                    const patternItem = button.closest('.pattern-item');
+                    codeView = patternItem ? patternItem.querySelector('.pattern-code-view') : null;
+                }
 
                 if (codeView) {
                     const isHidden = codeView.hasAttribute('hidden');
@@ -438,16 +452,72 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (isHidden) {
                         codeView.hidden = false;
                         button.setAttribute('aria-expanded', 'true');
-                        if (hideBlockCodeText) {
-                            button.textContent = hideBlockCodeText;
+                        const hideLabel = hideBlockCodeText || button.dataset.hideLabel;
+                        if (hideLabel) {
+                            button.textContent = hideLabel;
+                            button.dataset.hideLabel = hideLabel;
                         }
                     } else {
                         codeView.hidden = true;
                         button.setAttribute('aria-expanded', 'false');
-                        if (showBlockCodeText) {
-                            button.textContent = showBlockCodeText;
+                        const showLabel = showBlockCodeText || button.dataset.showLabel;
+                        if (showLabel) {
+                            button.textContent = showLabel;
                         }
                     }
+                }
+
+                return;
+            }
+
+            const cssTrigger = e.target.closest('.global-css-trigger');
+            if (cssTrigger) {
+                e.preventDefault();
+
+                let selector = cssTrigger.getAttribute('data-target');
+                if (!selector) {
+                    const href = cssTrigger.getAttribute('href');
+                    if (href && href.charAt(0) === '#') {
+                        selector = href;
+                    }
+                }
+
+                let targetDetails = null;
+
+                if (selector) {
+                    try {
+                        targetDetails = document.querySelector(selector);
+                    } catch (error) {
+                        targetDetails = null;
+                    }
+                }
+
+                if (!targetDetails) {
+                    targetDetails = globalCssDetails;
+                }
+
+                if (!targetDetails) {
+                    return;
+                }
+
+                if (targetDetails.tagName === 'DETAILS') {
+                    targetDetails.open = true;
+                    const summary = targetDetails.querySelector('summary');
+                    if (summary && typeof summary.focus === 'function') {
+                        summary.focus();
+                    } else if (typeof targetDetails.focus === 'function') {
+                        targetDetails.setAttribute('tabindex', '-1');
+                        targetDetails.focus();
+                        targetDetails.removeAttribute('tabindex');
+                    }
+                }
+
+                if (targetDetails.id) {
+                    window.location.hash = targetDetails.id;
+                }
+
+                if (typeof targetDetails.scrollIntoView === 'function') {
+                    targetDetails.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             }
         });
