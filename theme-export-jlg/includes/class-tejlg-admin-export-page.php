@@ -16,6 +16,8 @@ if (!class_exists('TEJLG_Redirect_Exception')) {
 }
 
 class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
+    const EXCLUSION_PATTERNS_OPTION = 'tejlg_export_exclusion_patterns';
+    const PORTABLE_MODE_OPTION      = 'tejlg_export_portable_mode';
     private $page_slug;
 
     public function __construct($template_dir, $page_slug) {
@@ -32,6 +34,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         if (isset($_POST['tejlg_nonce']) && wp_verify_nonce($_POST['tejlg_nonce'], 'tejlg_export_action')) {
             $is_portable = isset($_POST['export_portable']);
+            $this->store_portable_mode_preference($is_portable);
             TEJLG_Export::export_patterns_json([], $is_portable);
         }
 
@@ -74,12 +77,21 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         if (isset($_POST['tejlg_exclusion_patterns']) && is_string($_POST['tejlg_exclusion_patterns'])) {
             $exclusion_patterns_value = wp_unslash($_POST['tejlg_exclusion_patterns']);
+        } else {
+            $exclusion_patterns_value = $this->get_saved_exclusion_patterns();
+        }
+
+        $portable_mode_enabled = $this->get_portable_mode_preference(false);
+
+        if (isset($_POST['tejlg_nonce']) && wp_verify_nonce($_POST['tejlg_nonce'], 'tejlg_export_action')) {
+            $portable_mode_enabled = isset($_POST['export_portable']);
         }
 
         $this->render_template('export.php', [
             'page_slug'                 => $this->page_slug,
             'child_theme_value'         => $child_theme_value,
             'exclusion_patterns_value'  => $exclusion_patterns_value,
+            'portable_mode_enabled'     => $portable_mode_enabled,
         ]);
     }
 
@@ -114,6 +126,8 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         );
         $pagination_base = add_query_arg('pattern_page', '%#%', $pagination_base);
 
+        $portable_mode_enabled = $this->get_portable_mode_preference(true);
+
         $this->render_template('export-pattern-selection.php', [
             'page_slug'        => $this->page_slug,
             'patterns_query'   => $patterns_query,
@@ -121,6 +135,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'current_page'     => $current_page,
             'total_pages'      => $total_pages,
             'pagination_base'  => $pagination_base,
+            'portable_mode_enabled' => $portable_mode_enabled,
         ]);
 
         wp_reset_postdata();
@@ -143,8 +158,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             ? $this->sanitize_pattern_ids($_POST['selected_patterns'])
             : [];
 
+        $is_portable = isset($_POST['export_portable']);
+        $this->store_portable_mode_preference($is_portable);
+
         if (!empty($selected_patterns)) {
-            $is_portable = isset($_POST['export_portable']);
             TEJLG_Export::export_selected_patterns_json($selected_patterns, $is_portable);
             return;
         }
@@ -188,6 +205,8 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $raw_exclusions = isset($_POST['tejlg_exclusion_patterns'])
             ? wp_unslash((string) $_POST['tejlg_exclusion_patterns'])
             : '';
+
+        $this->store_exclusion_patterns($raw_exclusions);
 
         $exclusions = [];
 
@@ -321,6 +340,34 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         flush();
         exit;
+    }
+
+    private function store_exclusion_patterns($patterns) {
+        if (!is_string($patterns)) {
+            $patterns = '';
+        }
+
+        update_option(self::EXCLUSION_PATTERNS_OPTION, $patterns);
+    }
+
+    private function get_saved_exclusion_patterns() {
+        $stored = get_option(self::EXCLUSION_PATTERNS_OPTION, '');
+
+        return is_string($stored) ? $stored : '';
+    }
+
+    private function store_portable_mode_preference($is_portable) {
+        update_option(self::PORTABLE_MODE_OPTION, $is_portable ? '1' : '0');
+    }
+
+    private function get_portable_mode_preference($default) {
+        $stored = get_option(self::PORTABLE_MODE_OPTION, null);
+
+        if (null === $stored) {
+            return (bool) $default;
+        }
+
+        return '1' === (string) $stored;
     }
 
     private function notify_and_redirect($type, $code, $message) {

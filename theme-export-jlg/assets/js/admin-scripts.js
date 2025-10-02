@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const spinner = exportForm.querySelector('[data-export-spinner]');
             const strings = typeof exportAsync.strings === 'object' ? exportAsync.strings : {};
             const pollInterval = typeof exportAsync.pollInterval === 'number' ? exportAsync.pollInterval : 4000;
+            const defaults = (typeof exportAsync.defaults === 'object' && exportAsync.defaults !== null)
+                ? exportAsync.defaults
+                : null;
             const extractResponseMessage = function(payload) {
                 if (!payload || typeof payload !== 'object') {
                     return '';
@@ -54,6 +57,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             let currentJobId = null;
             let pollTimeout = null;
+
+            if (textarea && defaults && typeof defaults.exclusions === 'string' && !textarea.value) {
+                textarea.value = defaults.exclusions;
+            }
 
             const formatString = function(template, replacements) {
                 if (typeof template !== 'string') {
