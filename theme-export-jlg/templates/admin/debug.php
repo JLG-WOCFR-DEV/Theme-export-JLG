@@ -46,38 +46,40 @@
     <div class="accordion-section">
         <h3 class="accordion-section-title"><?php esc_html_e('Informations Système & WordPress', 'theme-export-jlg'); ?></h3>
         <div class="accordion-section-content">
-            <table class="widefat striped">
-                <tbody>
-                    <tr>
-                        <td><?php esc_html_e('Version de WordPress', 'theme-export-jlg'); ?></td>
-                        <td><?php echo esc_html(get_bloginfo('version')); ?></td>
-                    </tr>
-                    <tr>
-                        <td><?php esc_html_e('Version de PHP', 'theme-export-jlg'); ?></td>
-                        <td><?php echo esc_html(PHP_VERSION); ?></td>
-                    </tr>
-                    <tr>
-                        <td><?php echo wp_kses_post(__('Classe <code>ZipArchive</code> disponible', 'theme-export-jlg')); ?></td>
-                        <td><?php echo wp_kses_post($zip_status); ?></td>
-                    </tr>
-                    <tr>
-                        <td><?php echo wp_kses_post(__('Extension PHP <code>mbstring</code>', 'theme-export-jlg')); ?></td>
-                        <td><?php echo wp_kses_post($mbstring_status); ?></td>
-                    </tr>
-                    <tr>
-                        <td><?php esc_html_e('Statut WP-Cron', 'theme-export-jlg'); ?></td>
-                        <td><?php echo wp_kses_post($cron_status); ?></td>
-                    </tr>
-                    <tr>
-                        <td><?php esc_html_e('Limite de mémoire WP', 'theme-export-jlg'); ?></td>
-                        <td><?php echo esc_html(WP_MEMORY_LIMIT); ?></td>
-                    </tr>
-                    <tr>
-                        <td><?php esc_html_e('Taille max. d\'upload', 'theme-export-jlg'); ?></td>
-                        <td><?php echo esc_html(ini_get('upload_max_filesize')); ?></td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="tejlg-table-scroll">
+                <table class="widefat striped">
+                    <tbody>
+                        <tr>
+                            <td><?php esc_html_e('Version de WordPress', 'theme-export-jlg'); ?></td>
+                            <td><?php echo esc_html(get_bloginfo('version')); ?></td>
+                        </tr>
+                        <tr>
+                            <td><?php esc_html_e('Version de PHP', 'theme-export-jlg'); ?></td>
+                            <td><?php echo esc_html(PHP_VERSION); ?></td>
+                        </tr>
+                        <tr>
+                            <td><?php echo wp_kses_post(__('Classe <code>ZipArchive</code> disponible', 'theme-export-jlg')); ?></td>
+                            <td><?php echo wp_kses_post($zip_status); ?></td>
+                        </tr>
+                        <tr>
+                            <td><?php echo wp_kses_post(__('Extension PHP <code>mbstring</code>', 'theme-export-jlg')); ?></td>
+                            <td><?php echo wp_kses_post($mbstring_status); ?></td>
+                        </tr>
+                        <tr>
+                            <td><?php esc_html_e('Statut WP-Cron', 'theme-export-jlg'); ?></td>
+                            <td><?php echo wp_kses_post($cron_status); ?></td>
+                        </tr>
+                        <tr>
+                            <td><?php esc_html_e('Limite de mémoire WP', 'theme-export-jlg'); ?></td>
+                            <td><?php echo esc_html(WP_MEMORY_LIMIT); ?></td>
+                        </tr>
+                        <tr>
+                            <td><?php esc_html_e('Taille max. d\'upload', 'theme-export-jlg'); ?></td>
+                            <td><?php echo esc_html(ini_get('upload_max_filesize')); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
     <div class="accordion-section">
