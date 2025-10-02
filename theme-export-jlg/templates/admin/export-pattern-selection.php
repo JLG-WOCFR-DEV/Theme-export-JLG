@@ -5,6 +5,7 @@
 /** @var int       $current_page */
 /** @var int       $total_pages */
 /** @var string    $pagination_base */
+/** @var bool      $portable_mode_enabled */
 
 $back_url = add_query_arg([
     'page' => $page_slug,
@@ -73,7 +74,7 @@ $back_url = add_query_arg([
                 </div>
             <?php endif; ?>
         </div>
-        <p><label><input type="checkbox" name="export_portable" value="1" checked> <strong><?php esc_html_e('Générer un export "portable"', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(Recommandé pour migrer vers un autre site)', 'theme-export-jlg'); ?></label></p>
+        <p><label><input type="checkbox" name="export_portable" value="1" <?php checked($portable_mode_enabled); ?>> <strong><?php esc_html_e('Générer un export "portable"', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(Recommandé pour migrer vers un autre site)', 'theme-export-jlg'); ?></label></p>
 
         <p><button type="submit" name="tejlg_export_selected_patterns" class="button button-primary button-hero"><?php esc_html_e('Exporter la sélection', 'theme-export-jlg'); ?></button></p>
     </form>

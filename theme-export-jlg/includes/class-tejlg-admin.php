@@ -63,6 +63,13 @@ class TEJLG_Admin {
         }
 
         wp_enqueue_script('tejlg-admin-scripts', TEJLG_URL . 'assets/js/admin-scripts.js', [], TEJLG_VERSION, true);
+
+        $saved_exclusions = get_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION, '');
+
+        if (!is_string($saved_exclusions)) {
+            $saved_exclusions = '';
+        }
+
         wp_localize_script(
             'tejlg-admin-scripts',
             'tejlgAdminL10n',
@@ -113,6 +120,9 @@ class TEJLG_Admin {
                         'statusLabel'     => esc_html__('Statut de la tâche : %1$s', 'theme-export-jlg'),
                     ],
                     'previousJob' => TEJLG_Export::get_current_user_job_snapshot(),
+                    'defaults'    => [
+                        'exclusions' => $saved_exclusions,
+                    ],
                 ],
             ]
         );

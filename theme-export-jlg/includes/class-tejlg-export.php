@@ -606,6 +606,8 @@ class TEJLG_Export {
         $raw_exclusions = isset($_POST['exclusions']) ? wp_unslash((string) $_POST['exclusions']) : '';
         $exclusions     = [];
 
+        update_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION, $raw_exclusions);
+
         if ('' !== $raw_exclusions) {
             $split = preg_split('/[,\r\n]+/', $raw_exclusions);
 

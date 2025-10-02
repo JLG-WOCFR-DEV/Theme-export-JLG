@@ -2,6 +2,7 @@
 /** @var string $page_slug */
 /** @var string $child_theme_value */
 /** @var string $exclusion_patterns_value */
+/** @var bool   $portable_mode_enabled */
 
 $export_tab_url = add_query_arg([
     'page' => $page_slug,
@@ -59,7 +60,7 @@ $select_patterns_url = add_query_arg([
         <p><?php echo wp_kses_post(__('Générez un fichier <code>.json</code> contenant vos compositions.', 'theme-export-jlg')); ?></p>
         <form method="post" action="">
             <?php wp_nonce_field('tejlg_export_action', 'tejlg_nonce'); ?>
-            <p><label><input type="checkbox" name="export_portable" value="1"> <strong><?php esc_html_e('Export portable', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(compatibilité maximale)', 'theme-export-jlg'); ?></label></p>
+            <p><label><input type="checkbox" name="export_portable" value="1" <?php checked($portable_mode_enabled); ?>> <strong><?php esc_html_e('Export portable', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(compatibilité maximale)', 'theme-export-jlg'); ?></label></p>
             <p><button type="submit" name="tejlg_export_patterns" class="button button-primary"><?php esc_html_e('Exporter TOUTES les compositions', 'theme-export-jlg'); ?></button></p>
         </form>
         <p>
