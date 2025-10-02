@@ -760,9 +760,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
             let previewLoaded = false;
             const minHeightValue = getEffectiveMinHeight(iframe);
+            if (iframe && iframe.style) {
+                iframe.style.height = minHeightValue + 'px';
+            }
             let resizeObserver = null;
             let resizeInterval = null;
             let removalObserver = null;
+            let pendingHeightSyncHandle = null;
+            let pendingHeightSyncIsAnimationFrame = false;
+
+            const cancelScheduledHeightSync = function() {
+                if (pendingHeightSyncHandle === null) {
+                    return;
+                }
+
+                if (pendingHeightSyncIsAnimationFrame && typeof window.cancelAnimationFrame === 'function') {
+                    window.cancelAnimationFrame(pendingHeightSyncHandle);
+                } else {
+                    window.clearTimeout(pendingHeightSyncHandle);
+                }
+
+                pendingHeightSyncHandle = null;
+                pendingHeightSyncIsAnimationFrame = false;
+            };
 
             const cleanupResizeListeners = function() {
                 if (resizeObserver) {
@@ -778,6 +798,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const cleanupOnRemoval = function() {
                 cleanupResizeListeners();
+                cancelScheduledHeightSync();
                 if (removalObserver) {
                     removalObserver.disconnect();
                     removalObserver = null;
@@ -858,6 +879,7 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             const handleIframeLoad = function() {
+                cancelScheduledHeightSync();
                 try {
                     const iframeDocument = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document) || null;
                     if (!iframeDocument) {
@@ -873,6 +895,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
 
+            const scheduleHeightSync = function() {
+                if (pendingHeightSyncHandle !== null) {
+                    return;
+                }
+
+                const run = function() {
+                    pendingHeightSyncHandle = null;
+                    pendingHeightSyncIsAnimationFrame = false;
+                    handleIframeLoad();
+                };
+
+                if (typeof window.requestAnimationFrame === 'function') {
+                    pendingHeightSyncIsAnimationFrame = true;
+                    pendingHeightSyncHandle = window.requestAnimationFrame(run);
+                } else {
+                    pendingHeightSyncIsAnimationFrame = false;
+                    pendingHeightSyncHandle = window.setTimeout(run, 0);
+                }
+            };
+
             iframe.addEventListener('load', handleIframeLoad);
 
             if (blobSupported) {
@@ -883,6 +925,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     blobUrls.push(blobUrl);
                     previewLoaded = true;
                     hidePreviewMessage(messageElement);
+                    scheduleHeightSync();
                 } catch (error) {
                     previewLoaded = false;
                 }
@@ -899,6 +942,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     try {
                         iframe.srcdoc = htmlContent;
                         fallbackLoaded = true;
+                        scheduleHeightSync();
                     } catch (error) {
                         fallbackLoaded = false;
                     }
@@ -914,6 +958,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             iframeDocument.close();
                             fallbackLoaded = true;
                             handleIframeLoad();
+                            scheduleHeightSync();
                         } catch (error) {
                             fallbackLoaded = false;
                         }

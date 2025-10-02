@@ -103,6 +103,7 @@
 .pattern-preview-iframe {
     width: 100%;
     min-height: 250px;
+    height: auto;
     border: 1px dashed #ccc;
     background: #fff;
 }
