@@ -574,6 +574,9 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
             esc_html($block_label)
         );
 
-        return '<div class="tejlg-block-placeholder"><p>' . $placeholder_text . '</p></div>';
+        $icon_svg = '<svg class="tejlg-block-placeholder__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" role="img">'
+            . '<path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm0 15.25a1.25 1.25 0 1 1 1.25-1.25A1.251 1.251 0 0 1 12 17.25Zm1.5-5.75a1.5 1.5 0 0 1-3 0V7.75a1.5 1.5 0 0 1 3 0Z"/></svg>';
+
+        return '<div class="tejlg-block-placeholder" role="note">' . $icon_svg . '<p class="tejlg-block-placeholder__message">' . $placeholder_text . '</p></div>';
     }
 }
