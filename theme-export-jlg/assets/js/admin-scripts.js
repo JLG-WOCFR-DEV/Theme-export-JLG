@@ -476,6 +476,61 @@ document.addEventListener('DOMContentLoaded', function() {
             element.hidden = false;
         };
 
+        const DEFAULT_MIN_IFRAME_HEIGHT = 200;
+
+        const getEffectiveMinHeight = function(element) {
+            if (!element || typeof window.getComputedStyle !== 'function') {
+                return DEFAULT_MIN_IFRAME_HEIGHT;
+            }
+
+            const computed = window.getComputedStyle(element);
+            if (!computed) {
+                return DEFAULT_MIN_IFRAME_HEIGHT;
+            }
+
+            const minHeight = computed.minHeight;
+            if (!minHeight || minHeight === 'auto') {
+                return DEFAULT_MIN_IFRAME_HEIGHT;
+            }
+
+            const parsed = parseFloat(minHeight);
+            if (!isNaN(parsed) && isFinite(parsed)) {
+                return Math.max(parsed, 0);
+            }
+
+            return DEFAULT_MIN_IFRAME_HEIGHT;
+        };
+
+        const computeContentHeight = function(doc) {
+            if (!doc) {
+                return 0;
+            }
+
+            const documentElement = doc.documentElement;
+            const body = doc.body;
+            let maxHeight = 0;
+
+            if (documentElement) {
+                maxHeight = Math.max(
+                    maxHeight,
+                    documentElement.scrollHeight || 0,
+                    documentElement.offsetHeight || 0,
+                    documentElement.clientHeight || 0
+                );
+            }
+
+            if (body && body !== documentElement) {
+                maxHeight = Math.max(
+                    maxHeight,
+                    body.scrollHeight || 0,
+                    body.offsetHeight || 0,
+                    body.clientHeight || 0
+                );
+            }
+
+            return maxHeight;
+        };
+
         previewWrappers.forEach(function(wrapper) {
             const dataElement = wrapper.querySelector('.pattern-preview-data');
             const iframe = wrapper.querySelector('.pattern-preview-iframe');
@@ -499,6 +554,121 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             let previewLoaded = false;
+            const minHeightValue = getEffectiveMinHeight(iframe);
+            let resizeObserver = null;
+            let resizeInterval = null;
+            let removalObserver = null;
+
+            const cleanupResizeListeners = function() {
+                if (resizeObserver) {
+                    resizeObserver.disconnect();
+                    resizeObserver = null;
+                }
+
+                if (resizeInterval) {
+                    window.clearInterval(resizeInterval);
+                    resizeInterval = null;
+                }
+            };
+
+            const cleanupOnRemoval = function() {
+                cleanupResizeListeners();
+                if (removalObserver) {
+                    removalObserver.disconnect();
+                    removalObserver = null;
+                }
+                iframe.removeEventListener('load', handleIframeLoad);
+            };
+
+            const ensureRemovalObserver = function() {
+                if (removalObserver || typeof MutationObserver !== 'function') {
+                    return;
+                }
+
+                removalObserver = new MutationObserver(function() {
+                    if (!document.body || !document.body.contains(iframe)) {
+                        cleanupOnRemoval();
+                    }
+                });
+
+                if (document.body) {
+                    removalObserver.observe(document.body, { childList: true, subtree: true });
+                }
+            };
+
+            const applyIframeHeight = function(doc) {
+                let contentHeight = 0;
+
+                try {
+                    contentHeight = computeContentHeight(doc);
+                } catch (error) {
+                    contentHeight = 0;
+                }
+
+                if (!contentHeight && iframe) {
+                    iframe.style.height = minHeightValue + 'px';
+                    return;
+                }
+
+                const finalHeight = Math.max(contentHeight, minHeightValue);
+                iframe.style.height = finalHeight + 'px';
+            };
+
+            const startResizeTracking = function(doc) {
+                if (!doc) {
+                    return;
+                }
+
+                cleanupResizeListeners();
+
+                const updateHeight = function() {
+                    applyIframeHeight(doc);
+                };
+
+                if (typeof ResizeObserver === 'function') {
+                    try {
+                        resizeObserver = new ResizeObserver(function() {
+                            updateHeight();
+                        });
+
+                        if (doc.documentElement) {
+                            resizeObserver.observe(doc.documentElement);
+                        }
+
+                        if (doc.body && doc.body !== doc.documentElement) {
+                            resizeObserver.observe(doc.body);
+                        }
+                    } catch (error) {
+                        resizeObserver = null;
+                    }
+                }
+
+                if (!resizeObserver) {
+                    resizeInterval = window.setInterval(function() {
+                        updateHeight();
+                    }, 400);
+                }
+
+                updateHeight();
+            };
+
+            const handleIframeLoad = function() {
+                try {
+                    const iframeDocument = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document) || null;
+                    if (!iframeDocument) {
+                        iframe.style.height = minHeightValue + 'px';
+                        return;
+                    }
+
+                    applyIframeHeight(iframeDocument);
+                    startResizeTracking(iframeDocument);
+                    ensureRemovalObserver();
+                } catch (error) {
+                    iframe.style.height = minHeightValue + 'px';
+                }
+            };
+
+            iframe.addEventListener('load', handleIframeLoad);
 
             if (blobSupported) {
                 try {
@@ -538,6 +708,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             iframeDocument.write(htmlContent);
                             iframeDocument.close();
                             fallbackLoaded = true;
+                            handleIframeLoad();
                         } catch (error) {
                             fallbackLoaded = false;
                         }
@@ -545,6 +716,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 showPreviewMessage(messageElement, previewFallbackWarning);
+            }
+
+            if (previewLoaded) {
+                ensureRemovalObserver();
             }
         });
 
