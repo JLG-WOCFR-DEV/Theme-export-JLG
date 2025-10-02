@@ -778,6 +778,10 @@ class TEJLG_Import {
 
             $content = self::sanitize_pattern_content_for_current_user($content_source);
 
+            $excerpt_details        = self::extract_pattern_excerpt($pattern);
+            $meta_prepared          = self::prepare_pattern_meta_input($pattern);
+            $taxonomy_assignments   = self::prepare_pattern_taxonomy_assignments($pattern);
+
             $existing_block = null;
 
             if (!empty($candidate_slugs)) {
@@ -816,6 +820,16 @@ class TEJLG_Import {
                 'post_content' => $content,
                 'post_name'    => $slug,
             ];
+
+            if (isset($excerpt_details['has_excerpt']) && $excerpt_details['has_excerpt']) {
+                $post_data['post_excerpt'] = isset($excerpt_details['value']) ? $excerpt_details['value'] : '';
+            }
+
+            if (isset($meta_prepared['has_meta']) && $meta_prepared['has_meta']) {
+                $post_data['meta_input'] = isset($meta_prepared['meta_input']) && is_array($meta_prepared['meta_input'])
+                    ? $meta_prepared['meta_input']
+                    : [];
+            }
 
             $action = 'create';
 
@@ -879,6 +893,20 @@ class TEJLG_Import {
 
             if (empty($result)) {
                 $failure_reasons[] = __('WordPress a renvoyé une réponse vide.', 'theme-export-jlg');
+            }
+
+            if (empty($failure_reasons) && !empty($taxonomy_assignments)) {
+                $post_id = 'update' === $action
+                    ? ($existing_block instanceof WP_Post ? (int) $existing_block->ID : 0)
+                    : (int) $result;
+
+                if ($post_id > 0) {
+                    $taxonomy_errors = self::apply_pattern_taxonomies($post_id, $taxonomy_assignments);
+
+                    if (!empty($taxonomy_errors)) {
+                        $failure_reasons = array_merge($failure_reasons, $taxonomy_errors);
+                    }
+                }
             }
 
             if (!empty($failure_reasons)) {
@@ -964,6 +992,268 @@ class TEJLG_Import {
         }
 
         return self::sanitize_error_message($message);
+    }
+
+    private static function extract_pattern_excerpt(array $pattern) {
+        if (!array_key_exists('post_excerpt', $pattern)) {
+            return [
+                'has_excerpt' => false,
+                'value'       => '',
+            ];
+        }
+
+        $raw_excerpt = $pattern['post_excerpt'];
+
+        if (is_array($raw_excerpt)) {
+            if (isset($raw_excerpt['raw']) && is_scalar($raw_excerpt['raw'])) {
+                $raw_excerpt = (string) $raw_excerpt['raw'];
+            } elseif (isset($raw_excerpt['rendered']) && is_scalar($raw_excerpt['rendered'])) {
+                $raw_excerpt = (string) $raw_excerpt['rendered'];
+            } else {
+                $raw_excerpt = '';
+            }
+        } elseif (!is_scalar($raw_excerpt)) {
+            $raw_excerpt = '';
+        }
+
+        $excerpt = wp_kses_post((string) $raw_excerpt);
+
+        return [
+            'has_excerpt' => true,
+            'value'       => trim($excerpt),
+        ];
+    }
+
+    private static function prepare_pattern_meta_input(array $pattern) {
+        $meta_input = [];
+
+        $raw_meta = [];
+        $has_meta = false;
+
+        if (array_key_exists('meta', $pattern) && is_array($pattern['meta'])) {
+            $raw_meta = $pattern['meta'];
+            $has_meta = true;
+        }
+
+        $meta_keys = array_keys($raw_meta);
+
+        if (array_key_exists('viewportWidth', $pattern)) {
+            $meta_keys[] = 'viewportWidth';
+            $has_meta    = true;
+        }
+
+        $meta_keys = apply_filters('tejlg_import_patterns_meta_keys', array_values(array_unique($meta_keys)), $pattern);
+
+        foreach ($meta_keys as $meta_key) {
+            if (!is_string($meta_key)) {
+                continue;
+            }
+
+            $meta_key = trim($meta_key);
+
+            if ('' === $meta_key) {
+                continue;
+            }
+
+            if ('viewportWidth' === $meta_key) {
+                if (!array_key_exists('viewportWidth', $pattern)) {
+                    continue;
+                }
+
+                $viewport_value = self::sanitize_viewport_width($pattern['viewportWidth']);
+
+                if (null !== $viewport_value) {
+                    $meta_input[$meta_key] = $viewport_value;
+                }
+
+                continue;
+            }
+
+            if (!array_key_exists($meta_key, $raw_meta)) {
+                continue;
+            }
+
+            $sanitized_value = self::sanitize_meta_value($raw_meta[$meta_key]);
+
+            if (null === $sanitized_value) {
+                continue;
+            }
+
+            $meta_input[$meta_key] = $sanitized_value;
+        }
+
+        return [
+            'has_meta'   => $has_meta,
+            'meta_input' => $meta_input,
+        ];
+    }
+
+    private static function sanitize_meta_value($value) {
+        if (is_string($value)) {
+            return wp_kses_post($value);
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return $value;
+        }
+
+        if (is_array($value)) {
+            $sanitized = [];
+
+            foreach ($value as $key => $item) {
+                $sanitized[$key] = self::sanitize_meta_value($item);
+            }
+
+            return $sanitized;
+        }
+
+        if (is_object($value)) {
+            if (method_exists($value, '__toString')) {
+                return wp_kses_post((string) $value);
+            }
+
+            return self::sanitize_meta_value((array) $value);
+        }
+
+        if (null === $value) {
+            return '';
+        }
+
+        return null;
+    }
+
+    private static function sanitize_viewport_width($value) {
+        if (is_array($value)) {
+            if (isset($value['value'])) {
+                $value = $value['value'];
+            } elseif (!empty($value)) {
+                $first = reset($value);
+                $value = is_scalar($first) ? $first : null;
+            } else {
+                $value = null;
+            }
+        }
+
+        if (is_numeric($value)) {
+            return absint($value);
+        }
+
+        return null;
+    }
+
+    private static function prepare_pattern_taxonomy_assignments(array $pattern) {
+        $taxonomies = [];
+
+        if (isset($pattern['taxonomies']) && is_array($pattern['taxonomies'])) {
+            foreach ($pattern['taxonomies'] as $taxonomy => $terms) {
+                $taxonomies[$taxonomy] = $terms;
+            }
+        }
+
+        if (isset($pattern['categories']) && is_array($pattern['categories'])) {
+            if (!isset($taxonomies['wp_pattern_category'])) {
+                $taxonomies['wp_pattern_category'] = $pattern['categories'];
+            }
+        }
+
+        if (isset($pattern['tags']) && is_array($pattern['tags'])) {
+            if (isset($taxonomies['wp_pattern_tag'])) {
+                $taxonomies['wp_pattern_tag'] = array_merge((array) $taxonomies['wp_pattern_tag'], $pattern['tags']);
+            } else {
+                $taxonomies['wp_pattern_tag'] = $pattern['tags'];
+            }
+        }
+
+        $taxonomies = apply_filters('tejlg_import_patterns_taxonomies', $taxonomies, $pattern);
+
+        $assignments = [];
+
+        foreach ($taxonomies as $taxonomy => $terms) {
+            if (!is_string($taxonomy)) {
+                continue;
+            }
+
+            $taxonomy = trim($taxonomy);
+
+            if ('' === $taxonomy) {
+                continue;
+            }
+
+            $sanitized_terms = self::sanitize_pattern_taxonomy_terms($terms);
+
+            $assignments[$taxonomy] = [
+                'provided' => true,
+                'terms'    => $sanitized_terms,
+            ];
+        }
+
+        return $assignments;
+    }
+
+    private static function sanitize_pattern_taxonomy_terms($terms) {
+        $sanitized = [];
+
+        foreach ((array) $terms as $term) {
+            if (is_array($term)) {
+                if (isset($term['slug']) && is_scalar($term['slug'])) {
+                    $term = (string) $term['slug'];
+                } elseif (isset($term['name']) && is_scalar($term['name'])) {
+                    $term = sanitize_title((string) $term['name']);
+                } else {
+                    $term = '';
+                }
+            } elseif (is_scalar($term)) {
+                $term = (string) $term;
+            } else {
+                $term = '';
+            }
+
+            $term = trim($term);
+
+            if ('' === $term) {
+                continue;
+            }
+
+            $slug = sanitize_title($term);
+
+            if ('' === $slug) {
+                continue;
+            }
+
+            $sanitized[] = $slug;
+        }
+
+        return array_values(array_unique($sanitized));
+    }
+
+    private static function apply_pattern_taxonomies($post_id, array $taxonomy_assignments) {
+        $errors = [];
+
+        foreach ($taxonomy_assignments as $taxonomy => $data) {
+            $provided = isset($data['provided']) ? (bool) $data['provided'] : false;
+
+            if (!$provided) {
+                continue;
+            }
+
+            if (!taxonomy_exists($taxonomy)) {
+                $errors[] = self::sanitize_error_message(
+                    sprintf(__('La taxonomie « %s » est introuvable lors de l\'import.', 'theme-export-jlg'), $taxonomy)
+                );
+
+                continue;
+            }
+
+            $terms = isset($data['terms']) && is_array($data['terms']) ? $data['terms'] : [];
+
+            $result = wp_set_post_terms($post_id, $terms, $taxonomy, false);
+
+            if (is_wp_error($result)) {
+                $errors[] = self::sanitize_error_message($result->get_error_message());
+            }
+        }
+
+        return $errors;
     }
 
     private static function persist_global_styles_post($settings, $stylesheet) {
