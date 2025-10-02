@@ -34,6 +34,8 @@ $back_url = add_query_arg([
                 while ($patterns_query->have_posts()):
                     $patterns_query->the_post();
                     $pattern_counter++;
+                    $pattern_id = get_the_ID();
+
                     $raw_title = get_the_title();
                     if (!is_scalar($raw_title)) {
                         $raw_title = '';
@@ -45,15 +47,87 @@ $back_url = add_query_arg([
                             (int) $pattern_counter
                         );
                     }
+
+                    $raw_excerpt = get_the_excerpt($pattern_id);
+                    if (!is_string($raw_excerpt)) {
+                        $raw_excerpt = '';
+                    }
+                    $excerpt = trim(wp_strip_all_tags($raw_excerpt));
+                    if ('' === $excerpt) {
+                        $raw_content = get_the_content(null, false, $pattern_id);
+                        if (!is_string($raw_content)) {
+                            $raw_content = '';
+                        }
+                        $excerpt = trim(wp_strip_all_tags($raw_content));
+                    }
+                    if ('' !== $excerpt) {
+                        $excerpt = wp_trim_words($excerpt, 30, '…');
+                    }
+
+                    $terms = get_the_terms($pattern_id, 'wp_pattern_category');
+                    $term_badges = [];
+                    $term_tokens = [];
+                    if (is_array($terms) && !is_wp_error($terms)) {
+                        foreach ($terms as $term) {
+                            if (!is_object($term) || !isset($term->name)) {
+                                continue;
+                            }
+                            $term_name = is_scalar($term->name) ? trim((string) $term->name) : '';
+                            $term_slug = isset($term->slug) && is_scalar($term->slug) ? trim((string) $term->slug) : '';
+                            if ('' === $term_name) {
+                                continue;
+                            }
+                            $term_badges[] = sprintf('<span class="pattern-selection-term">%s</span>', esc_html($term_name));
+                            $term_tokens[] = $term_name;
+                            if ('' !== $term_slug) {
+                                $term_tokens[] = $term_slug;
+                            }
+                        }
+                    }
+                    $terms_display = implode('', $term_badges);
+                    $terms_for_data = implode(' ', array_unique($term_tokens));
+
+                    $display_date = get_the_date(get_option('date_format'));
+                    if (!is_string($display_date)) {
+                        $display_date = '';
+                    }
+                    $machine_date = get_the_date('Y-m-d');
+                    if (!is_string($machine_date)) {
+                        $machine_date = '';
+                    }
                 ?>
-                    <li class="pattern-selection-item" data-label="<?php echo esc_attr($pattern_title); ?>">
-                        <label>
-                            <input type="checkbox" name="selected_patterns[]" value="<?php echo esc_attr(get_the_ID()); ?>">
-                            <?php echo esc_html($pattern_title); ?>
+                    <li
+                        class="pattern-selection-item"
+                        data-label="<?php echo esc_attr($pattern_title); ?>"
+                        data-excerpt="<?php echo esc_attr($excerpt); ?>"
+                        data-terms="<?php echo esc_attr($terms_for_data); ?>"
+                        data-date="<?php echo esc_attr($machine_date); ?>"
+                    >
+                        <label class="pattern-selection-label">
+                            <input type="checkbox" name="selected_patterns[]" value="<?php echo esc_attr($pattern_id); ?>">
+                            <span class="pattern-selection-content">
+                                <span class="pattern-selection-title"><?php echo esc_html($pattern_title); ?></span>
+                                <?php if ('' !== $display_date || '' !== $terms_display): ?>
+                                    <span class="pattern-selection-meta">
+                                        <?php if ('' !== $display_date): ?>
+                                            <span class="pattern-selection-date"><?php echo esc_html($display_date); ?></span>
+                                        <?php endif; ?>
+                                        <?php if ('' !== $terms_display): ?>
+                                            <span class="pattern-selection-terms" aria-label="<?php echo esc_attr__('Catégories', 'theme-export-jlg'); ?>">
+                                                <?php echo wp_kses_post($terms_display); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </span>
+                                <?php endif; ?>
+                                <?php if ('' !== $excerpt): ?>
+                                    <span class="pattern-selection-excerpt"><?php echo esc_html($excerpt); ?></span>
+                                <?php endif; ?>
+                            </span>
                         </label>
                     </li>
                 <?php endwhile; ?>
             </ul>
+            <?php wp_reset_postdata(); ?>
             <?php if ($per_page > 0 && $total_pages > 1): ?>
                 <div class="tablenav">
                     <div class="tablenav-pages">

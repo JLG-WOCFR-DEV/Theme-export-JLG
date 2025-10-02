@@ -1248,9 +1248,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         patternItems.forEach(function(item) {
             const label = item.getAttribute('data-label') || '';
-            const isMatch = label.toLowerCase().indexOf(normalizedQuery) !== -1;
+            const excerpt = item.getAttribute('data-excerpt') || '';
+            const terms = item.getAttribute('data-terms') || '';
+            const date = item.getAttribute('data-date') || '';
+            const haystack = [label, excerpt, terms, date]
+                .join(' ')
+                .toLowerCase();
+            const isMatch = normalizedQuery === '' || haystack.indexOf(normalizedQuery) !== -1;
 
-            if (isMatch || normalizedQuery === '') {
+            if (isMatch) {
                 item.classList.remove('is-hidden');
             } else {
                 item.classList.add('is-hidden');
