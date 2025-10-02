@@ -6,9 +6,16 @@
     margin-top: 1em;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 782px) {
     .tejlg-cards-container {
         grid-template-columns: 1fr;
+        margin-inline: 10px;
+    }
+
+    .nav-tab-wrapper {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
     }
 }
 
