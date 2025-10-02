@@ -425,103 +425,145 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Gérer l'affichage/masquage du code des compositions
     const previewList = document.getElementById('patterns-preview-list');
-    const globalCssDetails = document.getElementById('tejlg-global-css');
+    const globalCssDetails = document.querySelector('[data-tejlg-global-css]')
+        || document.getElementById('tejlg-global-css');
+
+    const handleToggleCodeView = function(button) {
+        if (!button) {
+            return;
+        }
+
+        if (!button.dataset.showLabel) {
+            button.dataset.showLabel = button.textContent.trim();
+        }
+
+        const controlledId = button.getAttribute('aria-controls');
+        let codeView = null;
+
+        if (controlledId) {
+            codeView = document.getElementById(controlledId);
+        }
+
+        if (!codeView) {
+            const patternItem = button.closest('.pattern-item');
+            codeView = patternItem ? patternItem.querySelector('.pattern-code-view') : null;
+        }
+
+        if (!codeView) {
+            return;
+        }
+
+        const isHidden = codeView.hasAttribute('hidden');
+
+        if (isHidden) {
+            codeView.hidden = false;
+            button.setAttribute('aria-expanded', 'true');
+            const hideLabel = hideBlockCodeText || button.dataset.hideLabel;
+            if (hideLabel) {
+                button.textContent = hideLabel;
+                button.dataset.hideLabel = hideLabel;
+            }
+        } else {
+            codeView.hidden = true;
+            button.setAttribute('aria-expanded', 'false');
+            const showLabel = showBlockCodeText || button.dataset.showLabel;
+            if (showLabel) {
+                button.textContent = showLabel;
+            }
+        }
+    };
+
+    const focusDetails = function(targetDetails) {
+        if (targetDetails.tagName === 'DETAILS') {
+            targetDetails.open = true;
+            const summary = targetDetails.querySelector('summary');
+            if (summary && typeof summary.focus === 'function') {
+                summary.focus();
+            } else if (typeof targetDetails.focus === 'function') {
+                targetDetails.setAttribute('tabindex', '-1');
+                targetDetails.focus();
+                targetDetails.removeAttribute('tabindex');
+            }
+        }
+
+        if (targetDetails.id) {
+            window.location.hash = targetDetails.id;
+        }
+
+        if (typeof targetDetails.scrollIntoView === 'function') {
+            targetDetails.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    const resolveGlobalCssTarget = function(trigger) {
+        if (!trigger) {
+            return null;
+        }
+
+        let selector = trigger.getAttribute('data-target');
+        if (!selector) {
+            const href = trigger.getAttribute('href');
+            if (href && href.charAt(0) === '#') {
+                selector = href;
+            }
+        }
+
+        if (selector) {
+            try {
+                const resolved = document.querySelector(selector);
+                if (resolved) {
+                    return resolved;
+                }
+            } catch (error) {
+                // Ignore invalid selectors.
+            }
+        }
+
+        return globalCssDetails;
+    };
+
+    const handleGlobalCssTrigger = function(trigger, event) {
+        if (!trigger) {
+            return;
+        }
+
+        if (event) {
+            event.preventDefault();
+        }
+
+        const targetDetails = resolveGlobalCssTarget(trigger);
+        if (!targetDetails) {
+            return;
+        }
+
+        focusDetails(targetDetails);
+    };
+
     if (previewList) {
         previewList.addEventListener('click', function(e) {
-            const button = e.target.closest('.toggle-code-view');
-            if (button) {
-                if (!button.dataset.showLabel) {
-                    button.dataset.showLabel = button.textContent.trim();
-                }
-
-                const controlledId = button.getAttribute('aria-controls');
-                let codeView = null;
-
-                if (controlledId) {
-                    codeView = document.getElementById(controlledId);
-                }
-
-                if (!codeView) {
-                    const patternItem = button.closest('.pattern-item');
-                    codeView = patternItem ? patternItem.querySelector('.pattern-code-view') : null;
-                }
-
-                if (codeView) {
-                    const isHidden = codeView.hasAttribute('hidden');
-
-                    if (isHidden) {
-                        codeView.hidden = false;
-                        button.setAttribute('aria-expanded', 'true');
-                        const hideLabel = hideBlockCodeText || button.dataset.hideLabel;
-                        if (hideLabel) {
-                            button.textContent = hideLabel;
-                            button.dataset.hideLabel = hideLabel;
-                        }
-                    } else {
-                        codeView.hidden = true;
-                        button.setAttribute('aria-expanded', 'false');
-                        const showLabel = showBlockCodeText || button.dataset.showLabel;
-                        if (showLabel) {
-                            button.textContent = showLabel;
-                        }
-                    }
-                }
-
+            const toggleButton = e.target.closest('.toggle-code-view');
+            if (toggleButton) {
+                handleToggleCodeView(toggleButton);
                 return;
             }
 
             const cssTrigger = e.target.closest('.global-css-trigger');
             if (cssTrigger) {
-                e.preventDefault();
-
-                let selector = cssTrigger.getAttribute('data-target');
-                if (!selector) {
-                    const href = cssTrigger.getAttribute('href');
-                    if (href && href.charAt(0) === '#') {
-                        selector = href;
-                    }
-                }
-
-                let targetDetails = null;
-
-                if (selector) {
-                    try {
-                        targetDetails = document.querySelector(selector);
-                    } catch (error) {
-                        targetDetails = null;
-                    }
-                }
-
-                if (!targetDetails) {
-                    targetDetails = globalCssDetails;
-                }
-
-                if (!targetDetails) {
-                    return;
-                }
-
-                if (targetDetails.tagName === 'DETAILS') {
-                    targetDetails.open = true;
-                    const summary = targetDetails.querySelector('summary');
-                    if (summary && typeof summary.focus === 'function') {
-                        summary.focus();
-                    } else if (typeof targetDetails.focus === 'function') {
-                        targetDetails.setAttribute('tabindex', '-1');
-                        targetDetails.focus();
-                        targetDetails.removeAttribute('tabindex');
-                    }
-                }
-
-                if (targetDetails.id) {
-                    window.location.hash = targetDetails.id;
-                }
-
-                if (typeof targetDetails.scrollIntoView === 'function') {
-                    targetDetails.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
+                handleGlobalCssTrigger(cssTrigger, e);
             }
         });
     }
+
+    document.addEventListener('click', function(e) {
+        if (previewList && previewList.contains(e.target)) {
+            return;
+        }
+
+        const cssTrigger = e.target.closest('.global-css-trigger');
+        if (cssTrigger) {
+            handleGlobalCssTrigger(cssTrigger, e);
+        }
+    });
 
     const previewWrappers = document.querySelectorAll('.pattern-preview-wrapper');
     if (previewWrappers.length) {

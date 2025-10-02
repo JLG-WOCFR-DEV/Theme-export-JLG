@@ -10,7 +10,8 @@ $import_tab_url    = add_query_arg([
     'page' => $page_slug,
     'tab'  => 'import',
 ], admin_url('admin.php'));
-$has_global_styles = '' !== trim($global_styles);
+$has_global_styles      = '' !== trim($global_styles);
+$global_css_section_id = 'tejlg-global-css';
 ?>
 <h2><?php esc_html_e('Étape 2 : Choisir les compositions à importer', 'theme-export-jlg'); ?></h2>
 <p><?php esc_html_e('Cochez les compositions à importer. Vous pouvez prévisualiser le rendu et inspecter le code du bloc (le code CSS du thème est masqué par défaut).', 'theme-export-jlg'); ?></p>
@@ -58,27 +59,19 @@ $has_global_styles = '' !== trim($global_styles);
                     <pre><code><?php echo esc_html($pattern_data['content']); ?></code></pre>
                     <?php if ($has_global_styles): ?>
                         <p class="pattern-global-css-link">
-                            <button
-                                type="button"
+                            <a
                                 class="button-link global-css-trigger"
-                                data-target="#tejlg-global-css"
+                                href="#<?php echo esc_attr($global_css_section_id); ?>"
+                                aria-controls="<?php echo esc_attr($global_css_section_id); ?>"
                             >
                                 <?php esc_html_e('Afficher le CSS global du thème', 'theme-export-jlg'); ?>
-                            </button>
+                            </a>
                         </p>
                     <?php endif; ?>
                 </div>
 
             </div>
         <?php endforeach; ?>
-        <?php if ($has_global_styles): ?>
-            <div class="global-css-container">
-                <details class="css-accordion" id="tejlg-global-css">
-                    <summary><?php esc_html_e('Afficher le CSS global du thème', 'theme-export-jlg'); ?></summary>
-                    <pre><code><?php echo esc_html($global_styles); ?></code></pre>
-                </details>
-            </div>
-        <?php endif; ?>
         <?php if (!empty($encoding_failures)): ?>
             <div class="notice notice-warning">
                 <?php foreach ($encoding_failures as $failure_message): ?>
@@ -94,5 +87,17 @@ $has_global_styles = '' !== trim($global_styles);
             </div>
         <?php endif; ?>
     </div>
+    <?php if ($has_global_styles): ?>
+        <div class="global-css-container">
+            <details
+                class="css-accordion"
+                id="<?php echo esc_attr($global_css_section_id); ?>"
+                data-tejlg-global-css="true"
+            >
+                <summary><?php esc_html_e('Afficher le CSS global du thème', 'theme-export-jlg'); ?></summary>
+                <pre><code><?php echo esc_html($global_styles); ?></code></pre>
+            </details>
+        </div>
+    <?php endif; ?>
     <p><button type="submit" name="tejlg_import_patterns_step2" class="button button-primary button-hero"><?php esc_html_e('Importer la sélection', 'theme-export-jlg'); ?></button></p>
 </form>
