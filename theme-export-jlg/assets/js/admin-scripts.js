@@ -547,6 +547,25 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         };
 
+        const parsePreviewStylesheetMarkup = function(element) {
+            if (!element) {
+                return '';
+            }
+
+            const attributeValue = element.getAttribute('data-tejlg-stylesheet-links-html');
+
+            if (typeof attributeValue !== 'string' || attributeValue === '') {
+                return '';
+            }
+
+            try {
+                const parsed = JSON.parse(attributeValue);
+                return typeof parsed === 'string' ? parsed : '';
+            } catch (error) {
+                return '';
+            }
+        };
+
         const normalizeStylesheetUrls = function(urls) {
             if (!Array.isArray(urls) || !urls.length) {
                 return [];
@@ -586,12 +605,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return validUrls;
         };
 
-        const injectStylesheetsIntoHtml = function(html, stylesheetUrls) {
+        const injectStylesheetsIntoHtml = function(html, stylesheetUrls, stylesheetMarkup) {
             if (typeof html !== 'string' || !html.length) {
-                return html;
-            }
-
-            if (!Array.isArray(stylesheetUrls) || !stylesheetUrls.length) {
                 return html;
             }
 
@@ -628,17 +643,81 @@ document.addEventListener('DOMContentLoaded', function() {
                 return linkEl.href;
             });
 
-            stylesheetUrls.forEach(function(url) {
-                if (existingHrefs.indexOf(url) !== -1) {
+            const appendLinkElement = function(linkEl) {
+                if (!linkEl) {
                     return;
                 }
 
-                const linkEl = previewDocument.createElement('link');
-                linkEl.rel = 'stylesheet';
-                linkEl.href = url;
-                headElement.appendChild(linkEl);
-                existingHrefs.push(linkEl.href);
-            });
+                const href = linkEl.href;
+
+                if (typeof href !== 'string' || !href.length) {
+                    return;
+                }
+
+                const validator = previewDocument.createElement('a');
+                validator.href = href;
+
+                if (validator.protocol !== 'http:' && validator.protocol !== 'https:') {
+                    return;
+                }
+
+                if (existingHrefs.indexOf(href) !== -1) {
+                    return;
+                }
+
+                const newLink = previewDocument.createElement('link');
+                newLink.rel = 'stylesheet';
+                newLink.href = href;
+
+                if (linkEl.media) {
+                    newLink.media = linkEl.media;
+                }
+
+                if (linkEl.crossOrigin) {
+                    newLink.crossOrigin = linkEl.crossOrigin;
+                }
+
+                if (linkEl.integrity) {
+                    newLink.integrity = linkEl.integrity;
+                }
+
+                headElement.appendChild(newLink);
+                existingHrefs.push(newLink.href);
+            };
+
+            if (typeof stylesheetMarkup === 'string' && stylesheetMarkup.length) {
+                const container = previewDocument.createElement('div');
+
+                try {
+                    container.innerHTML = stylesheetMarkup;
+                } catch (error) {
+                    container.innerHTML = '';
+                }
+
+                const linkNodes = container.querySelectorAll('link[rel="stylesheet"]');
+                Array.prototype.forEach.call(linkNodes, appendLinkElement);
+            }
+
+            if (Array.isArray(stylesheetUrls) && stylesheetUrls.length) {
+                stylesheetUrls.forEach(function(url) {
+                    if (existingHrefs.indexOf(url) !== -1) {
+                        return;
+                    }
+
+                    const validator = previewDocument.createElement('a');
+                    validator.href = url;
+
+                    if (validator.protocol !== 'http:' && validator.protocol !== 'https:') {
+                        return;
+                    }
+
+                    const linkEl = previewDocument.createElement('link');
+                    linkEl.rel = 'stylesheet';
+                    linkEl.href = url;
+                    headElement.appendChild(linkEl);
+                    existingHrefs.push(linkEl.href);
+                });
+            }
 
             const serializedHtml = previewDocument.documentElement ? previewDocument.documentElement.outerHTML : '';
 
@@ -746,10 +825,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const stylesheetData = parsePreviewStylesheets(dataElement);
             const normalizedStylesheets = normalizeStylesheetUrls(stylesheetData);
+            const stylesheetMarkup = parsePreviewStylesheetMarkup(dataElement);
 
-            if (normalizedStylesheets.length) {
+            if (normalizedStylesheets.length || (typeof stylesheetMarkup === 'string' && stylesheetMarkup.length)) {
                 try {
-                    const enrichedHtml = injectStylesheetsIntoHtml(htmlContent, normalizedStylesheets);
+                    const enrichedHtml = injectStylesheetsIntoHtml(htmlContent, normalizedStylesheets, stylesheetMarkup);
                     if (typeof enrichedHtml === 'string' && enrichedHtml.length) {
                         htmlContent = enrichedHtml;
                     }

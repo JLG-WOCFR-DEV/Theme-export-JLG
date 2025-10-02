@@ -36,6 +36,7 @@ $has_global_styles = '' !== trim($global_styles);
                         type="application/json"
                         class="pattern-preview-data"
                         data-tejlg-stylesheets="<?php echo esc_attr($pattern_data['iframe_stylesheets_json']); ?>"
+                        data-tejlg-stylesheet-links-html="<?php echo esc_attr(isset($pattern_data['iframe_stylesheet_links_json']) ? $pattern_data['iframe_stylesheet_links_json'] : '""'); ?>"
                     ><?php echo $pattern_data['iframe_json']; ?></script>
                 </div>
 

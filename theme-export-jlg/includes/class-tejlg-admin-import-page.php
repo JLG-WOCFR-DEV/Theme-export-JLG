@@ -207,6 +207,7 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
             $iframe_json = wp_json_encode($iframe_content, $json_options);
 
             $stylesheets_json = wp_json_encode($preview_stylesheets, $json_options);
+            $stylesheet_links_json = wp_json_encode($stylesheet_links_markup, $json_options);
 
             if (false === $iframe_json) {
                 $iframe_json = wp_json_encode('', $json_options);
@@ -237,9 +238,14 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
                 $stylesheets_json = '[]';
             }
 
+            if (false === $stylesheet_links_json) {
+                $stylesheet_links_json = '""';
+            }
+
             $pattern_data['iframe_json']             = $iframe_json;
             $pattern_data['iframe_title']            = $iframe_title_text;
             $pattern_data['iframe_stylesheets_json'] = $stylesheets_json;
+            $pattern_data['iframe_stylesheet_links_json'] = $stylesheet_links_json;
         }
         unset($pattern_data);
 
