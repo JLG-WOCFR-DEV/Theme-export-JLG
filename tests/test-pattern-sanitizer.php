@@ -169,6 +169,151 @@ class Test_Pattern_Sanitizer extends WP_UnitTestCase {
         }
     }
 
+    public function filter_export_meta_keys($keys) {
+        $keys[] = 'custom_meta_key';
+
+        return array_values(array_unique($keys));
+    }
+
+    private function ensure_taxonomy_registered($taxonomy, $args = []) {
+        if (taxonomy_exists($taxonomy)) {
+            return;
+        }
+
+        $default_args = [
+            'hierarchical' => false,
+            'show_ui'      => true,
+            'show_in_rest' => true,
+        ];
+
+        $args = wp_parse_args($args, $default_args);
+
+        register_taxonomy($taxonomy, 'wp_block', $args);
+    }
+
+    public function test_export_patterns_json_includes_additional_metadata() {
+        $this->ensure_taxonomy_registered('wp_pattern_category', [
+            'hierarchical' => true,
+        ]);
+        $this->ensure_taxonomy_registered('wp_pattern_tag');
+
+        $pattern_id = self::factory()->post->create([
+            'post_type'    => 'wp_block',
+            'post_status'  => 'publish',
+            'post_title'   => 'Metadata Export Pattern',
+            'post_name'    => 'metadata-export-pattern',
+            'post_excerpt' => 'Résumé exporté',
+            'post_content' => '<!-- wp:paragraph --><p>Metadata export content</p><!-- /wp:paragraph -->',
+        ]);
+
+        wp_set_post_terms($pattern_id, ['landing'], 'wp_pattern_category', false);
+        wp_set_post_terms($pattern_id, ['featured'], 'wp_pattern_tag', false);
+
+        update_post_meta($pattern_id, 'viewportWidth', 1440);
+        update_post_meta($pattern_id, 'custom_meta_key', 'Valeur personnalisée');
+
+        add_filter('tejlg_export_stream_json_file', '__return_false');
+        add_filter('tejlg_export_patterns_meta_keys', [$this, 'filter_export_meta_keys']);
+
+        try {
+            $json = TEJLG_Export::export_selected_patterns_json([$pattern_id], false);
+        } finally {
+            remove_filter('tejlg_export_patterns_meta_keys', [$this, 'filter_export_meta_keys']);
+            remove_filter('tejlg_export_stream_json_file', '__return_false');
+        }
+
+        $this->assertIsString($json);
+
+        $decoded = json_decode($json, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertCount(1, $decoded);
+
+        $exported_pattern = $decoded[0];
+
+        $this->assertArrayHasKey('post_excerpt', $exported_pattern);
+        $this->assertSame('Résumé exporté', $exported_pattern['post_excerpt']);
+
+        $this->assertArrayHasKey('taxonomies', $exported_pattern);
+        $this->assertArrayHasKey('wp_pattern_category', $exported_pattern['taxonomies']);
+        $this->assertArrayHasKey('wp_pattern_tag', $exported_pattern['taxonomies']);
+        $this->assertSame(['landing'], $exported_pattern['taxonomies']['wp_pattern_category']);
+        $this->assertSame(['featured'], $exported_pattern['taxonomies']['wp_pattern_tag']);
+
+        $this->assertArrayHasKey('meta', $exported_pattern);
+        $this->assertArrayHasKey('viewportWidth', $exported_pattern['meta']);
+        $this->assertArrayHasKey('custom_meta_key', $exported_pattern['meta']);
+        $this->assertSame('Valeur personnalisée', $exported_pattern['meta']['custom_meta_key']);
+
+        $this->assertArrayHasKey('viewportWidth', $exported_pattern);
+        $this->assertSame(1440, $exported_pattern['viewportWidth']);
+
+        wp_delete_post($pattern_id, true);
+    }
+
+    public function test_import_restores_excerpt_taxonomies_and_meta() {
+        $admin_id = self::factory()->user->create([
+            'role' => 'administrator',
+        ]);
+
+        wp_set_current_user($admin_id);
+
+        $this->ensure_taxonomy_registered('wp_pattern_category', [
+            'hierarchical' => true,
+        ]);
+        $this->ensure_taxonomy_registered('wp_pattern_tag');
+
+        $pattern = [
+            'title'         => 'Metadata Import Pattern',
+            'slug'          => 'metadata-import-pattern',
+            'content'       => '<!-- wp:paragraph --><p>Metadata import content</p><!-- /wp:paragraph -->',
+            'post_excerpt'  => 'Résumé importé',
+            'taxonomies'    => [
+                'wp_pattern_category' => ['landing'],
+                'wp_pattern_tag'      => ['featured'],
+            ],
+            'meta'          => [
+                'custom_meta_key' => 'Valeur importée',
+                'viewportWidth'   => 960,
+            ],
+            'viewportWidth' => 960,
+        ];
+
+        $create_payload = new ReflectionMethod(TEJLG_Import::class, 'create_patterns_storage_payload');
+        $create_payload->setAccessible(true);
+
+        $transient_id = 'tejlg_' . md5(uniqid('metadata-import', true));
+        $payload      = $create_payload->invoke(null, [$pattern]);
+
+        set_transient($transient_id, $payload, HOUR_IN_SECONDS);
+
+        global $wp_settings_errors;
+        $wp_settings_errors = [];
+
+        TEJLG_Import::handle_patterns_import_step2($transient_id, [0]);
+
+        $imported_post = get_page_by_path('metadata-import-pattern', OBJECT, 'wp_block');
+
+        $this->assertInstanceOf(WP_Post::class, $imported_post);
+        $this->assertSame('Résumé importé', $imported_post->post_excerpt);
+
+        $category_terms = wp_get_post_terms($imported_post->ID, 'wp_pattern_category', ['fields' => 'slugs']);
+        $this->assertContains('landing', $category_terms);
+
+        $tag_terms = wp_get_post_terms($imported_post->ID, 'wp_pattern_tag', ['fields' => 'slugs']);
+        $this->assertContains('featured', $tag_terms);
+
+        $this->assertSame('Valeur importée', get_post_meta($imported_post->ID, 'custom_meta_key', true));
+        $this->assertSame(960, (int) get_post_meta($imported_post->ID, 'viewportWidth', true));
+
+        $messages = get_settings_errors('tejlg_import_messages');
+        $this->assertNotEmpty($messages);
+        $this->assertContains('success', wp_list_pluck($messages, 'type'));
+
+        wp_delete_post($imported_post->ID, true);
+        TEJLG_Import::delete_patterns_storage($transient_id, $payload);
+    }
+
     public function test_preview_and_import_succeeds_with_array_content() {
         $admin_id = self::factory()->user->create([
             'role' => 'administrator',

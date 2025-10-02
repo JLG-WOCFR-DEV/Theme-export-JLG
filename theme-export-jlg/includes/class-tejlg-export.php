@@ -844,11 +844,43 @@ class TEJLG_Export {
                     $slug = sanitize_title(get_the_title());
                 }
 
+                $post_id = get_the_ID();
+
                 $pattern_data = [
                     'title'   => get_the_title(),
                     'slug'    => $slug,
                     'content' => $content,
                 ];
+
+                $excerpt = get_post_field('post_excerpt', $post_id);
+
+                if (is_string($excerpt)) {
+                    $excerpt = trim($excerpt);
+
+                    if ('' !== $excerpt) {
+                        $pattern_data['post_excerpt'] = $excerpt;
+                    }
+                }
+
+                $taxonomies = self::get_pattern_taxonomies_payload($post_id);
+
+                if (!empty($taxonomies)) {
+                    $pattern_data['taxonomies'] = $taxonomies;
+                }
+
+                $meta = self::get_pattern_meta_payload($post_id);
+
+                if (!empty($meta)) {
+                    $pattern_data['meta'] = $meta;
+                }
+
+                if (!array_key_exists('viewportWidth', $pattern_data) && isset($meta['viewportWidth'])) {
+                    $viewport_width = $meta['viewportWidth'];
+
+                    if (is_numeric($viewport_width)) {
+                        $pattern_data['viewportWidth'] = (int) $viewport_width;
+                    }
+                }
 
                 $encoded_pattern = wp_json_encode($pattern_data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
@@ -894,6 +926,168 @@ class TEJLG_Export {
 
         $filename = empty($sanitized_ids) ? 'exported-patterns.json' : 'selected-patterns.json';
         return self::stream_json_file($temp_file, $filename);
+    }
+
+    private static function get_pattern_taxonomies_payload($post_id) {
+        $default_taxonomies = ['wp_pattern_category', 'wp_pattern_tag'];
+
+        $taxonomies = apply_filters('tejlg_export_patterns_taxonomies', $default_taxonomies, $post_id);
+
+        if (!is_array($taxonomies) || empty($taxonomies)) {
+            return [];
+        }
+
+        $payload = [];
+
+        foreach ($taxonomies as $taxonomy) {
+            if (!is_string($taxonomy) || '' === $taxonomy) {
+                continue;
+            }
+
+            $taxonomy = trim($taxonomy);
+
+            if ('' === $taxonomy || !taxonomy_exists($taxonomy)) {
+                continue;
+            }
+
+            $terms = wp_get_post_terms($post_id, $taxonomy, ['fields' => 'slugs']);
+
+            if (is_wp_error($terms) || empty($terms)) {
+                continue;
+            }
+
+            $sanitized_terms = array_values(
+                array_filter(
+                    array_unique(
+                        array_map(
+                            static function ($term) {
+                                if (!is_scalar($term)) {
+                                    return '';
+                                }
+
+                                $term = trim((string) $term);
+
+                                if ('' === $term) {
+                                    return '';
+                                }
+
+                                $sanitized = sanitize_title($term);
+
+                                return '' === $sanitized ? '' : $sanitized;
+                            },
+                            (array) $terms
+                        )
+                    ),
+                    static function ($term) {
+                        return '' !== $term;
+                    }
+                )
+            );
+
+            if (!empty($sanitized_terms)) {
+                $payload[$taxonomy] = $sanitized_terms;
+            }
+        }
+
+        return $payload;
+    }
+
+    private static function get_pattern_meta_payload($post_id) {
+        $registered_meta_keys = function_exists('get_registered_meta_keys')
+            ? get_registered_meta_keys('post', 'wp_block')
+            : [];
+
+        $default_meta_keys = [];
+
+        if (is_array($registered_meta_keys)) {
+            foreach ($registered_meta_keys as $meta_key => $meta_args) {
+                if (!is_string($meta_key) || '' === $meta_key) {
+                    continue;
+                }
+
+                $show_in_rest = is_array($meta_args) && isset($meta_args['show_in_rest'])
+                    ? $meta_args['show_in_rest']
+                    : false;
+
+                if ($show_in_rest) {
+                    $default_meta_keys[] = $meta_key;
+                }
+            }
+        }
+
+        $default_meta_keys[] = 'viewportWidth';
+
+        $meta_keys = apply_filters('tejlg_export_patterns_meta_keys', array_unique($default_meta_keys), $post_id);
+
+        if (!is_array($meta_keys) || empty($meta_keys)) {
+            return [];
+        }
+
+        $payload = [];
+
+        foreach ($meta_keys as $meta_key) {
+            if (!is_string($meta_key)) {
+                continue;
+            }
+
+            $meta_key = trim($meta_key);
+
+            if ('' === $meta_key) {
+                continue;
+            }
+
+            $value = get_post_meta($post_id, $meta_key, true);
+
+            if (is_string($value)) {
+                if ('' === $value && '0' !== $value) {
+                    continue;
+                }
+
+                $payload[$meta_key] = $value;
+                continue;
+            }
+
+            if (is_numeric($value) || is_bool($value)) {
+                $payload[$meta_key] = $value;
+                continue;
+            }
+
+            if (is_array($value)) {
+                $normalizer = static function ($item) {
+                    if (is_string($item)) {
+                        return $item;
+                    }
+
+                    if (is_numeric($item) || is_bool($item) || null === $item) {
+                        return $item;
+                    }
+
+                    return is_object($item) ? (array) $item : $item;
+                };
+
+                $normalized = function_exists('map_deep')
+                    ? map_deep($value, $normalizer)
+                    : self::map_deep_compat($value, $normalizer);
+
+                if (!empty($normalized)) {
+                    $payload[$meta_key] = $normalized;
+                }
+            }
+        }
+
+        return $payload;
+    }
+
+    private static function map_deep_compat($value, callable $callback) {
+        if (is_array($value)) {
+            foreach ($value as $key => $sub_value) {
+                $value[$key] = self::map_deep_compat($sub_value, $callback);
+            }
+
+            return $value;
+        }
+
+        return $callback($value);
     }
 
     private static function write_to_handle_or_fail($handle, $temp_file, $data) {
