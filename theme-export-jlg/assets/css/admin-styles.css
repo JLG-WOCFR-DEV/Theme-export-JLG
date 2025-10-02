@@ -230,6 +230,18 @@
     background: #fdfdfd;
 }
 
+@media (max-width: 782px) {
+    .pattern-selection-list {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    #pattern-selection-items {
+        max-height: none;
+        overflow-y: visible;
+    }
+}
+
 .pattern-selection-list li {
     padding: 0.25rem 0;
     list-style: none;
