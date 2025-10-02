@@ -64,6 +64,50 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
             $global_styles = '';
         }
 
+        $preview_stylesheets = [];
+        $candidate_stylesheets = [];
+
+        $primary_stylesheet_uri = get_stylesheet_uri();
+        if (is_string($primary_stylesheet_uri)) {
+            $candidate_stylesheets[] = $primary_stylesheet_uri;
+        }
+
+        foreach ($candidate_stylesheets as $candidate_url) {
+            if (!is_string($candidate_url)) {
+                continue;
+            }
+
+            $candidate_url = trim($candidate_url);
+
+            if ('' === $candidate_url) {
+                continue;
+            }
+
+            $validated_url = wp_http_validate_url($candidate_url);
+
+            if (false === $validated_url) {
+                if (0 === strpos($candidate_url, '//')) {
+                    $https_url = 'https:' . $candidate_url;
+                    $validated_url = wp_http_validate_url($https_url);
+
+                    if (false === $validated_url) {
+                        $http_url = 'http:' . $candidate_url;
+                        $validated_url = wp_http_validate_url($http_url);
+                    }
+                }
+
+                if (false === $validated_url) {
+                    $candidate_path = '/' . ltrim($candidate_url, '/');
+                    $home_based_url = home_url($candidate_path);
+                    $validated_url   = wp_http_validate_url($home_based_url);
+                }
+            }
+
+            if (false !== $validated_url && !in_array($validated_url, $preview_stylesheets, true)) {
+                $preview_stylesheets[] = $validated_url;
+            }
+        }
+
         $invalid_patterns = [];
         $prepared_patterns = [];
         $has_renderable_pattern = false;
@@ -147,7 +191,13 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
         $encoding_failures = [];
 
         foreach ($prepared_patterns as &$pattern_data) {
-            $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $pattern_data['rendered'] . '</body></html>';
+            $stylesheet_links_markup = '';
+
+            foreach ($preview_stylesheets as $stylesheet_url) {
+                $stylesheet_links_markup .= '<link rel="stylesheet" href="' . esc_url($stylesheet_url) . '" />';
+            }
+
+            $iframe_content = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0">' . $stylesheet_links_markup . '<style>' . $global_styles . '</style></head><body class="block-editor-writing-flow">' . $pattern_data['rendered'] . '</body></html>';
             $json_options = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
             if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
@@ -155,6 +205,8 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
             }
 
             $iframe_json = wp_json_encode($iframe_content, $json_options);
+
+            $stylesheets_json = wp_json_encode($preview_stylesheets, $json_options);
 
             if (false === $iframe_json) {
                 $iframe_json = wp_json_encode('', $json_options);
@@ -181,8 +233,13 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
                 $iframe_title_text = __('Aperçu de la composition', 'theme-export-jlg');
             }
 
-            $pattern_data['iframe_json']  = $iframe_json;
-            $pattern_data['iframe_title'] = $iframe_title_text;
+            if (false === $stylesheets_json) {
+                $stylesheets_json = '[]';
+            }
+
+            $pattern_data['iframe_json']             = $iframe_json;
+            $pattern_data['iframe_title']            = $iframe_title_text;
+            $pattern_data['iframe_stylesheets_json'] = $stylesheets_json;
         }
         unset($pattern_data);
 
