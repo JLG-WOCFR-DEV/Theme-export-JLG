@@ -458,6 +458,127 @@ document.addEventListener('DOMContentLoaded', function() {
         const blobSupported = typeof URL !== 'undefined' && URL !== null && typeof URL.createObjectURL === 'function';
         const blobUrls = [];
 
+        const parsePreviewStylesheets = function(element) {
+            if (!element) {
+                return [];
+            }
+
+            const attributeValue = element.getAttribute('data-tejlg-stylesheets');
+
+            if (typeof attributeValue !== 'string' || attributeValue === '') {
+                return [];
+            }
+
+            try {
+                const parsed = JSON.parse(attributeValue);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                return [];
+            }
+        };
+
+        const normalizeStylesheetUrls = function(urls) {
+            if (!Array.isArray(urls) || !urls.length) {
+                return [];
+            }
+
+            const validUrls = [];
+            const seen = [];
+
+            urls.forEach(function(urlCandidate) {
+                if (typeof urlCandidate !== 'string') {
+                    return;
+                }
+
+                const trimmedUrl = urlCandidate.trim();
+
+                if (!trimmedUrl.length) {
+                    return;
+                }
+
+                const anchor = document.createElement('a');
+                anchor.href = trimmedUrl;
+
+                if (anchor.protocol !== 'http:' && anchor.protocol !== 'https:') {
+                    return;
+                }
+
+                const normalized = anchor.href;
+
+                if (seen.indexOf(normalized) !== -1) {
+                    return;
+                }
+
+                seen.push(normalized);
+                validUrls.push(normalized);
+            });
+
+            return validUrls;
+        };
+
+        const injectStylesheetsIntoHtml = function(html, stylesheetUrls) {
+            if (typeof html !== 'string' || !html.length) {
+                return html;
+            }
+
+            if (!Array.isArray(stylesheetUrls) || !stylesheetUrls.length) {
+                return html;
+            }
+
+            let workingHtml = html;
+            let hasDoctype = false;
+
+            const doctypePattern = /^<!doctype html>/i;
+            if (doctypePattern.test(workingHtml)) {
+                hasDoctype = true;
+                workingHtml = workingHtml.replace(doctypePattern, '');
+            }
+
+            let previewDocument;
+
+            try {
+                previewDocument = document.implementation.createHTMLDocument('');
+            } catch (error) {
+                return html;
+            }
+
+            try {
+                previewDocument.documentElement.innerHTML = workingHtml;
+            } catch (error) {
+                return html;
+            }
+
+            const headElement = previewDocument.head || previewDocument.getElementsByTagName('head')[0];
+
+            if (!headElement) {
+                return html;
+            }
+
+            const existingHrefs = Array.prototype.slice.call(headElement.querySelectorAll('link[rel="stylesheet"]')).map(function(linkEl) {
+                return linkEl.href;
+            });
+
+            stylesheetUrls.forEach(function(url) {
+                if (existingHrefs.indexOf(url) !== -1) {
+                    return;
+                }
+
+                const linkEl = previewDocument.createElement('link');
+                linkEl.rel = 'stylesheet';
+                linkEl.href = url;
+                headElement.appendChild(linkEl);
+                existingHrefs.push(linkEl.href);
+            });
+
+            const serializedHtml = previewDocument.documentElement ? previewDocument.documentElement.outerHTML : '';
+
+            if (!serializedHtml.length) {
+                return html;
+            }
+
+            return (hasDoctype ? '<!DOCTYPE html>' : '') + serializedHtml;
+        };
+
         const hidePreviewMessage = function(element) {
             if (!element) {
                 return;
@@ -496,6 +617,20 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof htmlContent !== 'string' || htmlContent === '') {
                 hidePreviewMessage(messageElement);
                 return;
+            }
+
+            const stylesheetData = parsePreviewStylesheets(dataElement);
+            const normalizedStylesheets = normalizeStylesheetUrls(stylesheetData);
+
+            if (normalizedStylesheets.length) {
+                try {
+                    const enrichedHtml = injectStylesheetsIntoHtml(htmlContent, normalizedStylesheets);
+                    if (typeof enrichedHtml === 'string' && enrichedHtml.length) {
+                        htmlContent = enrichedHtml;
+                    }
+                } catch (error) {
+                    // Keep the original HTML content if stylesheet injection fails.
+                }
             }
 
             let previewLoaded = false;

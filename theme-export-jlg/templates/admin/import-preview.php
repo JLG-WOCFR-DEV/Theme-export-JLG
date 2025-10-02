@@ -31,7 +31,11 @@ $import_tab_url = add_query_arg([
                 <div class="pattern-preview-wrapper">
                     <iframe class="pattern-preview-iframe" title="<?php echo esc_attr($pattern_data['iframe_title']); ?>" sandbox="allow-same-origin" loading="lazy"></iframe>
                     <div class="pattern-preview-message notice notice-warning" role="status" aria-live="polite" hidden></div>
-                    <script type="application/json" class="pattern-preview-data"><?php echo $pattern_data['iframe_json']; ?></script>
+                    <script
+                        type="application/json"
+                        class="pattern-preview-data"
+                        data-tejlg-stylesheets="<?php echo esc_attr($pattern_data['iframe_stylesheets_json']); ?>"
+                    ><?php echo $pattern_data['iframe_json']; ?></script>
                 </div>
 
                 <div class="pattern-controls">
