@@ -1,7 +1,10 @@
 <?php
 /** @var string $page_slug */
 /** @var string $child_theme_value */
-/** @var string $exclusion_patterns_value */
+/** @var array  $exclusion_presets */
+/** @var array  $selected_exclusion_presets */
+/** @var string $exclusion_custom_value */
+/** @var array  $exclusion_summary */
 /** @var bool   $portable_mode_enabled */
 
 $export_tab_url = add_query_arg([
@@ -28,18 +31,69 @@ $select_patterns_url = add_query_arg([
             data-export-form
         >
             <?php wp_nonce_field('tejlg_theme_export_action', 'tejlg_theme_export_nonce'); ?>
-            <p>
-                <label for="tejlg_exclusion_patterns"><?php esc_html_e('Motifs d\'exclusion (optionnel) :', 'theme-export-jlg'); ?></label><br>
-                <textarea
-                    name="tejlg_exclusion_patterns"
-                    id="tejlg_exclusion_patterns"
-                    class="large-text code"
-                    rows="4"
-                    placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"
-                    aria-describedby="tejlg_exclusion_patterns_description"
-                ><?php echo esc_textarea($exclusion_patterns_value); ?></textarea>
-                <span id="tejlg_exclusion_patterns_description" class="description"><?php esc_html_e('Indiquez un motif par ligne ou séparez-les par des virgules (joker * accepté).', 'theme-export-jlg'); ?></span>
-            </p>
+            <fieldset class="tejlg-exclusion-fieldset">
+                <legend><?php esc_html_e("Motifs d'exclusion", 'theme-export-jlg'); ?></legend>
+                <p class="description"><?php esc_html_e('Sélectionnez les éléments à exclure de l’archive. Ajoutez des motifs personnalisés si nécessaire.', 'theme-export-jlg'); ?></p>
+                <div class="tejlg-exclusion-presets" role="group" aria-label="<?php echo esc_attr__("Motifs d'exclusion prédéfinis", 'theme-export-jlg'); ?>">
+                    <?php foreach ($exclusion_presets as $preset_key => $preset_config) :
+                        $preset_id = 'tejlg_exclusion_preset_' . sanitize_html_class($preset_key);
+                        $is_checked = in_array($preset_key, $selected_exclusion_presets, true);
+                        ?>
+                        <label for="<?php echo esc_attr($preset_id); ?>" class="tejlg-exclusion-preset">
+                            <input
+                                type="checkbox"
+                                name="tejlg_exclusion_presets[]"
+                                id="<?php echo esc_attr($preset_id); ?>"
+                                value="<?php echo esc_attr($preset_key); ?>"
+                                <?php checked($is_checked); ?>
+                                data-exclusion-preset
+                            >
+                            <span class="tejlg-exclusion-preset-label"><?php echo esc_html($preset_config['label']); ?></span>
+                            <?php if (!empty($preset_config['description'])) : ?>
+                                <span class="description"><?php echo esc_html($preset_config['description']); ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($preset_config['patterns'])) : ?>
+                                <span class="screen-reader-text"><?php esc_html_e('Motifs exclus :', 'theme-export-jlg'); ?></span>
+                                <ul class="tejlg-exclusion-patterns">
+                                    <?php foreach ((array) $preset_config['patterns'] as $pattern) : ?>
+                                        <li><code><?php echo esc_html((string) $pattern); ?></code></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+                <div class="tejlg-exclusion-custom">
+                    <label for="tejlg_exclusion_custom" class="tejlg-exclusion-custom-label"><?php esc_html_e('Motifs personnalisés', 'theme-export-jlg'); ?></label>
+                    <input
+                        type="text"
+                        name="tejlg_exclusion_custom"
+                        id="tejlg_exclusion_custom"
+                        class="regular-text"
+                        value="<?php echo esc_attr($exclusion_custom_value); ?>"
+                        placeholder="<?php echo esc_attr__('Ex. : assets/*.scss, *.map', 'theme-export-jlg'); ?>"
+                        data-exclusion-custom
+                        aria-describedby="tejlg_exclusion_custom_description"
+                    >
+                    <p id="tejlg_exclusion_custom_description" class="description"><?php esc_html_e('Séparez plusieurs motifs par une virgule.', 'theme-export-jlg'); ?></p>
+                </div>
+                <div class="tejlg-exclusion-summary">
+                    <strong><?php esc_html_e('Motifs actuellement exclus :', 'theme-export-jlg'); ?></strong>
+                    <ul
+                        class="tejlg-exclusion-summary-list"
+                        data-exclusion-summary
+                        data-empty-text="<?php echo esc_attr__('Aucun motif d’exclusion sélectionné.', 'theme-export-jlg'); ?>"
+                    >
+                        <?php if (empty($exclusion_summary)) : ?>
+                            <li class="description" data-summary-empty><?php esc_html_e('Aucun motif d’exclusion sélectionné.', 'theme-export-jlg'); ?></li>
+                        <?php else : ?>
+                            <?php foreach ($exclusion_summary as $pattern) : ?>
+                                <li><code><?php echo esc_html($pattern); ?></code></li>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+            </fieldset>
             <p class="tejlg-theme-export-actions">
                 <button type="submit" class="button button-primary" data-export-start><?php esc_html_e("Lancer l'export du thème", 'theme-export-jlg'); ?></button>
                 <span class="spinner" aria-hidden="true" data-export-spinner></span>

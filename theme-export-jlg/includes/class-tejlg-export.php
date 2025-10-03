@@ -603,30 +603,9 @@ class TEJLG_Export {
 
         check_ajax_referer('tejlg_start_theme_export', 'nonce');
 
-        $raw_exclusions = isset($_POST['exclusions']) ? wp_unslash((string) $_POST['exclusions']) : '';
-        $exclusions     = [];
-
-        update_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION, $raw_exclusions);
-
-        if ('' !== $raw_exclusions) {
-            $split = preg_split('/[,\r\n]+/', $raw_exclusions);
-
-            if (false !== $split) {
-                $exclusions = array_values(
-                    array_filter(
-                        array_map(
-                            static function ($pattern) {
-                                return trim((string) $pattern);
-                            },
-                            $split
-                        ),
-                        static function ($pattern) {
-                            return '' !== $pattern;
-                        }
-                    )
-                );
-            }
-        }
+        $selection  = TEJLG_Admin_Export_Page::extract_exclusion_selection_from_request($_POST);
+        TEJLG_Admin_Export_Page::store_exclusion_preferences($selection);
+        $exclusions = TEJLG_Admin_Export_Page::build_exclusion_list($selection);
 
         $result = self::export_theme($exclusions);
 

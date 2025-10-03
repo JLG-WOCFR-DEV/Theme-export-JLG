@@ -24,7 +24,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const exportForm = document.querySelector('[data-export-form]');
 
         if (exportForm && exportAsync.ajaxUrl && exportAsync.actions && exportAsync.nonces) {
-            const textarea = exportForm.querySelector('#tejlg_exclusion_patterns');
+            const presetInputs = exportForm.querySelectorAll('[data-exclusion-preset]');
+            const customInput = exportForm.querySelector('[data-exclusion-custom]');
+            const summaryList = exportForm.querySelector('[data-exclusion-summary]');
             const startButton = exportForm.querySelector('[data-export-start]');
             const feedback = exportForm.querySelector('[data-export-feedback]');
             const statusText = exportForm.querySelector('[data-export-status-text]');
@@ -37,6 +39,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const defaults = (typeof exportAsync.defaults === 'object' && exportAsync.defaults !== null)
                 ? exportAsync.defaults
                 : null;
+            const exclusionLocalization = (typeof localization.exclusions === 'object' && localization.exclusions !== null)
+                ? localization.exclusions
+                : null;
+            const summaryEmptyText = summaryList
+                ? summaryList.getAttribute('data-empty-text') || ((exclusionLocalization && exclusionLocalization.strings)
+                    ? exclusionLocalization.strings.summaryEmpty
+                    : '')
+                : '';
+            const presetCatalog = exclusionLocalization && Array.isArray(exclusionLocalization.presets)
+                ? exclusionLocalization.presets
+                : [];
             const extractResponseMessage = function(payload) {
                 if (!payload || typeof payload !== 'object') {
                     return '';
@@ -55,12 +68,172 @@ document.addEventListener('DOMContentLoaded', function() {
                 return '';
             };
 
+            const ensureDefaultsApplied = function() {
+                if (!defaults) {
+                    return;
+                }
+
+                if (customInput && typeof defaults.custom === 'string' && !customInput.value) {
+                    customInput.value = defaults.custom;
+                }
+
+                if (presetInputs && defaults.presets && Array.isArray(defaults.presets)) {
+                    const presetSet = {};
+                    defaults.presets.forEach(function(key) {
+                        presetSet[key] = true;
+                    });
+
+                    Array.prototype.forEach.call(presetInputs, function(input) {
+                        const value = input && typeof input.value === 'string' ? input.value : '';
+                        if (value && Object.prototype.hasOwnProperty.call(presetSet, value)) {
+                            input.checked = true;
+                        }
+                    });
+                }
+            };
+
+            const getSelectedPresetKeys = function() {
+                if (!presetInputs) {
+                    return [];
+                }
+
+                const keys = [];
+
+                Array.prototype.forEach.call(presetInputs, function(input) {
+                    if (!input || !input.checked) {
+                        return;
+                    }
+
+                    const value = typeof input.value === 'string' ? input.value : '';
+
+                    if (!value || keys.indexOf(value) !== -1) {
+                        return;
+                    }
+
+                    keys.push(value);
+                });
+
+                return keys;
+            };
+
+            const getPatternsForPreset = function(key) {
+                if (!presetCatalog.length) {
+                    return [];
+                }
+
+                for (let index = 0; index < presetCatalog.length; index += 1) {
+                    const preset = presetCatalog[index];
+                    if (!preset || typeof preset.key !== 'string') {
+                        continue;
+                    }
+
+                    if (preset.key === key) {
+                        return Array.isArray(preset.patterns) ? preset.patterns : [];
+                    }
+                }
+
+                return [];
+            };
+
+            const parseCustomPatterns = function(rawValue) {
+                if (typeof rawValue !== 'string' || !rawValue.length) {
+                    return [];
+                }
+
+                const split = rawValue.split(/[,\r\n]+/);
+
+                if (!split || !split.length) {
+                    return [];
+                }
+
+                return split
+                    .map(function(item) {
+                        return item.trim();
+                    })
+                    .filter(function(item) {
+                        return item.length > 0;
+                    });
+            };
+
+            const renderExclusionSummary = function() {
+                if (!summaryList) {
+                    return;
+                }
+
+                const summaryItems = [];
+                const seen = {};
+                const presetKeys = getSelectedPresetKeys();
+
+                presetKeys.forEach(function(key) {
+                    const patterns = getPatternsForPreset(key);
+                    patterns.forEach(function(pattern) {
+                        if (typeof pattern !== 'string' || !pattern.length) {
+                            return;
+                        }
+
+                        if (Object.prototype.hasOwnProperty.call(seen, pattern)) {
+                            return;
+                        }
+
+                        seen[pattern] = true;
+                        summaryItems.push(pattern);
+                    });
+                });
+
+                const customPatterns = parseCustomPatterns(customInput ? customInput.value : '');
+                customPatterns.forEach(function(pattern) {
+                    if (Object.prototype.hasOwnProperty.call(seen, pattern)) {
+                        return;
+                    }
+
+                    seen[pattern] = true;
+                    summaryItems.push(pattern);
+                });
+
+                while (summaryList.firstChild) {
+                    summaryList.removeChild(summaryList.firstChild);
+                }
+
+                if (!summaryItems.length) {
+                    const emptyItem = document.createElement('li');
+                    emptyItem.className = 'description';
+                    emptyItem.textContent = summaryEmptyText || '';
+                    summaryList.appendChild(emptyItem);
+                    return;
+                }
+
+                summaryItems.forEach(function(pattern) {
+                    const item = document.createElement('li');
+                    const code = document.createElement('code');
+                    code.textContent = pattern;
+                    item.appendChild(code);
+                    summaryList.appendChild(item);
+                });
+            };
+
+            ensureDefaultsApplied();
+            renderExclusionSummary();
+
+            if (presetInputs) {
+                Array.prototype.forEach.call(presetInputs, function(input) {
+                    if (!input) {
+                        return;
+                    }
+
+                    input.addEventListener('change', function() {
+                        renderExclusionSummary();
+                    });
+                });
+            }
+
+            if (customInput) {
+                customInput.addEventListener('input', function() {
+                    renderExclusionSummary();
+                });
+            }
+
             let currentJobId = null;
             let pollTimeout = null;
-
-            if (textarea && defaults && typeof defaults.exclusions === 'string' && !textarea.value) {
-                textarea.value = defaults.exclusions;
-            }
 
             const formatString = function(template, replacements) {
                 if (typeof template !== 'string') {
@@ -352,8 +525,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     const formData = new FormData();
                     formData.append('action', exportAsync.actions.start);
                     formData.append('nonce', exportAsync.nonces.start);
-                    if (textarea) {
-                        formData.append('exclusions', textarea.value || '');
+                    const presetKeys = getSelectedPresetKeys();
+
+                    if (presetKeys.length) {
+                        presetKeys.forEach(function(key) {
+                            formData.append('tejlg_exclusion_presets[]', key);
+                        });
+                    }
+
+                    if (customInput) {
+                        formData.append('tejlg_exclusion_custom', customInput.value || '');
                     }
 
                     window.fetch(exportAsync.ajaxUrl, {

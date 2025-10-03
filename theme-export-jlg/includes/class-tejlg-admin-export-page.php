@@ -20,6 +20,202 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
     const PORTABLE_MODE_OPTION      = 'tejlg_export_portable_mode';
     private $page_slug;
 
+    public static function get_exclusion_presets_catalog() {
+        return [
+            'node_modules'      => [
+                'label'       => esc_html__('Dépendances Node.js', 'theme-export-jlg'),
+                'description' => esc_html__("Ignore les dossiers et sous-dossiers node_modules générés par npm ou yarn.", 'theme-export-jlg'),
+                'patterns'    => [
+                    'node_modules',
+                    '*/node_modules',
+                    '**/node_modules/**',
+                ],
+            ],
+            'temporary_files'  => [
+                'label'       => esc_html__('Fichiers temporaires', 'theme-export-jlg'),
+                'description' => esc_html__("Exclut les fichiers temporaires et caches fréquemment créés localement.", 'theme-export-jlg'),
+                'patterns'    => [
+                    '*.log',
+                    '*.tmp',
+                    '.DS_Store',
+                    'Thumbs.db',
+                    '.cache',
+                    '**/.cache/**',
+                ],
+            ],
+            'uncompiled_assets' => [
+                'label'       => esc_html__('Sources non compilées', 'theme-export-jlg'),
+                'description' => esc_html__("Omet les sources front-end brutes (SCSS, TS, JSX…) pour un package plus léger.", 'theme-export-jlg'),
+                'patterns'    => [
+                    'assets/**/*.scss',
+                    'assets/**/*.sass',
+                    'assets/**/*.less',
+                    'assets/**/*.ts',
+                    'assets/**/*.tsx',
+                    'assets/**/*.jsx',
+                ],
+            ],
+        ];
+    }
+
+    public static function normalize_exclusion_option($stored) {
+        if (is_array($stored)) {
+            $presets = [];
+
+            if (isset($stored['presets']) && is_array($stored['presets'])) {
+                $presets = array_values(array_filter(array_map('sanitize_key', $stored['presets'])));
+            }
+
+            $custom = '';
+
+            if (isset($stored['custom']) && is_string($stored['custom'])) {
+                $custom = $stored['custom'];
+            }
+
+            return [
+                'presets' => $presets,
+                'custom'  => $custom,
+            ];
+        }
+
+        if (is_string($stored)) {
+            return [
+                'presets' => [],
+                'custom'  => $stored,
+            ];
+        }
+
+        return [
+            'presets' => [],
+            'custom'  => '',
+        ];
+    }
+
+    public static function extract_exclusion_selection_from_request($source) {
+        $presets = [];
+        $custom  = '';
+
+        if (isset($source['tejlg_exclusion_presets'])) {
+            $presets = $source['tejlg_exclusion_presets'];
+        }
+
+        if (array_key_exists('tejlg_exclusion_custom', $source)) {
+            $custom = $source['tejlg_exclusion_custom'];
+        }
+
+        if ('' === $custom && isset($source['tejlg_exclusion_patterns']) && is_string($source['tejlg_exclusion_patterns'])) {
+            $custom = $source['tejlg_exclusion_patterns'];
+        }
+
+        if (empty($presets) && '' === $custom && isset($source['exclusions']) && is_string($source['exclusions'])) {
+            $custom = $source['exclusions'];
+        }
+
+        return self::sanitize_exclusion_selection($presets, $custom);
+    }
+
+    public static function sanitize_exclusion_selection($raw_presets, $raw_custom) {
+        $catalog = self::get_exclusion_presets_catalog();
+        $presets = [];
+
+        if (is_array($raw_presets)) {
+            foreach ($raw_presets as $preset) {
+                $key = sanitize_key($preset);
+
+                if (!isset($catalog[$key])) {
+                    continue;
+                }
+
+                if (in_array($key, $presets, true)) {
+                    continue;
+                }
+
+                $presets[] = $key;
+            }
+        }
+
+        $custom = '';
+
+        if (is_string($raw_custom)) {
+            $custom = wp_unslash($raw_custom);
+        }
+
+        return [
+            'presets' => $presets,
+            'custom'  => $custom,
+        ];
+    }
+
+    public static function store_exclusion_preferences(array $selection) {
+        $normalized = self::normalize_exclusion_option($selection);
+        update_option(self::EXCLUSION_PATTERNS_OPTION, $normalized);
+    }
+
+    public static function get_saved_exclusion_preferences() {
+        $stored = get_option(self::EXCLUSION_PATTERNS_OPTION, [
+            'presets' => [],
+            'custom'  => '',
+        ]);
+
+        $normalized = self::normalize_exclusion_option($stored);
+
+        $catalog = self::get_exclusion_presets_catalog();
+        $normalized['presets'] = array_values(array_filter(
+            $normalized['presets'],
+            static function ($preset_key) use ($catalog) {
+                return isset($catalog[$preset_key]);
+            }
+        ));
+
+        return $normalized;
+    }
+
+    public static function build_exclusion_list(array $selection) {
+        $catalog   = self::get_exclusion_presets_catalog();
+        $patterns  = [];
+        $processed = [];
+
+        foreach ($selection['presets'] as $preset_key) {
+            if (!isset($catalog[$preset_key]) || !isset($catalog[$preset_key]['patterns'])) {
+                continue;
+            }
+
+            foreach ((array) $catalog[$preset_key]['patterns'] as $pattern) {
+                $pattern = (string) $pattern;
+
+                if ('' === $pattern || isset($processed[$pattern])) {
+                    continue;
+                }
+
+                $patterns[]           = $pattern;
+                $processed[$pattern]   = true;
+            }
+        }
+
+        if (isset($selection['custom']) && is_string($selection['custom'])) {
+            $custom_raw = $selection['custom'];
+
+            if ('' !== $custom_raw) {
+                $split = preg_split('/[,\r\n]+/', $custom_raw);
+
+                if (false !== $split) {
+                    foreach ($split as $pattern) {
+                        $pattern = trim((string) $pattern);
+
+                        if ('' === $pattern || isset($processed[$pattern])) {
+                            continue;
+                        }
+
+                        $patterns[]         = $pattern;
+                        $processed[$pattern] = true;
+                    }
+                }
+            }
+        }
+
+        return $patterns;
+    }
+
     public function __construct($template_dir, $page_slug) {
         parent::__construct($template_dir);
         $this->page_slug = $page_slug;
@@ -73,13 +269,13 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             }
         }
 
-        $exclusion_patterns_value = '';
+        $exclusion_selection = self::get_saved_exclusion_preferences();
 
-        if (isset($_POST['tejlg_exclusion_patterns']) && is_string($_POST['tejlg_exclusion_patterns'])) {
-            $exclusion_patterns_value = wp_unslash($_POST['tejlg_exclusion_patterns']);
-        } else {
-            $exclusion_patterns_value = $this->get_saved_exclusion_patterns();
+        if (isset($_POST['tejlg_exclusion_presets']) || array_key_exists('tejlg_exclusion_custom', $_POST)) {
+            $exclusion_selection = self::extract_exclusion_selection_from_request($_POST);
         }
+
+        $exclusion_summary = self::build_exclusion_list($exclusion_selection);
 
         $portable_mode_enabled = $this->get_portable_mode_preference(false);
 
@@ -90,7 +286,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $this->render_template('export.php', [
             'page_slug'                 => $this->page_slug,
             'child_theme_value'         => $child_theme_value,
-            'exclusion_patterns_value'  => $exclusion_patterns_value,
+            'exclusion_presets'         => self::get_exclusion_presets_catalog(),
+            'selected_exclusion_presets'=> $exclusion_selection['presets'],
+            'exclusion_custom_value'    => $exclusion_selection['custom'],
+            'exclusion_summary'         => $exclusion_summary,
             'portable_mode_enabled'     => $portable_mode_enabled,
         ]);
     }
@@ -202,33 +401,9 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             return null;
         }
 
-        $raw_exclusions = isset($_POST['tejlg_exclusion_patterns'])
-            ? wp_unslash((string) $_POST['tejlg_exclusion_patterns'])
-            : '';
-
-        $this->store_exclusion_patterns($raw_exclusions);
-
-        $exclusions = [];
-
-        if ('' !== $raw_exclusions) {
-            $split = preg_split('/[,\n]+/', $raw_exclusions);
-
-            if (false !== $split) {
-                $exclusions = array_values(
-                    array_filter(
-                        array_map(
-                            static function ($pattern) {
-                                return trim((string) $pattern);
-                            },
-                            $split
-                        ),
-                        static function ($pattern) {
-                            return '' !== $pattern;
-                        }
-                    )
-                );
-            }
-        }
+        $selection  = self::extract_exclusion_selection_from_request($_POST);
+        self::store_exclusion_preferences($selection);
+        $exclusions = self::build_exclusion_list($selection);
 
         add_filter('tejlg_export_run_jobs_immediately', '__return_true');
 
@@ -340,20 +515,6 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         flush();
         exit;
-    }
-
-    private function store_exclusion_patterns($patterns) {
-        if (!is_string($patterns)) {
-            $patterns = '';
-        }
-
-        update_option(self::EXCLUSION_PATTERNS_OPTION, $patterns);
-    }
-
-    private function get_saved_exclusion_patterns() {
-        $stored = get_option(self::EXCLUSION_PATTERNS_OPTION, '');
-
-        return is_string($stored) ? $stored : '';
     }
 
     private function store_portable_mode_preference($is_portable) {

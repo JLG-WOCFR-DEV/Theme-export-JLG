@@ -64,10 +64,17 @@ class TEJLG_Admin {
 
         wp_enqueue_script('tejlg-admin-scripts', TEJLG_URL . 'assets/js/admin-scripts.js', [], TEJLG_VERSION, true);
 
-        $saved_exclusions = get_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION, '');
+        $saved_selection = TEJLG_Admin_Export_Page::get_saved_exclusion_preferences();
+        $exclusion_presets = TEJLG_Admin_Export_Page::get_exclusion_presets_catalog();
 
-        if (!is_string($saved_exclusions)) {
-            $saved_exclusions = '';
+        $presets_for_js = [];
+
+        foreach ($exclusion_presets as $key => $config) {
+            $presets_for_js[] = [
+                'key'      => $key,
+                'label'    => isset($config['label']) ? $config['label'] : $key,
+                'patterns' => isset($config['patterns']) ? array_values((array) $config['patterns']) : [],
+            ];
         }
 
         wp_localize_script(
@@ -121,7 +128,16 @@ class TEJLG_Admin {
                     ],
                     'previousJob' => TEJLG_Export::get_current_user_job_snapshot(),
                     'defaults'    => [
-                        'exclusions' => $saved_exclusions,
+                        'presets'    => $saved_selection['presets'],
+                        'custom'     => $saved_selection['custom'],
+                    ],
+                ],
+                'exclusions' => [
+                    'presets'         => $presets_for_js,
+                    'selectedPresets' => $saved_selection['presets'],
+                    'custom'          => $saved_selection['custom'],
+                    'strings'         => [
+                        'summaryEmpty' => esc_html__('Aucun motif d’exclusion sélectionné.', 'theme-export-jlg'),
                     ],
                 ],
             ]

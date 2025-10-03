@@ -1,5 +1,6 @@
 <?php
 
+require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin-export-page.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
 
 /**
@@ -25,12 +26,14 @@ class Test_Ajax_Theme_Export extends WP_Ajax_UnitTestCase {
         wp_set_current_user($user_id);
 
         $raw_exclusions = "  \"first\"\nsecond,\r\n\"third\"\r\n,, \"fourth\"  ";
+        $selected_presets = ['node_modules', 'temporary_files'];
 
         $original_post = $_POST;
 
         $_POST = [
             'nonce'      => wp_create_nonce('tejlg_start_theme_export'),
-            'exclusions' => $raw_exclusions,
+            'tejlg_exclusion_presets' => $selected_presets,
+            'tejlg_exclusion_custom'  => $raw_exclusions,
         ];
 
         try {
@@ -58,13 +61,28 @@ class Test_Ajax_Theme_Export extends WP_Ajax_UnitTestCase {
         $this->assertIsArray($job, 'The job metadata should be stored.');
         $this->assertArrayHasKey('exclusions', $job, 'The job metadata should include the exclusions array.');
 
-        $expected_patterns = ['"first"', 'second', '"third"', '"fourth"'];
+        $expected_patterns = TEJLG_Admin_Export_Page::build_exclusion_list([
+            'presets' => $selected_presets,
+            'custom'  => wp_unslash($raw_exclusions),
+        ]);
 
-        $this->assertSame($expected_patterns, $job['exclusions'], 'The exclusions should preserve quoted patterns and omit empty values.');
+        $this->assertSame($expected_patterns, $job['exclusions'], 'The exclusions should preserve quoted patterns and append preset patterns.');
 
         foreach ($job['exclusions'] as $pattern) {
             $this->assertNotSame('', $pattern, 'The exclusions list should not contain empty strings.');
         }
+
+        $stored_preferences = get_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION);
+
+        $this->assertIsArray($stored_preferences, 'The exclusion preferences should be stored as an array.');
+        $this->assertSame(
+            [
+                'presets' => $selected_presets,
+                'custom'  => wp_unslash($raw_exclusions),
+            ],
+            TEJLG_Admin_Export_Page::normalize_exclusion_option($stored_preferences),
+            'The saved preferences should match the submitted data.'
+        );
 
         TEJLG_Export::delete_job($job_id);
 
