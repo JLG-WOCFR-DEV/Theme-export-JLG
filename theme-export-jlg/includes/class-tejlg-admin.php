@@ -103,6 +103,10 @@ class TEJLG_Admin {
                     'filtersSummaryIntro' => esc_html__('Filtres actifs :', 'theme-export-jlg'),
                     'filtersSummaryJoin'  => esc_html__(' ; ', 'theme-export-jlg'),
                 ],
+                'patternSelectionCount' => [
+                    'none' => esc_html__('0 sélection', 'theme-export-jlg'),
+                    'some' => esc_html__('%s sélection(s)', 'theme-export-jlg'),
+                ],
                 'exportAsync' => [
                     'ajaxUrl' => admin_url('admin-ajax.php'),
                     'actions' => [
