@@ -53,8 +53,23 @@
 <div id="debug-accordion" class="tejlg-card components-card is-elevated">
     <div class="components-card__body">
         <div class="accordion-section">
-            <h3 class="accordion-section-title"><?php esc_html_e('Informations Système & WordPress', 'theme-export-jlg'); ?></h3>
-            <div class="accordion-section-content">
+            <button
+                type="button"
+                class="accordion-section-title"
+                id="tejlg-debug-system-info-trigger"
+                aria-expanded="false"
+                aria-controls="tejlg-debug-system-info-content"
+            >
+                <?php esc_html_e('Informations Système & WordPress', 'theme-export-jlg'); ?>
+            </button>
+            <div
+                class="accordion-section-content"
+                id="tejlg-debug-system-info-content"
+                role="region"
+                aria-labelledby="tejlg-debug-system-info-trigger"
+                hidden
+                aria-hidden="true"
+            >
                 <div class="tejlg-table-scroll">
                     <table class="widefat striped">
                         <tbody>
@@ -92,8 +107,23 @@
             </div>
         </div>
         <div class="accordion-section">
-            <h3 class="accordion-section-title"><?php esc_html_e('Compositions personnalisées enregistrées', 'theme-export-jlg'); ?></h3>
-            <div class="accordion-section-content">
+            <button
+                type="button"
+                class="accordion-section-title"
+                id="tejlg-debug-custom-patterns-trigger"
+                aria-expanded="false"
+                aria-controls="tejlg-debug-custom-patterns-content"
+            >
+                <?php esc_html_e('Compositions personnalisées enregistrées', 'theme-export-jlg'); ?>
+            </button>
+            <div
+                class="accordion-section-content"
+                id="tejlg-debug-custom-patterns-content"
+                role="region"
+                aria-labelledby="tejlg-debug-custom-patterns-trigger"
+                hidden
+                aria-hidden="true"
+            >
             <?php
             $current_user_id = get_current_user_id();
             $custom_patterns_query = new WP_Query(

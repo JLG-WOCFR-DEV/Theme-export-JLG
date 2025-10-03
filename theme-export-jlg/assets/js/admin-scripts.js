@@ -424,12 +424,60 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gérer l'accordéon sur la page de débogage
     const accordionContainer = document.getElementById('debug-accordion');
     if (accordionContainer) {
-        const accordionTitles = accordionContainer.querySelectorAll('.accordion-section-title');
-        accordionTitles.forEach(function(title) {
-            title.addEventListener('click', function() {
-                const parentSection = this.closest('.accordion-section');
-                if (parentSection) {
-                    parentSection.classList.toggle('open');
+        const accordionButtons = accordionContainer.querySelectorAll('.accordion-section-title');
+
+        const updateSectionState = function(button, content, section, expanded) {
+            const isExpanded = Boolean(expanded);
+            button.setAttribute('aria-expanded', String(isExpanded));
+
+            if (content) {
+                content.hidden = !isExpanded;
+                content.setAttribute('aria-hidden', String(!isExpanded));
+            }
+
+            if (section) {
+                section.classList.toggle('open', isExpanded);
+            }
+        };
+
+        accordionButtons.forEach(function(button) {
+            const section = button.closest('.accordion-section');
+            const controlledId = button.getAttribute('aria-controls');
+            let content = null;
+
+            if (controlledId) {
+                content = document.getElementById(controlledId);
+            } else if (section) {
+                content = section.querySelector('.accordion-section-content');
+            }
+
+            if (content) {
+                const initialExpanded = button.getAttribute('aria-expanded') === 'true';
+                updateSectionState(button, content, section, initialExpanded);
+            }
+
+            const toggleSection = function() {
+                const isExpanded = button.getAttribute('aria-expanded') === 'true';
+                updateSectionState(button, content, section, !isExpanded);
+            };
+
+            let skipNextClick = false;
+
+            button.addEventListener('click', function(event) {
+                event.preventDefault();
+                if (skipNextClick) {
+                    skipNextClick = false;
+                    return;
+                }
+
+                toggleSection();
+            });
+
+            button.addEventListener('keydown', function(event) {
+                if (event.key === ' ' || event.key === 'Spacebar' || event.key === 'Enter') {
+                    event.preventDefault();
+                    skipNextClick = true;
+                    toggleSection();
                 }
             });
         });

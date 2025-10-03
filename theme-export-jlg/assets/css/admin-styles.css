@@ -389,29 +389,46 @@
 
 /* Style pour l'accordéon de débogage */
 #debug-accordion .accordion-section-title {
+    appearance: none;
+    width: 100%;
+    border: 0;
     border-bottom: 1px solid var(--tejlg-border-color);
     padding: 15px;
     cursor: pointer;
     font-size: 1.2em;
+    font-weight: 600;
     background: var(--tejlg-surface-alt-color);
+    color: inherit;
+    text-align: left;
+    font-family: inherit;
     margin: 0;
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
 }
 
-#debug-accordion .accordion-section-title:hover {
+#debug-accordion .accordion-section-title:hover,
+#debug-accordion .accordion-section-title:focus {
     background: var(--tejlg-surface-alt-color);
     background: color-mix(in srgb, var(--tejlg-surface-alt-color) 80%, var(--tejlg-surface-muted-color));
 }
 
+#debug-accordion .accordion-section-title:focus-visible {
+    outline: var(--wp-admin-border-width-focus, 3px) solid var(--tejlg-accent-color);
+    outline-offset: 2px;
+}
+
+#debug-accordion .accordion-section.open .accordion-section-title {
+    border-bottom-color: transparent;
+}
+
 #debug-accordion .accordion-section-content {
     padding: 15px;
-    display: none;
     border: 1px solid var(--tejlg-border-color);
     border-top: 0;
     background: var(--tejlg-surface-color);
 }
 
-#debug-accordion .accordion-section.open .accordion-section-content {
-    display: block;
+#debug-accordion .accordion-section-content[hidden] {
+    display: none;
 }
 #debug-accordion ul {
     list-style: disc;
