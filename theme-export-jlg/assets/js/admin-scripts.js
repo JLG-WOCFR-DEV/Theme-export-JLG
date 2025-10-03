@@ -20,6 +20,85 @@ document.addEventListener('DOMContentLoaded', function() {
         ? localization.exportAsync
         : null;
 
+    const adminNavContainers = document.querySelectorAll('[data-tejlg-admin-nav]');
+
+    if (adminNavContainers.length) {
+        adminNavContainers.forEach(function(container) {
+            const select = container.querySelector('[data-tejlg-nav-select]');
+            const navLinks = container.querySelectorAll('[data-tejlg-nav-link]');
+            const currentLabel = container.querySelector('[data-tejlg-nav-current]');
+
+            if (!select || !navLinks.length) {
+                return;
+            }
+
+            const updateSelectFromActive = function() {
+                const activeLink = container.querySelector('.nav-tab-active[data-tejlg-nav-link]');
+
+                if (activeLink) {
+                    const tabId = activeLink.getAttribute('data-tejlg-tab');
+                    if (tabId) {
+                        select.value = tabId;
+                    }
+                }
+
+                if (currentLabel && select.options.length) {
+                    const selectedOption = select.options[select.selectedIndex];
+                    if (selectedOption) {
+                        currentLabel.textContent = selectedOption.textContent;
+                    }
+                }
+            };
+
+            const updateLabelFromSelect = function() {
+                if (currentLabel && select.options.length) {
+                    const selectedOption = select.options[select.selectedIndex];
+                    if (selectedOption) {
+                        currentLabel.textContent = selectedOption.textContent;
+                    }
+                }
+            };
+
+            updateSelectFromActive();
+
+            select.addEventListener('change', function(event) {
+                const target = event.target;
+                if (!target) {
+                    return;
+                }
+
+                const selectedTab = target.value;
+                updateLabelFromSelect();
+
+                if (!selectedTab) {
+                    return;
+                }
+
+                let matchingLink = null;
+
+                navLinks.forEach(function(link) {
+                    if (!matchingLink && link.getAttribute('data-tejlg-tab') === selectedTab) {
+                        matchingLink = link;
+                    }
+                });
+
+                if (matchingLink && matchingLink.href) {
+                    window.location.href = matchingLink.href;
+                }
+            });
+
+            navLinks.forEach(function(link) {
+                link.addEventListener('click', function() {
+                    const tabId = link.getAttribute('data-tejlg-tab');
+                    if (tabId) {
+                        select.value = tabId;
+                        updateLabelFromSelect();
+                    }
+                });
+            });
+        });
+    }
+
     if (exportAsync) {
         const exportForm = document.querySelector('[data-export-form]');
 

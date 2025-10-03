@@ -140,15 +140,61 @@ class TEJLG_Admin {
 
     public function render_admin_page() {
         $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'export';
+
+        $tabs = [
+            'export' => [
+                'label' => __('Exporter & Outils', 'theme-export-jlg'),
+            ],
+            'import' => [
+                'label' => __('Importer', 'theme-export-jlg'),
+            ],
+            'migration_guide' => [
+                'label' => __('Guide de Migration', 'theme-export-jlg'),
+            ],
+            'debug' => [
+                'label' => __('Débogage', 'theme-export-jlg'),
+            ],
+        ];
+
+        foreach ($tabs as $tab_key => &$tab_data) {
+            $tab_data['url'] = esc_url(add_query_arg([
+                'page' => $this->page_slug,
+                'tab'  => $tab_key,
+            ], admin_url('admin.php')));
+        }
+        unset($tab_data);
+
+        if (!array_key_exists($active_tab, $tabs)) {
+            $active_tab = 'export';
+        }
+
+        $select_id = 'tejlg-admin-tab-select';
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
-            <h2 class="nav-tab-wrapper">
-                <a href="<?php echo esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'export'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab === 'export' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Exporter & Outils', 'theme-export-jlg'); ?></a>
-                <a href="<?php echo esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'import'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab === 'import' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Importer', 'theme-export-jlg'); ?></a>
-                <a href="<?php echo esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'migration_guide'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab === 'migration_guide' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Guide de Migration', 'theme-export-jlg'); ?></a>
-                <a href="<?php echo esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'debug'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab === 'debug' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Débogage', 'theme-export-jlg'); ?></a>
-            </h2>
+            <div class="tejlg-admin-nav" data-tejlg-admin-nav>
+                <label class="screen-reader-text" for="<?php echo esc_attr($select_id); ?>"><?php esc_html_e('Sélectionner un onglet d’administration', 'theme-export-jlg'); ?></label>
+                <div class="tejlg-admin-nav__mobile" aria-hidden="false">
+                    <span class="tejlg-admin-nav__current" data-tejlg-nav-current aria-hidden="true"><?php echo isset($tabs[$active_tab]['label']) ? esc_html($tabs[$active_tab]['label']) : ''; ?></span>
+                    <select id="<?php echo esc_attr($select_id); ?>" class="tejlg-admin-nav__select" data-tejlg-nav-select>
+                        <?php foreach ($tabs as $tab_key => $tab_data) : ?>
+                            <option value="<?php echo esc_attr($tab_key); ?>" <?php selected($active_tab, $tab_key); ?>><?php echo esc_html($tab_data['label']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <h2 class="nav-tab-wrapper" role="tablist">
+                    <?php foreach ($tabs as $tab_key => $tab_data) : ?>
+                        <a
+                            href="<?php echo $tab_data['url']; ?>"
+                            class="nav-tab <?php echo $active_tab === $tab_key ? 'nav-tab-active' : ''; ?>"
+                            data-tejlg-nav-link
+                            data-tejlg-tab="<?php echo esc_attr($tab_key); ?>"
+                        >
+                            <?php echo esc_html($tab_data['label']); ?>
+                        </a>
+                    <?php endforeach; ?>
+                </h2>
+            </div>
             <?php
             switch ($active_tab) {
                 case 'import':

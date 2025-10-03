@@ -1,3 +1,118 @@
+/* Navigation principale du plugin */
+.tejlg-admin-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.tejlg-admin-nav__mobile {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+}
+
+.tejlg-admin-nav__current {
+    display: none;
+    font-weight: 600;
+    color: #1d2327;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background-color: #f6f7f7;
+    border: 1px solid #d0d3d6;
+}
+
+.tejlg-admin-nav__select {
+    display: none;
+    min-width: 220px;
+    padding: 6px 34px 6px 12px;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    background-color: #fff;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+        linear-gradient(135deg, currentColor 50%, transparent 50%),
+        linear-gradient(to right, #dcdcde, #dcdcde);
+    background-position: calc(100% - 16px) calc(50% - 3px),
+        calc(100% - 10px) calc(50% - 3px),
+        calc(100% - 2.5em) 50%;
+    background-size: 6px 6px, 6px 6px, 1px 60%;
+    background-repeat: no-repeat;
+    color: inherit;
+    cursor: pointer;
+    appearance: none;
+}
+
+.tejlg-admin-nav__select:focus-visible {
+    outline: 2px solid var(--wp-admin-theme-color, #007cba);
+    outline-offset: 2px;
+}
+
+.tejlg-admin-nav .nav-tab {
+    position: relative;
+    transition: color 0.2s ease;
+}
+
+.tejlg-admin-nav .nav-tab::after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -1px;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background-color: transparent;
+    transition: background-color 0.2s ease;
+}
+
+.tejlg-admin-nav .nav-tab:hover {
+    color: var(--wp-admin-theme-color, #007cba);
+}
+
+.tejlg-admin-nav .nav-tab.nav-tab-active::after {
+    background-color: var(--wp-admin-theme-color, #007cba);
+}
+
+@media (max-width: 960px) {
+    .tejlg-admin-nav__current {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .tejlg-admin-nav__current::before {
+        content: '';
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: var(--wp-admin-theme-color, #007cba);
+        box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.15);
+    }
+}
+
+@media (max-width: 782px) {
+    .tejlg-admin-nav {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+    }
+
+    .tejlg-admin-nav__mobile {
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .tejlg-admin-nav__select {
+        display: block;
+        width: 100%;
+    }
+
+    .tejlg-admin-nav .nav-tab-wrapper {
+        display: none;
+    }
+}
+
 /* Style des cartes pour les onglets */
 .tejlg-cards-container {
     display: grid;
