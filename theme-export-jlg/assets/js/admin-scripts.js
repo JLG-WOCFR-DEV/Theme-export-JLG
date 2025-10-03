@@ -407,14 +407,6 @@ document.addEventListener('DOMContentLoaded', function() {
         : '';
 
     // Gérer la case "Tout sélectionner" pour l'import
-    const selectAllCheckbox = document.getElementById('select-all-patterns');
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function(e) {
-            document.querySelectorAll('input[name="selected_patterns[]"]').forEach(function(checkbox) {
-                checkbox.checked = e.target.checked;
-            });
-        });
-    }
 
     // Gérer l'accordéon sur la page de débogage
     const accordionContainer = document.getElementById('debug-accordion');
