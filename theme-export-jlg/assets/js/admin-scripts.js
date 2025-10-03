@@ -629,6 +629,305 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     const previewWrappers = document.querySelectorAll('.pattern-preview-wrapper');
+    const previewControllers = new WeakMap();
+
+    const previewWidthControl = document.querySelector('[data-preview-width-control]');
+    if (previewWidthControl && previewWrappers.length) {
+        const previewWidthStrings = (typeof localization.previewWidth === 'object' && localization.previewWidth !== null)
+            ? localization.previewWidth
+            : {};
+
+        const STORAGE_CHOICE_KEY = 'tejlgPreviewWidthChoice';
+        const STORAGE_CUSTOM_KEY = 'tejlgPreviewWidthCustom';
+        const CUSTOM_MIN_WIDTH = 320;
+        const CUSTOM_MAX_WIDTH = 1600;
+        const DEFAULT_EDITOR_WIDTH = 960;
+        const DEFAULT_CUSTOM_WIDTH = 1024;
+
+        const PRESET_WIDTHS = {
+            editor: DEFAULT_EDITOR_WIDTH,
+            full: null,
+        };
+
+        const widthButtons = previewWidthControl.querySelectorAll('[data-preview-width-option]');
+        const customContainer = previewWidthControl.querySelector('[data-preview-width-custom]');
+        const customRange = previewWidthControl.querySelector('[data-preview-width-range]');
+        const customNumber = previewWidthControl.querySelector('[data-preview-width-number]');
+        const valueDisplay = previewWidthControl.querySelector('[data-preview-width-value]');
+        const customButton = previewWidthControl.querySelector('[data-preview-width-option="custom"]');
+
+        const clampToCustomRange = function(value) {
+            if (typeof value !== 'number' || Number.isNaN(value)) {
+                return DEFAULT_CUSTOM_WIDTH;
+            }
+
+            if (value < CUSTOM_MIN_WIDTH) {
+                return CUSTOM_MIN_WIDTH;
+            }
+
+            if (value > CUSTOM_MAX_WIDTH) {
+                return CUSTOM_MAX_WIDTH;
+            }
+
+            return value;
+        };
+
+        const normalizeWidthValue = function(value, fallback) {
+            if (typeof value === 'number' && !Number.isNaN(value)) {
+                return clampToCustomRange(value);
+            }
+
+            const parsed = parseInt(value, 10);
+
+            if (Number.isNaN(parsed)) {
+                const fallbackValue = typeof fallback === 'number' ? fallback : DEFAULT_CUSTOM_WIDTH;
+                return clampToCustomRange(fallbackValue);
+            }
+
+            return clampToCustomRange(parsed);
+        };
+
+        const parseChoice = function(choice) {
+            if (choice === 'full' || choice === 'custom' || choice === 'editor') {
+                return choice;
+            }
+
+            return 'editor';
+        };
+
+        const storage = {
+            get: function(key) {
+                try {
+                    return window.localStorage.getItem(key);
+                } catch (error) {
+                    return null;
+                }
+            },
+            set: function(key, value) {
+                try {
+                    window.localStorage.setItem(key, value);
+                } catch (error) {
+                    // Ignore storage write errors (e.g. private browsing).
+                }
+            },
+        };
+
+        let valueTemplate = '';
+        if (typeof previewWidthStrings.valueTemplate === 'string' && previewWidthStrings.valueTemplate.length) {
+            valueTemplate = previewWidthStrings.valueTemplate;
+        } else if (valueDisplay && typeof valueDisplay.dataset.valueTemplate === 'string' && valueDisplay.dataset.valueTemplate.length) {
+            valueTemplate = valueDisplay.dataset.valueTemplate;
+        } else {
+            valueTemplate = 'Largeur : %s px';
+        }
+
+        const valueUnit = (typeof previewWidthStrings.unit === 'string' && previewWidthStrings.unit.length)
+            ? previewWidthStrings.unit
+            : 'px';
+
+        if (valueDisplay) {
+            valueDisplay.dataset.valueTemplate = valueTemplate;
+        }
+
+        const formatWidthLabel = function(width) {
+            if (typeof valueTemplate === 'string' && valueTemplate.indexOf('%s') !== -1) {
+                return valueTemplate.replace('%s', width);
+            }
+
+            return width + ' ' + valueUnit;
+        };
+
+        const customInputLabel = (typeof previewWidthStrings.customInputLabel === 'string' && previewWidthStrings.customInputLabel.length)
+            ? previewWidthStrings.customInputLabel
+            : '';
+
+        if (customRange && customInputLabel) {
+            customRange.setAttribute('aria-label', customInputLabel);
+        }
+
+        if (customNumber && customInputLabel) {
+            customNumber.setAttribute('aria-label', customInputLabel);
+        }
+
+        const updateCustomInputs = function(width) {
+            const sanitized = clampToCustomRange(width);
+            const widthString = String(sanitized);
+
+            if (customRange && customRange.value !== widthString) {
+                customRange.value = widthString;
+            }
+
+            if (customNumber && customNumber.value !== widthString) {
+                customNumber.value = widthString;
+            }
+
+            if (valueDisplay) {
+                valueDisplay.textContent = formatWidthLabel(sanitized);
+            }
+
+            return sanitized;
+        };
+
+        const updateActiveButton = function(choice) {
+            Array.prototype.forEach.call(widthButtons, function(button) {
+                const option = button.getAttribute('data-preview-width-option');
+                const isActive = option === choice;
+
+                if (isActive) {
+                    button.classList.add('is-active');
+                } else {
+                    button.classList.remove('is-active');
+                }
+
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+
+                if (option === 'custom') {
+                    button.setAttribute('aria-expanded', isActive ? 'true' : 'false');
+                }
+            });
+        };
+
+        const toggleCustomVisibility = function(choice) {
+            if (!customContainer) {
+                return;
+            }
+
+            const isCustom = choice === 'custom';
+            customContainer.hidden = !isCustom;
+            previewWidthControl.classList.toggle('is-custom-width-active', isCustom);
+
+            if (customButton) {
+                customButton.setAttribute('aria-expanded', isCustom ? 'true' : 'false');
+            }
+        };
+
+        const forEachWrapper = function(callback) {
+            Array.prototype.forEach.call(previewWrappers, function(wrapper, index) {
+                if (typeof callback === 'function') {
+                    callback(wrapper, index);
+                }
+            });
+        };
+
+        const applyWidthChoice = function(choice, options) {
+            const shouldSaveChoice = !options || options.saveChoice !== false;
+            const resolvedChoice = parseChoice(choice);
+            let cssValue = '';
+
+            if (resolvedChoice === 'full') {
+                cssValue = 'none';
+            } else if (resolvedChoice === 'custom') {
+                cssValue = clampToCustomRange(currentCustomWidth) + 'px';
+            } else {
+                const presetValue = PRESET_WIDTHS[resolvedChoice];
+                if (typeof presetValue === 'number') {
+                    cssValue = presetValue + 'px';
+                }
+            }
+
+            previewWidthControl.setAttribute('data-preview-width-active', resolvedChoice);
+
+            forEachWrapper(function(wrapper) {
+                if (!wrapper) {
+                    return;
+                }
+
+                wrapper.setAttribute('data-preview-width', resolvedChoice);
+
+                if (cssValue === 'none') {
+                    wrapper.style.setProperty('--tejlg-preview-max-width', 'none');
+                } else if (cssValue) {
+                    wrapper.style.setProperty('--tejlg-preview-max-width', cssValue);
+                } else {
+                    wrapper.style.removeProperty('--tejlg-preview-max-width');
+                }
+            });
+
+            forEachWrapper(function(wrapper) {
+                const controller = previewControllers.get(wrapper);
+                if (controller && typeof controller.syncHeight === 'function') {
+                    controller.syncHeight();
+                }
+            });
+
+            if (shouldSaveChoice) {
+                storage.set(STORAGE_CHOICE_KEY, resolvedChoice);
+            }
+        };
+
+        const commitCustomWidth = function(value, options) {
+            const sanitized = normalizeWidthValue(value, currentCustomWidth);
+            currentCustomWidth = sanitized;
+            updateCustomInputs(sanitized);
+
+            if (!options || options.save !== false) {
+                storage.set(STORAGE_CUSTOM_KEY, String(sanitized));
+            }
+
+            if (currentChoice === 'custom') {
+                applyWidthChoice('custom', { saveChoice: false });
+            }
+        };
+
+        let currentChoice = parseChoice(storage.get(STORAGE_CHOICE_KEY));
+        let currentCustomWidth = normalizeWidthValue(storage.get(STORAGE_CUSTOM_KEY), DEFAULT_CUSTOM_WIDTH);
+
+        currentCustomWidth = updateCustomInputs(currentCustomWidth);
+        updateActiveButton(currentChoice);
+        toggleCustomVisibility(currentChoice);
+        applyWidthChoice(currentChoice, { saveChoice: false });
+
+        Array.prototype.forEach.call(widthButtons, function(button) {
+            button.addEventListener('click', function() {
+                const option = parseChoice(button.getAttribute('data-preview-width-option'));
+                currentChoice = option;
+                updateActiveButton(option);
+                toggleCustomVisibility(option);
+                applyWidthChoice(option);
+            });
+        });
+
+        if (customRange) {
+            customRange.addEventListener('input', function() {
+                commitCustomWidth(customRange.value);
+            });
+        }
+
+        if (customNumber) {
+            customNumber.addEventListener('input', function() {
+                if (customNumber.value === '') {
+                    return;
+                }
+
+                commitCustomWidth(customNumber.value);
+            });
+
+            customNumber.addEventListener('blur', function() {
+                if (customNumber.value === '') {
+                    updateCustomInputs(currentCustomWidth);
+                    return;
+                }
+
+                commitCustomWidth(customNumber.value);
+            });
+
+            customNumber.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    if (customNumber.value === '') {
+                        updateCustomInputs(currentCustomWidth);
+                        return;
+                    }
+
+                    commitCustomWidth(customNumber.value);
+                }
+            });
+        }
+
+        previewWidthControl.addEventListener('tejlg:refresh-preview-width', function() {
+            applyWidthChoice(currentChoice, { saveChoice: false });
+        });
+    }
+
     if (previewWrappers.length) {
         const blobSupported = typeof URL !== 'undefined' && URL !== null && typeof URL.createObjectURL === 'function';
         const activeBlobUrls = new Set();
@@ -1433,6 +1732,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 requestLoad: requestLoad,
                 collapse: collapsePreview,
                 onIntersection: onIntersection,
+                syncHeight: function() {
+                    if (state.previewInitialized) {
+                        scheduleHeightSync();
+                    }
+                },
                 destroy: function() {
                     if (patternItem) {
                         patternItem.removeEventListener('tejlg:request-preview', onPreviewRequest);
@@ -1456,6 +1760,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 intersectionObserver.observe(wrapper);
             }
         });
+
+        if (previewWidthControl) {
+            try {
+                previewWidthControl.dispatchEvent(new CustomEvent('tejlg:refresh-preview-width'));
+            } catch (error) {
+                const event = document.createEvent('CustomEvent');
+                event.initCustomEvent('tejlg:refresh-preview-width', false, false, {});
+                previewWidthControl.dispatchEvent(event);
+            }
+        }
     }
     // Gérer la sélection, la recherche et les filtres pour l'export et l'import de compositions
     const patternSelectionStatusStrings = (typeof localization.patternSelectionStatus === 'object' && localization.patternSelectionStatus !== null)
