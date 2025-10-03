@@ -10,8 +10,12 @@ $import_tab_url    = add_query_arg([
     'page' => $page_slug,
     'tab'  => 'import',
 ], admin_url('admin.php'));
-$has_global_styles      = '' !== trim($global_styles);
-$global_css_section_id = 'tejlg-global-css';
+$has_global_styles       = '' !== trim($global_styles);
+$global_css_section_id   = 'tejlg-global-css';
+$show_preview_label      = esc_html__('Prévisualiser', 'theme-export-jlg');
+$hide_preview_label      = esc_html__('Masquer la prévisualisation', 'theme-export-jlg');
+$loading_preview_label   = esc_html__('Chargement de la prévisualisation…', 'theme-export-jlg');
+$empty_excerpt_fallback  = esc_html__('Aucun aperçu disponible.', 'theme-export-jlg');
 ?>
 <h2><?php esc_html_e('Étape 2 : Choisir les compositions à importer', 'theme-export-jlg'); ?></h2>
 <p><?php esc_html_e('Cochez les compositions à importer. Vous pouvez prévisualiser le rendu et inspecter le code du bloc (le code CSS du thème est masqué par défaut).', 'theme-export-jlg'); ?></p>
@@ -23,22 +27,98 @@ $global_css_section_id = 'tejlg-global-css';
             <label><input type="checkbox" id="select-all-patterns" checked> <strong><?php esc_html_e('Tout sélectionner', 'theme-export-jlg'); ?></strong></label>
         </div>
         <?php foreach ($patterns as $pattern_data): ?>
-            <div class="pattern-item">
+            <?php
+            $preview_area_id      = 'pattern-preview-area-' . (int) $pattern_data['index'];
+            $preview_excerpt      = isset($pattern_data['preview_excerpt']) ? (string) $pattern_data['preview_excerpt'] : '';
+            $preview_word_count   = isset($pattern_data['preview_word_count']) ? (int) $pattern_data['preview_word_count'] : 0;
+            $preview_block_count  = isset($pattern_data['preview_block_count']) ? (int) $pattern_data['preview_block_count'] : 0;
+            $pattern_title        = isset($pattern_data['title']) ? (string) $pattern_data['title'] : '';
+            $preview_excerpt_attr = '' !== $preview_excerpt ? $preview_excerpt : $empty_excerpt_fallback;
+            ?>
+            <div
+                class="pattern-item"
+                data-tejlg-preview-item="true"
+                data-label="<?php echo esc_attr($pattern_title); ?>"
+                data-excerpt="<?php echo esc_attr($preview_excerpt_attr); ?>"
+            >
                 <div class="pattern-selector">
                     <label>
                         <input type="checkbox" name="selected_patterns[]" value="<?php echo esc_attr($pattern_data['index']); ?>" checked>
-                        <strong><?php echo esc_html($pattern_data['title']); ?></strong>
+                        <strong><?php echo esc_html($pattern_title); ?></strong>
                     </label>
                 </div>
-                <div class="pattern-preview-wrapper">
-                    <iframe class="pattern-preview-iframe" title="<?php echo esc_attr($pattern_data['iframe_title']); ?>" sandbox="allow-same-origin" loading="lazy"></iframe>
-                    <div class="pattern-preview-message notice notice-warning" role="status" aria-live="polite" hidden></div>
-                    <script
-                        type="application/json"
-                        class="pattern-preview-data"
-                        data-tejlg-stylesheets="<?php echo esc_attr($pattern_data['iframe_stylesheets_json']); ?>"
-                        data-tejlg-stylesheet-links-html="<?php echo esc_attr(isset($pattern_data['iframe_stylesheet_links_json']) ? $pattern_data['iframe_stylesheet_links_json'] : '""'); ?>"
-                    ><?php echo $pattern_data['iframe_json']; ?></script>
+
+                <div class="pattern-compact" data-tejlg-preview-compact>
+                    <div class="pattern-compact-thumbnail" aria-hidden="true"></div>
+                    <div class="pattern-compact-details">
+                        <p class="pattern-compact-title"><?php echo esc_html($pattern_title); ?></p>
+                        <p class="pattern-compact-excerpt">
+                            <?php echo esc_html('' !== $preview_excerpt ? $preview_excerpt : $empty_excerpt_fallback); ?>
+                        </p>
+                        <ul class="pattern-compact-meta">
+                            <li>
+                                <?php
+                                $block_plural_choice = (1 === $preview_block_count) ? 1 : 2;
+                                printf(
+                                    /* translators: %s: number of blocks. */
+                                    _n('%s bloc', '%s blocs', $block_plural_choice, 'theme-export-jlg'),
+                                    number_format_i18n($preview_block_count)
+                                );
+                                ?>
+                            </li>
+                            <li>
+                                <?php
+                                $word_plural_choice = (1 === $preview_word_count) ? 1 : 2;
+                                printf(
+                                    /* translators: %s: number of words. */
+                                    _n('%s mot', '%s mots', $word_plural_choice, 'theme-export-jlg'),
+                                    number_format_i18n($preview_word_count)
+                                );
+                                ?>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="pattern-compact-actions">
+                        <button
+                            type="button"
+                            class="button button-secondary pattern-preview-toggle"
+                            data-tejlg-preview-trigger="true"
+                            data-preview-label-show="<?php echo esc_attr($show_preview_label); ?>"
+                            data-preview-label-hide="<?php echo esc_attr($hide_preview_label); ?>"
+                            aria-controls="<?php echo esc_attr($preview_area_id); ?>"
+                            aria-expanded="false"
+                        >
+                            <?php echo esc_html($show_preview_label); ?>
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    class="pattern-preview-area"
+                    id="<?php echo esc_attr($preview_area_id); ?>"
+                    data-tejlg-preview-area="true"
+                    hidden
+                    aria-hidden="true"
+                >
+                    <div
+                        class="pattern-preview-loading"
+                        data-tejlg-preview-loading="true"
+                        role="status"
+                        aria-live="polite"
+                        hidden
+                    >
+                        <?php echo esc_html($loading_preview_label); ?>
+                    </div>
+                    <div class="pattern-preview-wrapper">
+                        <iframe class="pattern-preview-iframe" title="<?php echo esc_attr($pattern_data['iframe_title']); ?>" sandbox="allow-same-origin" loading="lazy"></iframe>
+                        <div class="pattern-preview-message notice notice-warning" role="status" aria-live="polite" hidden></div>
+                        <script
+                            type="application/json"
+                            class="pattern-preview-data"
+                            data-tejlg-stylesheets="<?php echo esc_attr($pattern_data['iframe_stylesheets_json']); ?>"
+                            data-tejlg-stylesheet-links-html="<?php echo esc_attr(isset($pattern_data['iframe_stylesheet_links_json']) ? $pattern_data['iframe_stylesheet_links_json'] : '""'); ?>"
+                        ><?php echo $pattern_data['iframe_json']; ?></script>
+                    </div>
                 </div>
 
                 <div class="pattern-controls">

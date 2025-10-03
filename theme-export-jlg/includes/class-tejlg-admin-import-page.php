@@ -191,6 +191,26 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
         $encoding_failures = [];
 
         foreach ($prepared_patterns as &$pattern_data) {
+            $plain_text = '';
+
+            if (isset($pattern_data['rendered'])) {
+                $plain_text = wp_strip_all_tags($pattern_data['rendered']);
+                $plain_text = is_string($plain_text) ? trim($plain_text) : '';
+            }
+
+            $word_count = 0;
+            if ('' !== $plain_text) {
+                $words = preg_split('/[\s]+/u', $plain_text, -1, PREG_SPLIT_NO_EMPTY);
+                if (is_array($words)) {
+                    $word_count = count($words);
+                }
+            }
+
+            $block_count = 0;
+            if (isset($pattern_data['content']) && is_string($pattern_data['content'])) {
+                $block_count = substr_count($pattern_data['content'], '<!-- wp:');
+            }
+
             $stylesheet_links_markup = '';
 
             foreach ($preview_stylesheets as $stylesheet_url) {
@@ -246,6 +266,9 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
             $pattern_data['iframe_title']            = $iframe_title_text;
             $pattern_data['iframe_stylesheets_json'] = $stylesheets_json;
             $pattern_data['iframe_stylesheet_links_json'] = $stylesheet_links_json;
+            $pattern_data['preview_excerpt']         = wp_trim_words($plain_text, 24, '…');
+            $pattern_data['preview_word_count']      = $word_count;
+            $pattern_data['preview_block_count']     = $block_count;
         }
         unset($pattern_data);
 
