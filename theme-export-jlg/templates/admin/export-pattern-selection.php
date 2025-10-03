@@ -29,12 +29,18 @@ $back_url = add_query_arg([
                 <input type="search" id="pattern-search" placeholder="<?php echo esc_attr__('Rechercher…', 'theme-export-jlg'); ?>" aria-controls="pattern-selection-items">
             </p>
             <p id="pattern-selection-status" aria-live="polite" class="screen-reader-text"></p>
-            <p
-                id="pattern-selection-count"
-                class="pattern-selection-count"
+            <div
+                class="pattern-selection-feedback"
+                role="status"
                 aria-live="polite"
                 aria-atomic="true"
-            ></p>
+            >
+                <p
+                    id="pattern-selection-count"
+                    class="pattern-selection-count"
+                    data-pattern-selection-count
+                ></p>
+            </div>
             <ul class="pattern-selection-items" id="pattern-selection-items" aria-live="polite" data-searchable="true">
                 <?php
                 $pattern_counter = $per_page > 0 ? (($current_page - 1) * $per_page) : 0;

@@ -179,9 +179,15 @@
     color: #3c434a;
 }
 
-.pattern-selection-count {
+.pattern-selection-feedback {
     margin: 0 0 1rem;
     display: flex;
+    align-items: center;
+}
+
+.pattern-selection-count {
+    margin: 0;
+    display: inline-flex;
     align-items: center;
     gap: 0.5rem;
     color: var(--tejlg-text-subtle-color);
