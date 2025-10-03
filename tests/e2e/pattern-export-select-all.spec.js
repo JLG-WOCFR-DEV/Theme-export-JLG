@@ -107,6 +107,105 @@ test.describe('Pattern export selection screen', () => {
     await expect(statusLiveRegion).toHaveAttribute('aria-busy', 'false');
   });
 
+  test('import preview select-all only affects visible patterns', async ({ admin, page, requestUtils }) => {
+    await requestUtils.activatePlugin('theme-export-jlg/theme-export-jlg.php');
+
+    await admin.visitAdminPage('admin.php', 'page=theme-export-jlg&tab=import');
+
+    const importPatterns = [
+      {
+        title: 'Alpha Import',
+        content: '<!-- wp:paragraph --><p>Alpha Import</p><!-- /wp:paragraph -->',
+      },
+      {
+        title: 'Beta Import',
+        content: '<!-- wp:paragraph --><p>Beta Import</p><!-- /wp:paragraph -->',
+      },
+      {
+        title: 'Gamma Import',
+        content: '<!-- wp:paragraph --><p>Gamma Import</p><!-- /wp:paragraph -->',
+      },
+    ];
+
+    const patternsInput = page.locator('#patterns_json');
+
+    await patternsInput.setInputFiles({
+      name: 'patterns.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(importPatterns)),
+    });
+
+    await Promise.all([
+      page.waitForNavigation(),
+      page.click('button[name="tejlg_import_patterns_step1"]'),
+    ]);
+
+    const selectAll = page.locator('#select-all-patterns');
+    const searchInput = page.locator('#tejlg-import-pattern-search');
+    const visibleItems = page.locator('#patterns-preview-items .pattern-item:not(.is-hidden)');
+    const hiddenItems = page.locator('#patterns-preview-items .pattern-item.is-hidden');
+    const statusLiveRegion = page.locator('#pattern-import-status');
+    const alphaCheckbox = page
+      .locator('#patterns-preview-items .pattern-item', { hasText: 'Alpha Import' })
+      .locator('input[type="checkbox"]');
+    const betaCheckbox = page
+      .locator('#patterns-preview-items .pattern-item', { hasText: 'Beta Import' })
+      .locator('input[type="checkbox"]');
+    const gammaCheckbox = page
+      .locator('#patterns-preview-items .pattern-item', { hasText: 'Gamma Import' })
+      .locator('input[type="checkbox"]');
+
+    await expect(visibleItems).toHaveCount(importPatterns.length);
+    await expect(selectAll).toBeChecked();
+    await expect(selectAll).toHaveJSProperty('indeterminate', false);
+    await expect(statusLiveRegion).toHaveText('3 compositions visibles.');
+    await expect(statusLiveRegion).toHaveAttribute('aria-busy', 'false');
+
+    await alphaCheckbox.uncheck();
+
+    await expect(alphaCheckbox).not.toBeChecked();
+    await expect(selectAll).not.toBeChecked();
+    await expect(selectAll).toHaveJSProperty('indeterminate', true);
+
+    await searchInput.fill('beta');
+
+    await expect(visibleItems).toHaveCount(1);
+    await expect(hiddenItems).toHaveCount(importPatterns.length - 1);
+    await expect(visibleItems.first()).toContainText('Beta Import');
+    await expect(selectAll).toBeChecked();
+    await expect(selectAll).toHaveJSProperty('indeterminate', false);
+    await expect(statusLiveRegion).toHaveText('1 composition visible.');
+    await expect(statusLiveRegion).toHaveAttribute('aria-busy', 'false');
+
+    await selectAll.uncheck();
+
+    await expect(betaCheckbox).not.toBeChecked();
+    await expect(alphaCheckbox).not.toBeChecked();
+    await expect(gammaCheckbox).toBeChecked();
+    await expect(selectAll).not.toBeChecked();
+    await expect(selectAll).toHaveJSProperty('indeterminate', false);
+
+    await selectAll.check();
+
+    await expect(betaCheckbox).toBeChecked();
+    await expect(alphaCheckbox).not.toBeChecked();
+    await expect(gammaCheckbox).toBeChecked();
+    await expect(selectAll).toBeChecked();
+    await expect(selectAll).toHaveJSProperty('indeterminate', false);
+
+    await searchInput.fill('');
+
+    await expect(visibleItems).toHaveCount(importPatterns.length);
+    await expect(hiddenItems).toHaveCount(0);
+    await expect(alphaCheckbox).not.toBeChecked();
+    await expect(betaCheckbox).toBeChecked();
+    await expect(gammaCheckbox).toBeChecked();
+    await expect(selectAll).not.toBeChecked();
+    await expect(selectAll).toHaveJSProperty('indeterminate', true);
+    await expect(statusLiveRegion).toHaveText('3 compositions visibles.');
+    await expect(statusLiveRegion).toHaveAttribute('aria-busy', 'false');
+  });
+
   test('displays fallback title for untitled patterns and allows searching with it', async ({ admin, page, requestUtils }) => {
     await requestUtils.activatePlugin('theme-export-jlg/theme-export-jlg.php');
 
