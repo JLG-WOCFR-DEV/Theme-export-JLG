@@ -29,6 +29,12 @@ $back_url = add_query_arg([
                 <input type="search" id="pattern-search" placeholder="<?php echo esc_attr__('Rechercher…', 'theme-export-jlg'); ?>" aria-controls="pattern-selection-items">
             </p>
             <p id="pattern-selection-status" aria-live="polite" class="screen-reader-text"></p>
+            <p
+                id="pattern-selection-count"
+                class="pattern-selection-count"
+                aria-live="polite"
+                aria-atomic="true"
+            ></p>
             <ul class="pattern-selection-items" id="pattern-selection-items" aria-live="polite" data-searchable="true">
                 <?php
                 $pattern_counter = $per_page > 0 ? (($current_page - 1) * $per_page) : 0;
@@ -150,6 +156,6 @@ $back_url = add_query_arg([
         </div>
         <p><label><input type="checkbox" name="export_portable" value="1" <?php checked($portable_mode_enabled); ?>> <strong><?php esc_html_e('Générer un export "portable"', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(Recommandé pour migrer vers un autre site)', 'theme-export-jlg'); ?></label></p>
 
-        <p><button type="submit" name="tejlg_export_selected_patterns" class="button button-primary button-hero"><?php esc_html_e('Exporter la sélection', 'theme-export-jlg'); ?></button></p>
+        <p><button type="submit" name="tejlg_export_selected_patterns" class="button button-primary button-hero" data-pattern-submit="true"><?php esc_html_e('Exporter la sélection', 'theme-export-jlg'); ?></button></p>
     </form>
 <?php endif; ?>

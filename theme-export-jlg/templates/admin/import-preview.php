@@ -110,6 +110,12 @@ $controls_help_id = 'tejlg-import-controls-help';
             </div>
         </div>
         <p id="pattern-import-status" class="pattern-import-status" aria-live="polite" aria-atomic="true"></p>
+        <p
+            id="pattern-import-selection-count"
+            class="pattern-selection-count"
+            aria-live="polite"
+            aria-atomic="true"
+        ></p>
         <div class="pattern-import-items" id="patterns-preview-items" data-searchable="true">
             <?php foreach ($patterns as $pattern_data): ?>
                 <?php
@@ -284,5 +290,5 @@ $controls_help_id = 'tejlg-import-controls-help';
             </details>
         </div>
     <?php endif; ?>
-    <p><button type="submit" name="tejlg_import_patterns_step2" class="button button-primary button-hero"><?php esc_html_e('Importer la sélection', 'theme-export-jlg'); ?></button></p>
+    <p><button type="submit" name="tejlg_import_patterns_step2" class="button button-primary button-hero" data-pattern-submit="true"><?php esc_html_e('Importer la sélection', 'theme-export-jlg'); ?></button></p>
 </form>

@@ -1413,6 +1413,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const patternSelectionStatusStrings = (typeof localization.patternSelectionStatus === 'object' && localization.patternSelectionStatus !== null)
         ? localization.patternSelectionStatus
         : {};
+    const patternSelectionCountStrings = (typeof localization.patternSelectionCount === 'object' && localization.patternSelectionCount !== null)
+        ? localization.patternSelectionCount
+        : {};
     const patternSelectionNumberFormatter = (function() {
         const locale = typeof patternSelectionStatusStrings.numberLocale === 'string' && patternSelectionStatusStrings.numberLocale
             ? patternSelectionStatusStrings.numberLocale
@@ -1435,6 +1438,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         return String(count);
+    }
+
+    function buildPatternSelectionCountMessage(count) {
+        const formattedCount = formatPatternSelectionCount(count);
+
+        if (count === 0) {
+            if (typeof patternSelectionCountStrings.none === 'string' && patternSelectionCountStrings.none !== '') {
+                if (patternSelectionCountStrings.none.indexOf('%s') !== -1) {
+                    return patternSelectionCountStrings.none.replace('%s', formattedCount);
+                }
+
+                return patternSelectionCountStrings.none;
+            }
+
+            if (typeof patternSelectionCountStrings.some === 'string' && patternSelectionCountStrings.some.indexOf('%s') !== -1) {
+                return patternSelectionCountStrings.some.replace('%s', formattedCount);
+            }
+
+            return formattedCount + ' selection(s)';
+        }
+
+        const template = (typeof patternSelectionCountStrings.some === 'string' && patternSelectionCountStrings.some !== '')
+            ? patternSelectionCountStrings.some
+            : '%s selection(s)';
+
+        if (template.indexOf('%s') !== -1) {
+            return template.replace('%s', formattedCount);
+        }
+
+        return template;
+    }
+
+    function isElement(node) {
+        return !!node && typeof node === 'object' && node.nodeType === 1;
     }
 
     function toFiniteNumber(value) {
@@ -1472,8 +1509,43 @@ document.addEventListener('DOMContentLoaded', function() {
         const noCategoryValue = typeof options.noCategoryValue === 'string' ? options.noCategoryValue : '';
         const noDateValue = typeof options.noDateValue === 'string' ? options.noDateValue : '';
         const defaultSort = typeof options.defaultSort === 'string' ? options.defaultSort : '';
+        const selectionCountElement = isElement(options.selectionCountElement)
+            ? options.selectionCountElement
+            : null;
+        const submitButtons = (function(source) {
+            const elements = [];
+
+            const addElement = function(element) {
+                if (isElement(element) && elements.indexOf(element) === -1) {
+                    elements.push(element);
+                }
+            };
+
+            if (!source) {
+                return elements;
+            }
+
+            if (Array.isArray(source)) {
+                source.forEach(addElement);
+                return elements;
+            }
+
+            if (typeof source.forEach === 'function') {
+                source.forEach(addElement);
+                return elements;
+            }
+
+            if (typeof source.length === 'number') {
+                Array.prototype.forEach.call(source, addElement);
+                return elements;
+            }
+
+            addElement(source);
+            return elements;
+        })(options.submitButtons);
 
         if (!items.length) {
+            updateSelectionFeedback();
             if (statusElement) {
                 statusElement.setAttribute('aria-busy', 'false');
                 const emptyMessage = typeof patternSelectionStatusStrings.empty === 'string'
@@ -1702,6 +1774,46 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
         }
 
+        function getAllCheckboxes() {
+            return items
+                .map(function(item) {
+                    return getItemCheckbox(item);
+                })
+                .filter(function(checkbox) {
+                    return checkbox !== null && !checkbox.disabled;
+                });
+        }
+
+        function updateSelectionFeedback() {
+            const allCheckboxes = getAllCheckboxes();
+            const checkedCount = allCheckboxes.filter(function(checkbox) {
+                return checkbox.checked;
+            }).length;
+
+            if (selectionCountElement) {
+                selectionCountElement.textContent = buildPatternSelectionCountMessage(checkedCount);
+            }
+
+            submitButtons.forEach(function(button) {
+                if (!button) {
+                    return;
+                }
+
+                if (checkedCount === 0) {
+                    button.disabled = true;
+                    button.setAttribute('aria-disabled', 'true');
+                } else {
+                    button.disabled = false;
+                    button.removeAttribute('aria-disabled');
+                }
+            });
+
+            return {
+                total: allCheckboxes.length,
+                checked: checkedCount,
+            };
+        }
+
         function applySelectAllStateToVisible(shouldCheck) {
             getVisibleCheckboxes().forEach(function(checkbox) {
                 if (checkbox.checked !== shouldCheck) {
@@ -1911,6 +2023,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function updateSelectAllState() {
+            updateSelectionFeedback();
+
             if (!selectAllCheckbox) {
                 updateStatus();
                 return;
@@ -2071,22 +2185,44 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
+    const exportPatternList = document.getElementById('pattern-selection-items');
+
     createPatternSelectionController({
-        listElement: document.getElementById('pattern-selection-items'),
+        listElement: exportPatternList,
         itemSelector: '.pattern-selection-item',
         hiddenClass: 'is-hidden',
         selectAllCheckbox: document.getElementById('select-all-export-patterns'),
         searchInput: document.getElementById('pattern-search'),
         statusElement: document.getElementById('pattern-selection-status'),
+        selectionCountElement: document.getElementById('pattern-selection-count'),
+        submitButtons: (function() {
+            if (!exportPatternList) {
+                return [];
+            }
+
+            const parentForm = exportPatternList.closest('form');
+            return parentForm ? parentForm.querySelectorAll('[data-pattern-submit]') : [];
+        })(),
     });
 
+    const importPatternList = document.getElementById('patterns-preview-items');
+
     createPatternSelectionController({
-        listElement: document.getElementById('patterns-preview-items'),
+        listElement: importPatternList,
         itemSelector: '.pattern-item',
         hiddenClass: 'is-hidden',
         selectAllCheckbox: document.getElementById('select-all-patterns'),
         searchInput: document.getElementById('tejlg-import-pattern-search'),
         statusElement: document.getElementById('pattern-import-status'),
+        selectionCountElement: document.getElementById('pattern-import-selection-count'),
+        submitButtons: (function() {
+            if (!importPatternList) {
+                return [];
+            }
+
+            const parentForm = importPatternList.closest('form');
+            return parentForm ? parentForm.querySelectorAll('[data-pattern-submit]') : [];
+        })(),
         categorySelect: document.getElementById('tejlg-import-filter-category'),
         dateSelect: document.getElementById('tejlg-import-filter-date'),
         sortSelect: document.getElementById('tejlg-import-sort'),
