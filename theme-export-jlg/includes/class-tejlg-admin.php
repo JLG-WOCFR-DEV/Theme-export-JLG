@@ -6,6 +6,8 @@ require_once TEJLG_PATH . 'includes/class-tejlg-admin-import-page.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin-debug-page.php';
 
 class TEJLG_Admin {
+    const BLOCK_EDITOR_STYLE_HANDLE = 'tejlg-block-editor-styles';
+
     /**
      * Hook suffix returned by add_menu_page().
      *
@@ -30,6 +32,7 @@ class TEJLG_Admin {
 
         add_action('admin_menu', [ $this, 'add_menu_page' ]);
         add_action('admin_enqueue_scripts', [ $this, 'enqueue_assets' ]);
+        add_action('enqueue_block_editor_assets', [ $this, 'enqueue_block_editor_assets' ]);
         add_action('admin_init', [ $this, 'handle_form_requests' ]);
     }
 
@@ -54,7 +57,14 @@ class TEJLG_Admin {
             return;
         }
 
-        wp_enqueue_style('tejlg-admin-styles', TEJLG_URL . 'assets/css/admin-styles.css', [], TEJLG_VERSION);
+        $this->register_block_editor_style();
+
+        wp_enqueue_style(
+            'tejlg-admin-styles',
+            TEJLG_URL . 'assets/css/admin-styles.css',
+            [ self::BLOCK_EDITOR_STYLE_HANDLE ],
+            TEJLG_VERSION
+        );
 
         $icon_size = $this->debug_page->get_metrics_icon_size();
         if ($icon_size > 0) {
@@ -126,6 +136,95 @@ class TEJLG_Admin {
                 ],
             ]
         );
+    }
+
+    public function enqueue_block_editor_assets() {
+        if (!$this->should_enqueue_block_editor_assets()) {
+            return;
+        }
+
+        $this->register_block_editor_style();
+
+        wp_enqueue_style(self::BLOCK_EDITOR_STYLE_HANDLE);
+    }
+
+    private function register_block_editor_style() {
+        if (wp_style_is(self::BLOCK_EDITOR_STYLE_HANDLE, 'registered')) {
+            return;
+        }
+
+        wp_register_style(
+            self::BLOCK_EDITOR_STYLE_HANDLE,
+            TEJLG_URL . 'assets/css/block-editor.css',
+            [],
+            TEJLG_VERSION
+        );
+    }
+
+    private function should_enqueue_block_editor_assets() {
+        $post   = get_post();
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+
+        $should_enqueue = $post instanceof WP_Post ? $this->post_contains_plugin_block_data($post) : false;
+
+        /**
+         * Allow third-parties to control when the block editor assets should be loaded.
+         *
+         * @param bool            $should_enqueue Default detection result.
+         * @param WP_Post|null    $post            Current post being edited, if any.
+         * @param WP_Screen|null  $screen          Current screen instance when available.
+         */
+        return (bool) apply_filters('tejlg_should_enqueue_block_editor_assets', $should_enqueue, $post, $screen);
+    }
+
+    private function post_contains_plugin_block_data($post) {
+        if (!$post instanceof WP_Post) {
+            return false;
+        }
+
+        $content = (string) $post->post_content;
+
+        $markers = apply_filters(
+            'tejlg_block_editor_content_markers',
+            [
+                'tejlg-block-placeholder',
+                'data-tejlg-notice',
+                'data-tejlg-warning',
+            ],
+            $post
+        );
+
+        foreach ($markers as $marker) {
+            $marker = (string) $marker;
+
+            if ('' === $marker) {
+                continue;
+            }
+
+            if (false !== strpos($content, $marker)) {
+                return true;
+            }
+        }
+
+        if (!function_exists('has_block')) {
+            return false;
+        }
+
+        $block_names = apply_filters('tejlg_block_editor_block_names', [], $post);
+
+        foreach ($block_names as $block_name) {
+            $block_name = (string) $block_name;
+
+            if ('' === $block_name) {
+                continue;
+            }
+
+            if (has_block($block_name, $post)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function handle_form_requests() {

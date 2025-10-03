@@ -1,0 +1,60 @@
+/*
+ * Styles partagés pour l'éditeur de blocs et les aperçus générés par Theme Export - JLG.
+ */
+body.wp-admin .tejlg-block-placeholder,
+body.block-editor-page .tejlg-block-placeholder,
+body.edit-site-page .tejlg-block-placeholder,
+.editor-styles-wrapper .tejlg-block-placeholder {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 12px 0;
+    padding: 16px 18px;
+    border: 2px dashed #2b4a6f;
+    border-radius: 8px;
+    background-color: #f2f5ff;
+    color: #0f213b;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+body.block-editor-page .tejlg-block-placeholder:focus-visible,
+body.edit-site-page .tejlg-block-placeholder:focus-visible,
+.editor-styles-wrapper .tejlg-block-placeholder:focus-visible {
+    outline: 3px solid #1c64f2;
+    outline-offset: 2px;
+}
+
+body.wp-admin .tejlg-block-placeholder__icon,
+body.block-editor-page .tejlg-block-placeholder__icon,
+body.edit-site-page .tejlg-block-placeholder__icon,
+.editor-styles-wrapper .tejlg-block-placeholder__icon {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    color: inherit;
+}
+
+body.wp-admin .tejlg-block-placeholder__message,
+body.block-editor-page .tejlg-block-placeholder__message,
+body.edit-site-page .tejlg-block-placeholder__message,
+.editor-styles-wrapper .tejlg-block-placeholder__message {
+    margin: 0;
+}
+
+body.block-editor-page .notice[data-tejlg-notice],
+body.edit-site-page .notice[data-tejlg-notice],
+.editor-styles-wrapper .notice[data-tejlg-notice] {
+    margin: 16px 0;
+    padding: 12px 16px;
+    border-radius: 4px;
+    border-left: 4px solid #dba617;
+    background: #fffbe5;
+    color: #1d2327;
+}
+
+body.block-editor-page .notice[data-tejlg-notice] p,
+body.edit-site-page .notice[data-tejlg-notice] p,
+.editor-styles-wrapper .notice[data-tejlg-notice] p {
+    margin: 0.5em 0;
+}

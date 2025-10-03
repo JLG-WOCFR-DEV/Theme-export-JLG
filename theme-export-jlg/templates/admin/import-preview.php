@@ -32,7 +32,7 @@ $global_css_section_id = 'tejlg-global-css';
                 </div>
                 <div class="pattern-preview-wrapper">
                     <iframe class="pattern-preview-iframe" title="<?php echo esc_attr($pattern_data['iframe_title']); ?>" sandbox="allow-same-origin" loading="lazy"></iframe>
-                    <div class="pattern-preview-message notice notice-warning" role="status" aria-live="polite" hidden></div>
+                    <div class="pattern-preview-message notice notice-warning" data-tejlg-notice="warning" role="status" aria-live="polite" hidden></div>
                     <script
                         type="application/json"
                         class="pattern-preview-data"
@@ -74,14 +74,14 @@ $global_css_section_id = 'tejlg-global-css';
             </div>
         <?php endforeach; ?>
         <?php if (!empty($encoding_failures)): ?>
-            <div class="notice notice-warning">
+            <div class="notice notice-warning" data-tejlg-notice="warning">
                 <?php foreach ($encoding_failures as $failure_message): ?>
                     <p><?php echo esc_html($failure_message); ?></p>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
         <?php if (!empty($warnings)): ?>
-            <div class="notice notice-warning">
+            <div class="notice notice-warning" data-tejlg-notice="warning">
                 <?php foreach ($warnings as $warning_message): ?>
                     <p><?php echo esc_html($warning_message); ?></p>
                 <?php endforeach; ?>

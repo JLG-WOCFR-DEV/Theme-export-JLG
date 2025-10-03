@@ -118,37 +118,6 @@
     background: #fff;
 }
 
-/* Placeholder pour les blocs dynamiques non rendus */
-.tejlg-block-placeholder {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    margin: 12px 0;
-    padding: 16px 18px;
-    border: 2px dashed #2b4a6f;
-    border-radius: 8px;
-    background-color: #f2f5ff;
-    color: #0f213b;
-    font-size: 14px;
-    line-height: 1.5;
-}
-
-.tejlg-block-placeholder:focus-visible {
-    outline: 3px solid #1c64f2;
-    outline-offset: 2px;
-}
-
-.tejlg-block-placeholder__icon {
-    flex: 0 0 auto;
-    width: 24px;
-    height: 24px;
-    color: inherit;
-}
-
-.tejlg-block-placeholder__message {
-    margin: 0;
-}
-
 /* Style pour l'accordéon de débogage */
 #debug-accordion .accordion-section-title {
     border-bottom: 1px solid #ccc;
