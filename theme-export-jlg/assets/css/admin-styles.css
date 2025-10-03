@@ -235,6 +235,110 @@
     background: var(--tejlg-surface-muted-color);
 }
 
+.pattern-preview-compact {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.pattern-preview-compact-thumbnail {
+    position: relative;
+    flex: 0 0 88px;
+    height: 66px;
+    border: 1px dashed var(--tejlg-border-color);
+    border-radius: var(--wp-admin-border-radius, 6px);
+    background: var(--tejlg-surface-color);
+    overflow: hidden;
+}
+
+.pattern-preview-compact-thumbnail::before,
+.pattern-preview-compact-thumbnail::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+}
+
+.pattern-preview-compact-thumbnail::before {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--tejlg-accent-color) 18%, transparent), transparent 65%);
+    opacity: 0.45;
+}
+
+.pattern-preview-compact-thumbnail::after {
+    background:
+        repeating-linear-gradient(
+            90deg,
+            color-mix(in srgb, var(--tejlg-border-color) 70%, transparent) 0,
+            color-mix(in srgb, var(--tejlg-border-color) 70%, transparent) 12px,
+            transparent 12px,
+            transparent 24px
+        );
+    opacity: 0.4;
+}
+
+.pattern-preview-compact-details {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pattern-preview-compact-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    font-size: 13px;
+    color: var(--tejlg-text-muted-color);
+}
+
+.pattern-preview-compact-date {
+    font-weight: 500;
+}
+
+.pattern-preview-compact-categories {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pattern-preview-compact-category {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: var(--wp-admin-border-radius, 999px);
+    background: color-mix(in srgb, var(--tejlg-accent-color) 12%, transparent);
+    color: var(--tejlg-accent-color-darker);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.pattern-preview-live {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pattern-preview-trigger--collapse {
+    align-self: flex-end;
+}
+
+.pattern-preview-loading {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.pattern-preview-loading .spinner {
+    visibility: visible;
+    margin: 0;
+}
+
+.pattern-preview-loading-text {
+    font-size: 13px;
+}
+
 .pattern-preview-iframe {
     width: 100%;
     min-height: 250px;

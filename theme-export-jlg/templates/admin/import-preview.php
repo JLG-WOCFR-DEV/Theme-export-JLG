@@ -141,6 +141,7 @@ $controls_help_id = 'tejlg-import-controls-help';
                     data-title-sort="<?php echo esc_attr($title_sort); ?>"
                     data-original-index="<?php echo esc_attr($original_index); ?>"
                 >
+                    <?php $preview_live_id = 'pattern-preview-live-' . (int) $pattern_data['index']; ?>
                     <div class="pattern-selector">
                         <label>
                             <input type="checkbox" name="selected_patterns[]" value="<?php echo esc_attr($pattern_data['index']); ?>" checked>
@@ -164,16 +165,64 @@ $controls_help_id = 'tejlg-import-controls-help';
                             <p class="pattern-import-excerpt"><?php echo esc_html($excerpt); ?></p>
                         <?php endif; ?>
                     </div>
-                    <div class="pattern-preview-wrapper">
-                        <iframe class="pattern-preview-iframe" title="<?php echo esc_attr($pattern_data['iframe_title']); ?>" sandbox="allow-same-origin" loading="lazy"></iframe>
-                        <div class="pattern-preview-message notice notice-warning" role="status" aria-live="polite" hidden></div>
-                    <script
-                        type="application/json"
-                        class="pattern-preview-data"
-                        data-tejlg-stylesheets="<?php echo esc_attr($pattern_data['iframe_stylesheets_json']); ?>"
-                        data-tejlg-stylesheet-links-html="<?php echo esc_attr(isset($pattern_data['iframe_stylesheet_links_json']) ? $pattern_data['iframe_stylesheet_links_json'] : '""'); ?>"
-                    ><?php echo $pattern_data['iframe_json']; ?></script>
-                </div>
+                    <div class="pattern-preview-wrapper" data-preview-state="compact">
+                        <div class="pattern-preview-compact" data-preview-compact>
+                            <div class="pattern-preview-compact-thumbnail" aria-hidden="true"></div>
+                            <div class="pattern-preview-compact-details">
+                                <?php if ('' !== $date_display || !empty($category_labels)): ?>
+                                    <div class="pattern-preview-compact-meta">
+                                        <?php if ('' !== $date_display): ?>
+                                            <span class="pattern-preview-compact-date"><?php echo esc_html($date_display); ?></span>
+                                        <?php endif; ?>
+                                        <?php if (!empty($category_labels)): ?>
+                                            <span class="pattern-preview-compact-categories" aria-label="<?php echo esc_attr__('Catégories associées', 'theme-export-jlg'); ?>">
+                                                <?php foreach ($category_labels as $category_label): ?>
+                                                    <span class="pattern-preview-compact-category"><?php echo esc_html($category_label); ?></span>
+                                                <?php endforeach; ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+                                <button
+                                    type="button"
+                                    class="button button-secondary pattern-preview-trigger"
+                                    data-preview-trigger="expand"
+                                    aria-controls="<?php echo esc_attr($preview_live_id); ?>"
+                                    aria-expanded="false"
+                                >
+                                    <?php esc_html_e('Prévisualiser', 'theme-export-jlg'); ?>
+                                </button>
+                            </div>
+                        </div>
+                        <div
+                            class="pattern-preview-live"
+                            data-preview-live
+                            id="<?php echo esc_attr($preview_live_id); ?>"
+                            hidden
+                        >
+                            <button
+                                type="button"
+                                class="button-link pattern-preview-trigger pattern-preview-trigger--collapse"
+                                data-preview-trigger="collapse"
+                                aria-controls="<?php echo esc_attr($preview_live_id); ?>"
+                                aria-expanded="true"
+                            >
+                                <?php esc_html_e('Masquer la prévisualisation', 'theme-export-jlg'); ?>
+                            </button>
+                            <div class="pattern-preview-loading" data-preview-loading role="status" aria-live="polite" hidden>
+                                <span class="spinner is-active" aria-hidden="true"></span>
+                                <span class="pattern-preview-loading-text"><?php esc_html_e('Chargement de la prévisualisation…', 'theme-export-jlg'); ?></span>
+                            </div>
+                            <iframe class="pattern-preview-iframe" title="<?php echo esc_attr($pattern_data['iframe_title']); ?>" sandbox="allow-same-origin" loading="lazy"></iframe>
+                            <div class="pattern-preview-message notice notice-warning" role="status" aria-live="polite" hidden></div>
+                            <script
+                                type="application/json"
+                                class="pattern-preview-data"
+                                data-tejlg-stylesheets="<?php echo esc_attr($pattern_data['iframe_stylesheets_json']); ?>"
+                                data-tejlg-stylesheet-links-html="<?php echo esc_attr(isset($pattern_data['iframe_stylesheet_links_json']) ? $pattern_data['iframe_stylesheet_links_json'] : '""'); ?>"
+                            ><?php echo $pattern_data['iframe_json']; ?></script>
+                        </div>
+                    </div>
 
                 <div class="pattern-controls">
                     <button
