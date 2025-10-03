@@ -110,12 +110,18 @@ $controls_help_id = 'tejlg-import-controls-help';
             </div>
         </div>
         <p id="pattern-import-status" class="pattern-import-status" aria-live="polite" aria-atomic="true"></p>
-        <p
-            id="pattern-import-selection-count"
-            class="pattern-selection-count"
+        <div
+            class="pattern-selection-feedback"
+            role="status"
             aria-live="polite"
             aria-atomic="true"
-        ></p>
+        >
+            <p
+                id="pattern-import-selection-count"
+                class="pattern-selection-count"
+                data-pattern-selection-count
+            ></p>
+        </div>
         <div class="pattern-import-items" id="patterns-preview-items" data-searchable="true">
             <?php foreach ($patterns as $pattern_data): ?>
                 <?php

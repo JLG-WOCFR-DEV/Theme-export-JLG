@@ -1791,7 +1791,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }).length;
 
             if (selectionCountElement) {
-                selectionCountElement.textContent = buildPatternSelectionCountMessage(checkedCount);
+                const message = buildPatternSelectionCountMessage(checkedCount);
+                selectionCountElement.textContent = message;
+                selectionCountElement.setAttribute('data-selection-count', String(checkedCount));
             }
 
             submitButtons.forEach(function(button) {
@@ -1804,7 +1806,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     button.setAttribute('aria-disabled', 'true');
                 } else {
                     button.disabled = false;
-                    button.removeAttribute('aria-disabled');
+                    button.setAttribute('aria-disabled', 'false');
                 }
             });
 
