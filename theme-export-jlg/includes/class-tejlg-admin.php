@@ -107,6 +107,11 @@ class TEJLG_Admin {
                     'none' => esc_html__('0 sélection', 'theme-export-jlg'),
                     'some' => esc_html__('%s sélection(s)', 'theme-export-jlg'),
                 ],
+                'previewWidth' => [
+                    'valueTemplate'    => esc_html__('Largeur : %s px', 'theme-export-jlg'),
+                    'unit'             => esc_html__('px', 'theme-export-jlg'),
+                    'customInputLabel' => esc_html__('Largeur personnalisée (px)', 'theme-export-jlg'),
+                ],
                 'exportAsync' => [
                     'ajaxUrl' => admin_url('admin-ajax.php'),
                     'actions' => [

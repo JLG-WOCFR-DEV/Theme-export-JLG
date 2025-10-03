@@ -108,6 +108,83 @@ $controls_help_id = 'tejlg-import-controls-help';
                     <option value="original" <?php selected($default_sort, 'original'); ?>><?php esc_html_e('Ordre du fichier importé', 'theme-export-jlg'); ?></option>
                 </select>
             </div>
+            <div
+                class="pattern-import-control pattern-import-control--preview-width"
+                data-preview-width-control
+            >
+                <span class="pattern-import-control-label"><?php esc_html_e('Largeur de la prévisualisation', 'theme-export-jlg'); ?></span>
+                <div class="pattern-preview-width-buttons" role="group" aria-label="<?php esc_attr_e('Options de largeur de prévisualisation', 'theme-export-jlg'); ?>">
+                    <button
+                        type="button"
+                        class="button button-secondary pattern-preview-width-button"
+                        data-preview-width-option="editor"
+                        data-preview-width
+                        aria-pressed="false"
+                    >
+                        <?php esc_html_e('Éditeur', 'theme-export-jlg'); ?>
+                    </button>
+                    <button
+                        type="button"
+                        class="button button-secondary pattern-preview-width-button"
+                        data-preview-width-option="full"
+                        data-preview-width
+                        aria-pressed="false"
+                    >
+                        <?php esc_html_e('Pleine largeur', 'theme-export-jlg'); ?>
+                    </button>
+                    <button
+                        type="button"
+                        class="button button-secondary pattern-preview-width-button"
+                        data-preview-width-option="custom"
+                        data-preview-width
+                        aria-pressed="false"
+                        aria-controls="tejlg-preview-width-custom-panel"
+                        aria-expanded="false"
+                    >
+                        <?php esc_html_e('Largeur personnalisée…', 'theme-export-jlg'); ?>
+                    </button>
+                </div>
+                <div
+                    class="pattern-preview-width-custom"
+                    id="tejlg-preview-width-custom-panel"
+                    data-preview-width-custom
+                    hidden
+                >
+                    <span class="pattern-preview-width-custom-label" id="tejlg-preview-width-custom-label"><?php esc_html_e('Largeur personnalisée (px)', 'theme-export-jlg'); ?></span>
+                    <div class="pattern-preview-width-custom-controls" role="group" aria-labelledby="tejlg-preview-width-custom-label">
+                        <input
+                            type="range"
+                            id="tejlg-preview-width-range"
+                            class="pattern-preview-width-range"
+                            min="320"
+                            max="1600"
+                            step="10"
+                            value="1024"
+                            data-preview-width-range
+                            aria-label="<?php esc_attr_e('Définir la largeur personnalisée en pixels', 'theme-export-jlg'); ?>"
+                        >
+                        <label class="screen-reader-text" for="tejlg-preview-width-number"><?php esc_html_e('Définir la largeur personnalisée en pixels', 'theme-export-jlg'); ?></label>
+                        <input
+                            type="number"
+                            id="tejlg-preview-width-number"
+                            class="pattern-preview-width-number"
+                            min="320"
+                            max="1600"
+                            step="10"
+                            value="1024"
+                            data-preview-width-number
+                        >
+                        <output
+                            class="pattern-preview-width-value"
+                            for="tejlg-preview-width-range tejlg-preview-width-number"
+                            data-preview-width-value
+                            data-value-template="<?php echo esc_attr__('Largeur : %s px', 'theme-export-jlg'); ?>"
+                            aria-live="polite"
+                        ><?php echo esc_html__('Largeur : 1024 px', 'theme-export-jlg'); ?></output>
+                    </div>
+                    <p class="description pattern-preview-width-description"><?php esc_html_e('Ajustez la largeur pour simuler différents écrans.', 'theme-export-jlg'); ?></p>
+                </div>
+            </div>
         </div>
         <p id="pattern-import-status" class="pattern-import-status" aria-live="polite" aria-atomic="true"></p>
         <p
