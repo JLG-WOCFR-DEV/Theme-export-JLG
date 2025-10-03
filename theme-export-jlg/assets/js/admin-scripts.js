@@ -1692,6 +1692,24 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
+        function getVisibleCheckboxes() {
+            return getVisibleItems()
+                .map(function(item) {
+                    return getItemCheckbox(item);
+                })
+                .filter(function(checkbox) {
+                    return checkbox !== null && !checkbox.disabled;
+                });
+        }
+
+        function applySelectAllStateToVisible(shouldCheck) {
+            getVisibleCheckboxes().forEach(function(checkbox) {
+                if (checkbox.checked !== shouldCheck) {
+                    checkbox.checked = shouldCheck;
+                }
+            });
+        }
+
         function setBusy(isBusy) {
             if (!statusElement) {
                 return;
@@ -1898,14 +1916,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            const visibleItems = getVisibleItems();
-            const visibleCheckboxes = visibleItems
-                .map(function(item) {
-                    return getItemCheckbox(item);
-                })
-                .filter(function(checkbox) {
-                    return checkbox !== null;
-                });
+            const visibleCheckboxes = getVisibleCheckboxes();
 
             if (!visibleCheckboxes.length) {
                 selectAllCheckbox.checked = false;
@@ -2011,12 +2022,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', function(event) {
                 const shouldCheck = event.target.checked;
-                getVisibleItems().forEach(function(item) {
-                    const checkbox = getItemCheckbox(item);
-                    if (checkbox) {
-                        checkbox.checked = shouldCheck;
-                    }
-                });
+                applySelectAllStateToVisible(shouldCheck);
 
                 updateSelectAllState();
             });

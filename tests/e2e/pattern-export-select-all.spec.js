@@ -58,6 +58,24 @@ test.describe('Pattern export selection screen', () => {
     await expect(betaCheckbox).toBeChecked();
     await expect(alphaCheckbox).toBeChecked();
     await expect(gammaCheckbox).not.toBeChecked();
+    await expect(selectAll).toBeChecked();
+    await expect(selectAll).toHaveJSProperty('indeterminate', false);
+
+    await selectAll.uncheck();
+
+    await expect(betaCheckbox).not.toBeChecked();
+    await expect(alphaCheckbox).toBeChecked();
+    await expect(gammaCheckbox).not.toBeChecked();
+    await expect(selectAll).not.toBeChecked();
+    await expect(selectAll).toHaveJSProperty('indeterminate', false);
+
+    await selectAll.check();
+
+    await expect(betaCheckbox).toBeChecked();
+    await expect(alphaCheckbox).toBeChecked();
+    await expect(gammaCheckbox).not.toBeChecked();
+    await expect(selectAll).toBeChecked();
+    await expect(selectAll).toHaveJSProperty('indeterminate', false);
 
     await searchInput.fill('');
 
