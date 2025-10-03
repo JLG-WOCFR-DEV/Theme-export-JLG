@@ -25,6 +25,13 @@ Theme Export - JLG est un plugin WordPress pour administrateurs de sites blocs q
 - **Améliorer l’ergonomie** grâce à des scripts dédiés : sélection/désélection en masse, accordéons de débogage, confirmation de remplacement pour l’import de thèmes et bascule d’affichage du code des compositions.【F:theme-export-jlg/assets/js/admin-scripts.js†L1-L69】
 - **Nettoyer les données temporaires** créées pendant les imports (transients) lors de la désinstallation du plugin.【F:theme-export-jlg/uninstall.php†L1-L35】
 
+## Cohérence visuelle dans l’administration
+
+- Les vues d’export, d’import et de débogage s’appuient désormais sur les composants de l’interface WordPress (`.components-card`, classes `wp-ui-*`) et sur les variables CSS de l’admin (`--wp-admin-theme-color`, `--wp-components-color-*`). Toute évolution doit conserver ces classes afin de rester alignée avec les palettes officielles et le mode sombre.【F:theme-export-jlg/assets/css/admin-styles.css†L1-L214】【F:theme-export-jlg/templates/admin/export.php†L18-L118】【F:theme-export-jlg/templates/admin/import.php†L13-L71】【F:theme-export-jlg/templates/admin/debug.php†L9-L118】
+- Lorsqu’un nouveau bloc d’interface est ajouté, réutilisez les cartes existantes (`tejlg-card components-card is-elevated`) plutôt que de créer un style personnalisé. Les boutons doivent combiner les classes historiques (`button button-primary|secondary`) et la variante `wp-ui-*` adaptée pour bénéficier de la coloration dynamique.【F:theme-export-jlg/templates/admin/export.php†L36-L113】【F:theme-export-jlg/templates/admin/import.php†L22-L63】【F:theme-export-jlg/templates/admin/debug.php†L12-L74】
+- Testez systématiquement les écrans dans les différents schémas de couleurs de l’administration (préférences utilisateur) **et** dans l’éditeur de site en modes clair et sombre afin de valider les contrastes. En local, utilisez la commande `wp-admin/options-general.php?page=global-settings` ou la palette rapide (`Options → Administration color scheme`).
+- Pensez à vérifier le rendu des cartes dans l’éditeur du site (`/wp-admin/site-editor.php`) où les styles admin sont partagés. Les variables CSS adoptées ici garantissent un contraste suffisant quelles que soient les combinaisons activées.
+
 ## Utilisation en ligne de commande (WP-CLI)
 
 Le plugin enregistre la commande `wp theme-export-jlg` dès que WP-CLI est disponible.【F:theme-export-jlg/includes/class-tejlg-cli.php†L7-L168】 Elle propose deux sous-commandes :
