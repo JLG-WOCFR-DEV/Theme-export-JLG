@@ -406,6 +406,19 @@ document.addEventListener('DOMContentLoaded', function() {
         ? localization.themeImportConfirm
         : '';
 
+    if (themeImportConfirmMessage) {
+        const themeImportForm = document.getElementById('tejlg-import-theme-form');
+
+        if (themeImportForm) {
+            themeImportForm.addEventListener('submit', function(event) {
+                if (!window.confirm(themeImportConfirmMessage)) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                }
+            });
+        }
+    }
+
     // Gérer la case "Tout sélectionner" pour l'import
     const selectAllCheckbox = document.getElementById('select-all-patterns');
     if (selectAllCheckbox) {
