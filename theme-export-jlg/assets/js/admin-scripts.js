@@ -424,12 +424,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gérer l'accordéon sur la page de débogage
     const accordionContainer = document.getElementById('debug-accordion');
     if (accordionContainer) {
-        const accordionTitles = accordionContainer.querySelectorAll('.accordion-section-title');
-        accordionTitles.forEach(function(title) {
-            title.addEventListener('click', function() {
-                const parentSection = this.closest('.accordion-section');
-                if (parentSection) {
-                    parentSection.classList.toggle('open');
+        const accordionSections = accordionContainer.querySelectorAll('.accordion-section');
+        const activationKeys = [' ', 'Spacebar', 'Space', 'Enter'];
+
+        accordionSections.forEach(function(section) {
+            const trigger = section.querySelector('.accordion-section-title');
+            const content = section.querySelector('.accordion-section-content');
+
+            if (!trigger || !content) {
+                return;
+            }
+
+            const setExpandedState = function(isExpanded) {
+                trigger.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+                content.hidden = !isExpanded;
+                content.setAttribute('aria-hidden', isExpanded ? 'false' : 'true');
+                section.classList.toggle('open', isExpanded);
+            };
+
+            const initialExpanded = trigger.getAttribute('aria-expanded') === 'true'
+                || section.classList.contains('open')
+                || !content.hasAttribute('hidden');
+            setExpandedState(initialExpanded);
+
+            const toggleSection = function() {
+                const isExpanded = trigger.getAttribute('aria-expanded') === 'true';
+                setExpandedState(!isExpanded);
+            };
+
+            trigger.addEventListener('click', function() {
+                toggleSection();
+            });
+
+            trigger.addEventListener('keydown', function(event) {
+                if (activationKeys.includes(event.key)) {
+                    event.preventDefault();
+                    toggleSection();
                 }
             });
         });

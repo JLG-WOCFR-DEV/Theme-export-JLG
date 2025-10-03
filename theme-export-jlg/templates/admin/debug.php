@@ -53,8 +53,23 @@
 <div id="debug-accordion" class="tejlg-card components-card is-elevated">
     <div class="components-card__body">
         <div class="accordion-section">
-            <h3 class="accordion-section-title"><?php esc_html_e('Informations Système & WordPress', 'theme-export-jlg'); ?></h3>
-            <div class="accordion-section-content">
+            <button
+                type="button"
+                class="accordion-section-title"
+                id="debug-accordion-trigger-system"
+                aria-expanded="false"
+                aria-controls="debug-accordion-panel-system"
+            >
+                <?php esc_html_e('Informations Système & WordPress', 'theme-export-jlg'); ?>
+            </button>
+            <div
+                class="accordion-section-content"
+                id="debug-accordion-panel-system"
+                role="region"
+                aria-labelledby="debug-accordion-trigger-system"
+                hidden
+                aria-hidden="true"
+            >
                 <div class="tejlg-table-scroll">
                     <table class="widefat striped">
                         <tbody>
@@ -92,8 +107,23 @@
             </div>
         </div>
         <div class="accordion-section">
-            <h3 class="accordion-section-title"><?php esc_html_e('Compositions personnalisées enregistrées', 'theme-export-jlg'); ?></h3>
-            <div class="accordion-section-content">
+            <button
+                type="button"
+                class="accordion-section-title"
+                id="debug-accordion-trigger-patterns"
+                aria-expanded="false"
+                aria-controls="debug-accordion-panel-patterns"
+            >
+                <?php esc_html_e('Compositions personnalisées enregistrées', 'theme-export-jlg'); ?>
+            </button>
+            <div
+                class="accordion-section-content"
+                id="debug-accordion-panel-patterns"
+                role="region"
+                aria-labelledby="debug-accordion-trigger-patterns"
+                hidden
+                aria-hidden="true"
+            >
             <?php
             $current_user_id = get_current_user_id();
             $custom_patterns_query = new WP_Query(
