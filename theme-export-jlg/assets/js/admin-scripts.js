@@ -1121,12 +1121,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Gérer la case "Tout sélectionner" pour l'export sélectif
-    const patternList = document.querySelector('[data-searchable="true"]');
-    const patternItems = patternList ? Array.from(patternList.querySelectorAll('.pattern-selection-item')) : [];
-    const selectAllExportCheckbox = document.getElementById('select-all-export-patterns');
-    const patternSearchInput = document.getElementById('pattern-search');
-    const patternSelectionStatus = document.getElementById('pattern-selection-status');
+    // Gérer la sélection, la recherche et les filtres pour l'export et l'import de compositions
     const patternSelectionStatusStrings = (typeof localization.patternSelectionStatus === 'object' && localization.patternSelectionStatus !== null)
         ? localization.patternSelectionStatus
         : {};
@@ -1146,20 +1141,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return null;
     })();
 
-    function getVisiblePatternItems() {
-        return patternItems.filter(function(item) {
-            return !item.classList.contains('is-hidden');
-        });
-    }
-
-    function setPatternSelectionBusy(isBusy) {
-        if (!patternSelectionStatus) {
-            return;
-        }
-
-        patternSelectionStatus.setAttribute('aria-busy', isBusy ? 'true' : 'false');
-    }
-
     function formatPatternSelectionCount(count) {
         if (patternSelectionNumberFormatter) {
             return patternSelectionNumberFormatter.format(count);
@@ -1168,148 +1149,693 @@ document.addEventListener('DOMContentLoaded', function() {
         return String(count);
     }
 
-    function updatePatternSelectionStatus() {
-        if (!patternSelectionStatus) {
-            return;
+    function toFiniteNumber(value) {
+        if (typeof value === 'number') {
+            return isFinite(value) ? value : null;
         }
 
-        const visibleCount = getVisiblePatternItems().length;
-        let message = '';
-
-        if (visibleCount === 0) {
-            message = typeof patternSelectionStatusStrings.empty === 'string'
-                ? patternSelectionStatusStrings.empty
-                : '';
-        } else if (visibleCount === 1) {
-            const template = typeof patternSelectionStatusStrings.countSingular === 'string'
-                ? patternSelectionStatusStrings.countSingular
-                : (typeof patternSelectionStatusStrings.countPlural === 'string'
-                    ? patternSelectionStatusStrings.countPlural
-                    : '%s');
-            message = template.replace('%s', formatPatternSelectionCount(visibleCount));
-        } else {
-            const template = typeof patternSelectionStatusStrings.countPlural === 'string'
-                ? patternSelectionStatusStrings.countPlural
-                : (typeof patternSelectionStatusStrings.countSingular === 'string'
-                    ? patternSelectionStatusStrings.countSingular
-                    : '%s');
-            message = template.replace('%s', formatPatternSelectionCount(visibleCount));
+        if (typeof value === 'string' && value.trim() !== '') {
+            const parsed = Number(value);
+            return isFinite(parsed) ? parsed : null;
         }
 
-        patternSelectionStatus.textContent = message;
-        setPatternSelectionBusy(false);
+        return null;
     }
 
-    function updateSelectAllExportCheckbox() {
-        const visibleItems = getVisiblePatternItems();
-
-        if (!selectAllExportCheckbox) {
-            updatePatternSelectionStatus();
-            return;
+    function createPatternSelectionController(options) {
+        if (!options || !options.listElement) {
+            return null;
         }
 
-        const visibleCheckboxes = visibleItems
-            .map(function(item) {
+        const listElement = options.listElement;
+        const itemSelector = typeof options.itemSelector === 'string' && options.itemSelector
+            ? options.itemSelector
+            : '.pattern-selection-item';
+        const items = Array.from(listElement.querySelectorAll(itemSelector));
+        const hiddenClass = typeof options.hiddenClass === 'string' && options.hiddenClass
+            ? options.hiddenClass
+            : 'is-hidden';
+        const selectAllCheckbox = options.selectAllCheckbox || null;
+        const searchInput = options.searchInput || null;
+        const categorySelect = options.categorySelect || null;
+        const dateSelect = options.dateSelect || null;
+        const sortSelect = options.sortSelect || null;
+        const statusElement = options.statusElement || null;
+        const noCategoryValue = typeof options.noCategoryValue === 'string' ? options.noCategoryValue : '';
+        const noDateValue = typeof options.noDateValue === 'string' ? options.noDateValue : '';
+        const defaultSort = typeof options.defaultSort === 'string' ? options.defaultSort : '';
+
+        if (!items.length) {
+            if (statusElement) {
+                statusElement.setAttribute('aria-busy', 'false');
+                const emptyMessage = typeof patternSelectionStatusStrings.empty === 'string'
+                    ? patternSelectionStatusStrings.empty
+                    : '';
+                statusElement.textContent = emptyMessage;
+            }
+
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.disabled = true;
+            }
+
+            return null;
+        }
+
+        const state = {
+            search: '',
+            category: '',
+            date: '',
+            sort: '',
+        };
+
+        const getItemCheckbox = typeof options.getItemCheckbox === 'function'
+            ? options.getItemCheckbox
+            : function(item) {
                 return item.querySelector('input[type="checkbox"]');
-            })
-            .filter(function(checkbox) {
-                return checkbox !== null;
-            });
+            };
 
-        if (visibleCheckboxes.length === 0) {
-            selectAllExportCheckbox.checked = false;
-            selectAllExportCheckbox.indeterminate = false;
-            selectAllExportCheckbox.disabled = true;
-            return;
-        }
+        const getSearchableText = typeof options.getSearchableText === 'function'
+            ? options.getSearchableText
+            : function(item) {
+                return (item.textContent || '').toLowerCase();
+            };
 
-        selectAllExportCheckbox.disabled = false;
+        const getCategoryTokens = typeof options.getCategoryTokens === 'function'
+            ? options.getCategoryTokens
+            : function(item) {
+                const attr = item.getAttribute('data-terms') || '';
+                if (!attr) {
+                    return [];
+                }
 
-        const checkedCount = visibleCheckboxes.filter(function(checkbox) {
-            return checkbox.checked;
-        }).length;
+                return attr
+                    .split(/\s+/)
+                    .filter(function(token) { return token !== ''; })
+                    .map(function(token) { return token.toLowerCase(); });
+            };
 
-        if (checkedCount === 0) {
-            selectAllExportCheckbox.checked = false;
-            selectAllExportCheckbox.indeterminate = false;
-        } else if (checkedCount === visibleCheckboxes.length) {
-            selectAllExportCheckbox.checked = true;
-            selectAllExportCheckbox.indeterminate = false;
-        } else {
-            selectAllExportCheckbox.checked = false;
-            selectAllExportCheckbox.indeterminate = true;
-        }
+        const getDateValue = typeof options.getDateValue === 'function'
+            ? options.getDateValue
+            : function(item) {
+                return item.getAttribute('data-date') || '';
+            };
 
-        updatePatternSelectionStatus();
-    }
+        const getTimestamp = typeof options.getTimestamp === 'function'
+            ? options.getTimestamp
+            : function() {
+                return null;
+            };
 
-    function filterPatternItems(query) {
-        if (!patternItems.length) {
-            setPatternSelectionBusy(true);
-            updateSelectAllExportCheckbox();
-            return;
-        }
+        const getTitleSortValue = typeof options.getTitleSortValue === 'function'
+            ? options.getTitleSortValue
+            : function(item) {
+                const label = item.getAttribute('data-label') || '';
+                return label.toLowerCase();
+            };
 
-        setPatternSelectionBusy(true);
-        const normalizedQuery = query.trim().toLowerCase();
+        const getOriginalIndex = typeof options.getOriginalIndex === 'function'
+            ? options.getOriginalIndex
+            : function(item, index) {
+                const attr = item.getAttribute('data-original-index');
+                const parsed = toFiniteNumber(attr);
+                if (parsed !== null) {
+                    return parsed;
+                }
 
-        patternItems.forEach(function(item) {
-            const label = item.getAttribute('data-label') || '';
-            const excerpt = item.getAttribute('data-excerpt') || '';
-            const terms = item.getAttribute('data-terms') || '';
-            const date = item.getAttribute('data-date') || '';
-            const haystack = [label, excerpt, terms, date]
-                .join(' ')
-                .toLowerCase();
-            const isMatch = normalizedQuery === '' || haystack.indexOf(normalizedQuery) !== -1;
+                return index;
+            };
 
-            if (isMatch) {
-                item.classList.remove('is-hidden');
-            } else {
-                item.classList.add('is-hidden');
+        const originalIndexMap = typeof WeakMap === 'function' ? new WeakMap() : null;
+        items.forEach(function(item, index) {
+            if (originalIndexMap) {
+                originalIndexMap.set(item, index);
             }
         });
 
-        updateSelectAllExportCheckbox();
-    }
+        function getOriginalIndexNumber(item, index) {
+            const provided = getOriginalIndex(item, index);
+            const parsedProvided = toFiniteNumber(provided);
 
-    if (patternSelectionStatus) {
-        setPatternSelectionBusy(false);
-    }
+            if (parsedProvided !== null) {
+                return parsedProvided;
+            }
 
-    if (selectAllExportCheckbox) {
-        selectAllExportCheckbox.addEventListener('change', function(e) {
-            const shouldCheck = e.target.checked;
-            getVisiblePatternItems().forEach(function(item) {
-                const checkbox = item.querySelector('input[type="checkbox"]');
-                if (checkbox) {
-                    checkbox.checked = shouldCheck;
+            if (originalIndexMap && originalIndexMap.has(item)) {
+                return originalIndexMap.get(item);
+            }
+
+            const fallbackIndex = items.indexOf(item);
+            return fallbackIndex === -1 ? index : fallbackIndex;
+        }
+
+        function getTimestampNumber(item) {
+            const raw = getTimestamp(item);
+            const parsed = toFiniteNumber(raw);
+            return parsed === null ? null : parsed;
+        }
+
+        function compareTitleValues(valueA, valueB) {
+            const a = typeof valueA === 'string' ? valueA : '';
+            const b = typeof valueB === 'string' ? valueB : '';
+
+            if (typeof a.localeCompare === 'function') {
+                return a.localeCompare(b, undefined, { sensitivity: 'base' });
+            }
+
+            if (a === b) {
+                return 0;
+            }
+
+            return a > b ? 1 : -1;
+        }
+
+        function compareByOriginal(a, b) {
+            const indexA = getOriginalIndexNumber(a, 0);
+            const indexB = getOriginalIndexNumber(b, 0);
+
+            if (indexA === indexB) {
+                return 0;
+            }
+
+            return indexA < indexB ? -1 : 1;
+        }
+
+        function compareByTitleAsc(a, b) {
+            const result = compareTitleValues(getTitleSortValue(a), getTitleSortValue(b));
+            if (result !== 0) {
+                return result;
+            }
+
+            return compareByOriginal(a, b);
+        }
+
+        function compareByTitleDesc(a, b) {
+            const result = compareTitleValues(getTitleSortValue(b), getTitleSortValue(a));
+            if (result !== 0) {
+                return result;
+            }
+
+            return compareByOriginal(a, b);
+        }
+
+        function compareByTimestampDesc(a, b) {
+            const timeA = getTimestampNumber(a);
+            const timeB = getTimestampNumber(b);
+            const hasA = timeA !== null;
+            const hasB = timeB !== null;
+
+            if (hasA && hasB) {
+                if (timeA === timeB) {
+                    return compareByTitleAsc(a, b);
+                }
+
+                return timeB - timeA;
+            }
+
+            if (hasA) {
+                return -1;
+            }
+
+            if (hasB) {
+                return 1;
+            }
+
+            return compareByTitleAsc(a, b);
+        }
+
+        function compareByTimestampAsc(a, b) {
+            const timeA = getTimestampNumber(a);
+            const timeB = getTimestampNumber(b);
+            const hasA = timeA !== null;
+            const hasB = timeB !== null;
+
+            if (hasA && hasB) {
+                if (timeA === timeB) {
+                    return compareByTitleAsc(a, b);
+                }
+
+                return timeA - timeB;
+            }
+
+            if (hasA) {
+                return -1;
+            }
+
+            if (hasB) {
+                return 1;
+            }
+
+            return compareByTitleAsc(a, b);
+        }
+
+        const comparators = {
+            'title-asc': compareByTitleAsc,
+            'title-desc': compareByTitleDesc,
+            'date-desc': compareByTimestampDesc,
+            'date-asc': compareByTimestampAsc,
+            'original': compareByOriginal,
+        };
+
+        function getVisibleItems() {
+            return items.filter(function(item) {
+                return !item.classList.contains(hiddenClass);
+            });
+        }
+
+        function setBusy(isBusy) {
+            if (!statusElement) {
+                return;
+            }
+
+            statusElement.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+        }
+
+        function buildStatusMessage() {
+            if (!statusElement) {
+                return '';
+            }
+
+            const visibleCount = getVisibleItems().length;
+            let message = '';
+
+            if (visibleCount === 0) {
+                message = typeof patternSelectionStatusStrings.empty === 'string'
+                    ? patternSelectionStatusStrings.empty
+                    : '';
+            } else if (visibleCount === 1) {
+                const templateSingular = typeof patternSelectionStatusStrings.countSingular === 'string'
+                    ? patternSelectionStatusStrings.countSingular
+                    : (typeof patternSelectionStatusStrings.countPlural === 'string'
+                        ? patternSelectionStatusStrings.countPlural
+                        : '%s');
+                message = templateSingular.replace('%s', formatPatternSelectionCount(visibleCount));
+            } else {
+                const templatePlural = typeof patternSelectionStatusStrings.countPlural === 'string'
+                    ? patternSelectionStatusStrings.countPlural
+                    : (typeof patternSelectionStatusStrings.countSingular === 'string'
+                        ? patternSelectionStatusStrings.countSingular
+                        : '%s');
+                message = templatePlural.replace('%s', formatPatternSelectionCount(visibleCount));
+            }
+
+            const summaries = [];
+
+            if (searchInput && state.search) {
+                const rawValue = searchInput.value ? searchInput.value.trim() : state.search;
+                const template = typeof patternSelectionStatusStrings.filterSearch === 'string'
+                    ? patternSelectionStatusStrings.filterSearch
+                    : '';
+
+                if (template && template.indexOf('%s') !== -1) {
+                    summaries.push(template.replace('%s', rawValue));
+                } else if (rawValue) {
+                    summaries.push(rawValue);
+                }
+            }
+
+            if (categorySelect && state.category) {
+                const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+                const label = selectedOption ? selectedOption.textContent.trim() : state.category;
+                if (state.category === noCategoryValue) {
+                    const templateNone = typeof patternSelectionStatusStrings.filterCategoryNone === 'string'
+                        ? patternSelectionStatusStrings.filterCategoryNone
+                        : '';
+
+                    if (templateNone && templateNone.indexOf('%s') !== -1) {
+                        summaries.push(templateNone.replace('%s', label));
+                    } else if (templateNone) {
+                        summaries.push(templateNone);
+                    } else if (label) {
+                        summaries.push(label);
+                    }
+                } else {
+                    const template = typeof patternSelectionStatusStrings.filterCategory === 'string'
+                        ? patternSelectionStatusStrings.filterCategory
+                        : '';
+
+                    if (template && template.indexOf('%s') !== -1) {
+                        summaries.push(template.replace('%s', label));
+                    } else if (label) {
+                        summaries.push(label);
+                    }
+                }
+            }
+
+            if (dateSelect && state.date) {
+                const selectedOption = dateSelect.options[dateSelect.selectedIndex];
+                const label = selectedOption ? selectedOption.textContent.trim() : state.date;
+                if (state.date === noDateValue) {
+                    const templateNone = typeof patternSelectionStatusStrings.filterDateNone === 'string'
+                        ? patternSelectionStatusStrings.filterDateNone
+                        : '';
+
+                    if (templateNone && templateNone.indexOf('%s') !== -1) {
+                        summaries.push(templateNone.replace('%s', label));
+                    } else if (templateNone) {
+                        summaries.push(templateNone);
+                    } else if (label) {
+                        summaries.push(label);
+                    }
+                } else {
+                    const template = typeof patternSelectionStatusStrings.filterDate === 'string'
+                        ? patternSelectionStatusStrings.filterDate
+                        : '';
+
+                    if (template && template.indexOf('%s') !== -1) {
+                        summaries.push(template.replace('%s', label));
+                    } else if (label) {
+                        summaries.push(label);
+                    }
+                }
+            }
+
+            if (summaries.length) {
+                const intro = typeof patternSelectionStatusStrings.filtersSummaryIntro === 'string'
+                    ? patternSelectionStatusStrings.filtersSummaryIntro
+                    : '';
+                const joiner = typeof patternSelectionStatusStrings.filtersSummaryJoin === 'string'
+                    ? patternSelectionStatusStrings.filtersSummaryJoin
+                    : ', ';
+                const summaryText = (intro ? intro + ' ' : '') + summaries.join(joiner);
+                message = message ? message + ' ' + summaryText : summaryText;
+            }
+
+            return message;
+        }
+
+        function updateStatus() {
+            if (!statusElement) {
+                return;
+            }
+
+            statusElement.textContent = buildStatusMessage();
+            setBusy(false);
+        }
+
+        function matchesFilters(item) {
+            const haystack = (getSearchableText(item) || '').toLowerCase();
+
+            if (state.search && haystack.indexOf(state.search) === -1) {
+                return false;
+            }
+
+            if (categorySelect) {
+                if (state.category === noCategoryValue) {
+                    const tokens = getCategoryTokens(item);
+                    if (tokens.length !== 0) {
+                        return false;
+                    }
+                } else if (state.category) {
+                    const tokens = getCategoryTokens(item).map(function(token) {
+                        return String(token).toLowerCase();
+                    });
+                    if (tokens.indexOf(state.category.toLowerCase()) === -1) {
+                        return false;
+                    }
+                }
+            }
+
+            if (dateSelect) {
+                const value = getDateValue(item) || '';
+                if (state.date === noDateValue) {
+                    if (value !== '') {
+                        return false;
+                    }
+                } else if (state.date && value !== state.date) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        function applyFilters() {
+            setBusy(true);
+
+            items.forEach(function(item) {
+                if (matchesFilters(item)) {
+                    item.classList.remove(hiddenClass);
+                } else {
+                    item.classList.add(hiddenClass);
                 }
             });
 
-            updateSelectAllExportCheckbox();
-        });
-    }
+            updateSelectAllState();
+        }
 
-    if (patternItems.length) {
-        patternItems.forEach(function(item) {
-            const checkbox = item.querySelector('input[type="checkbox"]');
+        function sortItems() {
+            if (!sortSelect) {
+                return;
+            }
+
+            const activeSort = state.sort && comparators[state.sort]
+                ? state.sort
+                : (defaultSort && comparators[defaultSort] ? defaultSort : '');
+            const comparator = activeSort && comparators[activeSort]
+                ? comparators[activeSort]
+                : compareByOriginal;
+
+            const orderedItems = items.slice().sort(comparator);
+            orderedItems.forEach(function(item) {
+                listElement.appendChild(item);
+            });
+            items.splice.apply(items, [0, items.length].concat(orderedItems));
+        }
+
+        function updateSelectAllState() {
+            if (!selectAllCheckbox) {
+                updateStatus();
+                return;
+            }
+
+            const visibleItems = getVisibleItems();
+            const visibleCheckboxes = visibleItems
+                .map(function(item) {
+                    return getItemCheckbox(item);
+                })
+                .filter(function(checkbox) {
+                    return checkbox !== null;
+                });
+
+            if (!visibleCheckboxes.length) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.disabled = true;
+                updateStatus();
+                return;
+            }
+
+            selectAllCheckbox.disabled = false;
+
+            const checkedCount = visibleCheckboxes.filter(function(checkbox) {
+                return checkbox.checked;
+            }).length;
+
+            if (checkedCount === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedCount === visibleCheckboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+
+            updateStatus();
+        }
+
+        function setSearchTerm(rawValue) {
+            const normalized = (rawValue || '').trim().toLowerCase();
+            if (normalized === state.search) {
+                updateSelectAllState();
+                return;
+            }
+
+            state.search = normalized;
+            applyFilters();
+        }
+
+        function setCategory(value) {
+            const normalized = typeof value === 'string' ? value : '';
+            if (normalized === state.category) {
+                applyFilters();
+                return;
+            }
+
+            state.category = normalized;
+            applyFilters();
+        }
+
+        function setDate(value) {
+            const normalized = typeof value === 'string' ? value : '';
+            if (normalized === state.date) {
+                applyFilters();
+                return;
+            }
+
+            state.date = normalized;
+            applyFilters();
+        }
+
+        function setSort(value) {
+            const normalized = typeof value === 'string' ? value : '';
+            if (normalized === state.sort) {
+                sortItems();
+                applyFilters();
+                return;
+            }
+
+            state.sort = normalized;
+            sortItems();
+            applyFilters();
+        }
+
+        if (statusElement) {
+            statusElement.setAttribute('aria-busy', 'false');
+        }
+
+        if (searchInput && searchInput.value) {
+            state.search = (searchInput.value || '').trim().toLowerCase();
+        }
+
+        if (categorySelect && categorySelect.value) {
+            state.category = categorySelect.value;
+        }
+
+        if (dateSelect && dateSelect.value) {
+            state.date = dateSelect.value;
+        }
+
+        if (sortSelect) {
+            const initialSort = defaultSort || sortSelect.value || '';
+            state.sort = initialSort;
+            if (sortSelect.value !== initialSort) {
+                sortSelect.value = initialSort;
+            }
+            sortItems();
+        }
+
+        applyFilters();
+
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function(event) {
+                const shouldCheck = event.target.checked;
+                getVisibleItems().forEach(function(item) {
+                    const checkbox = getItemCheckbox(item);
+                    if (checkbox) {
+                        checkbox.checked = shouldCheck;
+                    }
+                });
+
+                updateSelectAllState();
+            });
+        }
+
+        items.forEach(function(item, index) {
+            const checkbox = getItemCheckbox(item);
             if (checkbox) {
-                checkbox.addEventListener('change', updateSelectAllExportCheckbox);
+                checkbox.addEventListener('change', updateSelectAllState);
+            }
+
+            if (originalIndexMap) {
+                originalIndexMap.set(item, index);
             }
         });
 
-        updateSelectAllExportCheckbox();
-    }
+        if (searchInput) {
+            const searchHandler = function(event) {
+                setSearchTerm(event.target.value || '');
+            };
 
-    if (patternSearchInput) {
-        const searchHandler = function(event) {
-            filterPatternItems(event.target.value || '');
+            searchInput.addEventListener('input', searchHandler);
+            searchInput.addEventListener('keyup', searchHandler);
+        }
+
+        if (categorySelect) {
+            categorySelect.addEventListener('change', function(event) {
+                setCategory(event.target.value || '');
+            });
+        }
+
+        if (dateSelect) {
+            dateSelect.addEventListener('change', function(event) {
+                setDate(event.target.value || '');
+            });
+        }
+
+        if (sortSelect) {
+            sortSelect.addEventListener('change', function(event) {
+                setSort(event.target.value || '');
+            });
+        }
+
+        return {
+            refresh: applyFilters,
         };
-
-        patternSearchInput.addEventListener('input', searchHandler);
-        patternSearchInput.addEventListener('keyup', searchHandler);
     }
+
+    createPatternSelectionController({
+        listElement: document.getElementById('pattern-selection-items'),
+        itemSelector: '.pattern-selection-item',
+        hiddenClass: 'is-hidden',
+        selectAllCheckbox: document.getElementById('select-all-export-patterns'),
+        searchInput: document.getElementById('pattern-search'),
+        statusElement: document.getElementById('pattern-selection-status'),
+    });
+
+    createPatternSelectionController({
+        listElement: document.getElementById('patterns-preview-items'),
+        itemSelector: '.pattern-item',
+        hiddenClass: 'is-hidden',
+        selectAllCheckbox: document.getElementById('select-all-patterns'),
+        searchInput: document.getElementById('tejlg-import-pattern-search'),
+        statusElement: document.getElementById('pattern-import-status'),
+        categorySelect: document.getElementById('tejlg-import-filter-category'),
+        dateSelect: document.getElementById('tejlg-import-filter-date'),
+        sortSelect: document.getElementById('tejlg-import-sort'),
+        noCategoryValue: '__no-category__',
+        noDateValue: '__no-date__',
+        defaultSort: (function() {
+            const container = document.getElementById('patterns-preview-list');
+            if (!container) {
+                return '';
+            }
+
+            return container.getAttribute('data-default-sort') || '';
+        })(),
+        getItemCheckbox: function(item) {
+            return item.querySelector('.pattern-selector input[type="checkbox"]');
+        },
+        getSearchableText: function(item) {
+            return (item.getAttribute('data-search') || '').toLowerCase();
+        },
+        getCategoryTokens: function(item) {
+            const attr = item.getAttribute('data-categories') || '';
+            if (!attr) {
+                return [];
+            }
+
+            return attr
+                .split(/\s+/)
+                .filter(function(token) { return token !== ''; })
+                .map(function(token) { return token.toLowerCase(); });
+        },
+        getDateValue: function(item) {
+            return item.getAttribute('data-period') || '';
+        },
+        getTimestamp: function(item) {
+            return item.getAttribute('data-timestamp') || null;
+        },
+        getTitleSortValue: function(item) {
+            return item.getAttribute('data-title-sort') || '';
+        },
+        getOriginalIndex: function(item) {
+            return item.getAttribute('data-original-index') || null;
+        },
+    });
 
     // Mettre à jour en continu les métriques de performance dans le badge.
     const fpsElement = document.getElementById('tejlg-metric-fps');

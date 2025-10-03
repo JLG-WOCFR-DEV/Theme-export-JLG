@@ -99,6 +99,119 @@
     background: #fff;
 }
 
+.pattern-import-layout {
+    margin-top: 1.5rem;
+}
+
+.pattern-import-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.pattern-import-actions .description {
+    margin: 0;
+    color: #50575e;
+}
+
+.pattern-import-instructions {
+    margin: 0 0 1rem;
+    max-width: 760px;
+    color: #50575e;
+}
+
+.pattern-import-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-bottom: 1rem;
+}
+
+.pattern-import-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 180px;
+}
+
+.pattern-import-control--search {
+    flex: 1 1 260px;
+    min-width: 220px;
+}
+
+#tejlg-import-pattern-search,
+#tejlg-import-filter-category,
+#tejlg-import-filter-date,
+#tejlg-import-sort {
+    width: 100%;
+    max-width: 100%;
+    padding: 6px 10px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+#tejlg-import-pattern-search:focus,
+#tejlg-import-filter-category:focus,
+#tejlg-import-filter-date:focus,
+#tejlg-import-sort:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
+}
+
+.pattern-import-status {
+    margin: 0 0 1rem;
+    font-style: italic;
+    color: #3c434a;
+}
+
+.pattern-import-items .pattern-item {
+    margin-bottom: 20px;
+}
+
+.pattern-item.is-hidden {
+    display: none;
+}
+
+.pattern-import-meta {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.pattern-import-meta-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pattern-import-category {
+    display: inline-flex;
+    align-items: center;
+}
+
+.pattern-import-excerpt {
+    margin: 0.5rem 0 0;
+    color: #3c434a;
+    line-height: 1.45;
+}
+
+@media (max-width: 782px) {
+    .pattern-import-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pattern-import-control {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
 .pattern-selector {
     padding: 10px 15px;
     border-bottom: 1px solid #ccd0d4;
