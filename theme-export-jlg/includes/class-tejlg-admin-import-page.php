@@ -108,9 +108,23 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
             }
         }
 
-        $invalid_patterns = [];
-        $prepared_patterns = [];
+        $invalid_patterns       = [];
+        $prepared_patterns      = [];
         $has_renderable_pattern = false;
+        $category_filters       = [];
+        $date_filters           = [];
+        $has_uncategorized      = false;
+        $has_undated            = false;
+
+        $lowercase = static function ($value) {
+            $value = (string) $value;
+
+            if (function_exists('mb_strtolower')) {
+                return mb_strtolower($value, 'UTF-8');
+            }
+
+            return strtolower($value);
+        };
 
         foreach ($patterns as $index => $pattern) {
             if (!is_array($pattern) || !array_key_exists('title', $pattern) || !array_key_exists('content', $pattern)) {
@@ -146,11 +160,231 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
                 $has_renderable_pattern = true;
             }
 
+            $raw_description = '';
+
+            if (isset($pattern['description'])) {
+                $raw_description = $pattern['description'];
+
+                if (is_array($raw_description)) {
+                    if (isset($raw_description['rendered']) && is_scalar($raw_description['rendered'])) {
+                        $raw_description = (string) $raw_description['rendered'];
+                    } elseif (isset($raw_description['raw']) && is_scalar($raw_description['raw'])) {
+                        $raw_description = (string) $raw_description['raw'];
+                    } else {
+                        $raw_description = '';
+                    }
+                } elseif (!is_scalar($raw_description)) {
+                    $raw_description = '';
+                }
+            }
+
+            $raw_description = trim((string) $raw_description);
+
+            $excerpt_source = '' !== $raw_description
+                ? $raw_description
+                : wp_strip_all_tags($pattern_content);
+
+            $excerpt = '' !== $excerpt_source
+                ? wp_trim_words($excerpt_source, 36, '…')
+                : '';
+
+            $category_entries = [];
+
+            if (isset($pattern['taxonomies']) && is_array($pattern['taxonomies'])) {
+                if (isset($pattern['taxonomies']['wp_pattern_category']) && is_array($pattern['taxonomies']['wp_pattern_category'])) {
+                    $category_entries = array_merge($category_entries, $pattern['taxonomies']['wp_pattern_category']);
+                }
+            }
+
+            if (isset($pattern['categories']) && is_array($pattern['categories'])) {
+                $category_entries = array_merge($category_entries, $pattern['categories']);
+            }
+
+            $normalized_category_tokens = [];
+            $category_labels            = [];
+
+            foreach ($category_entries as $category_entry) {
+                $slug_candidate  = '';
+                $label_candidate = '';
+
+                if (is_array($category_entry)) {
+                    if (isset($category_entry['slug']) && is_scalar($category_entry['slug'])) {
+                        $slug_candidate = (string) $category_entry['slug'];
+                    }
+
+                    if (isset($category_entry['name']) && is_scalar($category_entry['name'])) {
+                        $label_candidate = (string) $category_entry['name'];
+                    } elseif (isset($category_entry['label']) && is_scalar($category_entry['label'])) {
+                        $label_candidate = (string) $category_entry['label'];
+                    } elseif (isset($category_entry['title']) && is_scalar($category_entry['title'])) {
+                        $label_candidate = (string) $category_entry['title'];
+                    }
+                } elseif (is_scalar($category_entry)) {
+                    $slug_candidate  = (string) $category_entry;
+                    $label_candidate = (string) $category_entry;
+                }
+
+                $slug_candidate  = sanitize_title($slug_candidate);
+                $label_candidate = trim((string) $label_candidate);
+
+                if ('' === $slug_candidate && '' !== $label_candidate) {
+                    $slug_candidate = sanitize_title($label_candidate);
+                }
+
+                if ('' === $label_candidate && '' !== $slug_candidate) {
+                    $label_candidate = ucwords(str_replace(['-', '_'], ' ', $slug_candidate));
+                }
+
+                if ('' === $slug_candidate) {
+                    continue;
+                }
+
+                if ('' === $label_candidate) {
+                    $label_candidate = $slug_candidate;
+                }
+
+                if (!in_array($slug_candidate, $normalized_category_tokens, true)) {
+                    $normalized_category_tokens[] = $slug_candidate;
+                }
+
+                $category_labels[$slug_candidate] = $label_candidate;
+                $category_filters[$slug_candidate] = $label_candidate;
+            }
+
+            if (empty($normalized_category_tokens)) {
+                $has_uncategorized = true;
+            }
+
+            $keywords = [];
+
+            if (isset($pattern['keywords']) && is_array($pattern['keywords'])) {
+                foreach ($pattern['keywords'] as $keyword) {
+                    if (is_array($keyword)) {
+                        if (isset($keyword['name']) && is_scalar($keyword['name'])) {
+                            $keyword = (string) $keyword['name'];
+                        } elseif (isset($keyword['slug']) && is_scalar($keyword['slug'])) {
+                            $keyword = (string) $keyword['slug'];
+                        } else {
+                            $keyword = '';
+                        }
+                    } elseif (!is_scalar($keyword)) {
+                        $keyword = '';
+                    }
+
+                    $keyword = trim((string) $keyword);
+
+                    if ('' !== $keyword) {
+                        $keywords[] = $keyword;
+                    }
+                }
+            }
+
+            $date_timestamp = null;
+            $date_display   = '';
+            $date_machine   = '';
+            $period_value   = '';
+            $period_label   = '';
+
+            foreach (['modified', 'modified_gmt', 'date', 'date_gmt'] as $date_key) {
+                if (!isset($pattern[$date_key])) {
+                    continue;
+                }
+
+                $raw_date = $pattern[$date_key];
+
+                if (is_array($raw_date)) {
+                    if (isset($raw_date['raw']) && is_scalar($raw_date['raw'])) {
+                        $raw_date = (string) $raw_date['raw'];
+                    } elseif (isset($raw_date['rendered']) && is_scalar($raw_date['rendered'])) {
+                        $raw_date = (string) $raw_date['rendered'];
+                    } else {
+                        $raw_date = '';
+                    }
+                } elseif (!is_scalar($raw_date)) {
+                    $raw_date = '';
+                }
+
+                $raw_date = trim((string) $raw_date);
+
+                if ('' === $raw_date) {
+                    continue;
+                }
+
+                $timestamp = strtotime($raw_date);
+
+                if (false === $timestamp) {
+                    continue;
+                }
+
+                $date_timestamp = $timestamp;
+                break;
+            }
+
+            if (null !== $date_timestamp) {
+                $date_display = wp_date(get_option('date_format'), $date_timestamp);
+                $date_machine = wp_date('Y-m-d', $date_timestamp);
+                $period_value = wp_date('Y-m', $date_timestamp);
+                $period_label = wp_date('F Y', $date_timestamp);
+
+                if ('' !== $period_value && !isset($date_filters[$period_value])) {
+                    $date_filters[$period_value] = [
+                        'label'     => $period_label,
+                        'timestamp' => $date_timestamp,
+                    ];
+                }
+            } else {
+                $has_undated = true;
+            }
+
+            $category_label_values = [];
+
+            foreach ($normalized_category_tokens as $token) {
+                if (isset($category_labels[$token])) {
+                    $category_label_values[] = $category_labels[$token];
+                }
+            }
+
+            $search_components = [
+                $title,
+                implode(' ', $normalized_category_tokens),
+                implode(' ', $category_label_values),
+                implode(' ', $keywords),
+                $excerpt,
+                $date_display,
+                $date_machine,
+                $period_label,
+            ];
+
+            if (isset($pattern['slug']) && is_scalar($pattern['slug'])) {
+                $search_components[] = (string) $pattern['slug'];
+            }
+
+            $search_components = array_filter($search_components, static function ($component) {
+                return '' !== trim((string) $component);
+            });
+
+            $search_haystack = '';
+
+            if (!empty($search_components)) {
+                $search_haystack = $lowercase(implode(' ', $search_components));
+            }
+
             $prepared_patterns[] = [
-                'index'    => (int) $index,
-                'title'    => $title,
-                'content'  => $pattern_content,
-                'rendered' => $sanitized_rendered_pattern,
+                'index'             => (int) $index,
+                'title'             => $title,
+                'title_sort'        => $lowercase($title),
+                'content'           => $pattern_content,
+                'rendered'          => $sanitized_rendered_pattern,
+                'excerpt'           => $excerpt,
+                'categories'        => $normalized_category_tokens,
+                'category_labels'   => $category_label_values,
+                'date_display'      => $date_display,
+                'date_machine'      => $date_machine,
+                'period_value'      => $period_value,
+                'period_label'      => $period_label,
+                'timestamp'         => $date_timestamp,
+                'search_haystack'   => $search_haystack,
+                'original_index'    => (int) $index,
             ];
         }
 
@@ -187,6 +421,46 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
             echo '<p><a href="' . esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'import'], admin_url('admin.php'))) . '">&larr; ' . esc_html__("Retour au formulaire d'import", 'theme-export-jlg') . '</a></p>';
             return;
         }
+
+        if (!empty($category_filters)) {
+            natcasesort($category_filters);
+        }
+
+        $category_filter_options = $category_filters;
+
+        if (!empty($date_filters)) {
+            uasort(
+                $date_filters,
+                static function ($a, $b) {
+                    $a_time = isset($a['timestamp']) ? (int) $a['timestamp'] : 0;
+                    $b_time = isset($b['timestamp']) ? (int) $b['timestamp'] : 0;
+
+                    if ($a_time === $b_time) {
+                        return 0;
+                    }
+
+                    return ($a_time > $b_time) ? -1 : 1;
+                }
+            );
+        }
+
+        $date_filter_options = [];
+
+        foreach ($date_filters as $value => $data) {
+            $label = '';
+
+            if (isset($data['label']) && is_scalar($data['label'])) {
+                $label = (string) $data['label'];
+            }
+
+            if ('' === $label) {
+                $label = (string) $value;
+            }
+
+            $date_filter_options[$value] = $label;
+        }
+
+        $default_sort = 'title-asc';
 
         $encoding_failures = [];
 
@@ -256,6 +530,11 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
             'encoding_failures'  => $encoding_failures,
             'warnings'           => $warnings,
             'global_styles'      => $global_styles,
+            'category_filters'   => $category_filter_options,
+            'date_filters'       => $date_filter_options,
+            'has_uncategorized'  => $has_uncategorized,
+            'has_undated'        => $has_undated,
+            'default_sort'       => $default_sort,
         ]);
     }
 

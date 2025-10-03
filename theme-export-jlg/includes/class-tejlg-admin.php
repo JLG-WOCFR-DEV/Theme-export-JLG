@@ -95,6 +95,13 @@ class TEJLG_Admin {
                     'empty'          => esc_html__('Aucune composition visible.', 'theme-export-jlg'),
                     'countSingular'  => esc_html__('%s composition visible.', 'theme-export-jlg'),
                     'countPlural'    => esc_html__('%s compositions visibles.', 'theme-export-jlg'),
+                    'filterSearch'   => esc_html__('recherche « %s »', 'theme-export-jlg'),
+                    'filterCategory' => esc_html__('catégorie « %s »', 'theme-export-jlg'),
+                    'filterCategoryNone' => esc_html__('sans catégorie', 'theme-export-jlg'),
+                    'filterDate'     => esc_html__('période « %s »', 'theme-export-jlg'),
+                    'filterDateNone' => esc_html__('sans date', 'theme-export-jlg'),
+                    'filtersSummaryIntro' => esc_html__('Filtres actifs :', 'theme-export-jlg'),
+                    'filtersSummaryJoin'  => esc_html__(' ; ', 'theme-export-jlg'),
                 ],
                 'exportAsync' => [
                     'ajaxUrl' => admin_url('admin-ajax.php'),
