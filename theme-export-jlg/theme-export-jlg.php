@@ -25,6 +25,7 @@ define( 'TEJLG_URL', plugin_dir_url( __FILE__ ) );
 
 // Charger les classes nécessaires
 require_once TEJLG_PATH . 'includes/class-tejlg-admin.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-export-history.php';
 require_once TEJLG_PATH . 'includes/class-wp-background-process.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-zip-writer.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export-process.php';

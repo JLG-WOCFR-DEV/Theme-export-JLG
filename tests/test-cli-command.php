@@ -1,6 +1,7 @@
 <?php
 
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
+require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export-history.php';
 
 if (!defined('WP_CLI')) {
     define('WP_CLI', true);
@@ -55,6 +56,9 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
 
         WP_CLI::$success_message = '';
         WP_CLI::$error_message = '';
+        WP_CLI::$last_log       = '';
+
+        TEJLG_Export_History::clear_history();
     }
 
     protected function tearDown(): void {
@@ -79,6 +83,53 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
         $this->assertNotNull($decoded, 'JSON should decode even if empty array.');
         $this->assertNotSame('', WP_CLI::$success_message, 'CLI should return a success message.');
         $this->assertStringContainsString($target, WP_CLI::$success_message);
+    }
+
+    public function test_history_command_outputs_empty_state() {
+        $cli = new TEJLG_CLI();
+
+        WP_CLI::$last_log = '';
+
+        $cli->history([], []);
+
+        $this->assertStringContainsString(
+            'Aucun export',
+            WP_CLI::$last_log,
+            'History command should warn when no entries exist.'
+        );
+    }
+
+    public function test_history_command_lists_recorded_entry() {
+        $temp_file = wp_tempnam('cli-history.zip');
+        $this->assertNotFalse($temp_file);
+
+        file_put_contents($temp_file, 'cli');
+
+        TEJLG_Export_History::record_job([
+            'id'            => 'cli-history-job',
+            'status'        => 'completed',
+            'zip_path'      => $temp_file,
+            'zip_file_name' => 'cli-history.zip',
+            'zip_file_size' => filesize($temp_file),
+            'exclusions'    => [],
+            'created_at'    => time(),
+            'updated_at'    => time(),
+            'completed_at'  => time(),
+            'created_via'   => 'cli',
+        ]);
+
+        $cli = new TEJLG_CLI();
+        $cli->history([], []);
+
+        $this->assertStringContainsString(
+            'cli-history-job',
+            WP_CLI::$last_log,
+            'History command should list the recorded entry.'
+        );
+
+        if (file_exists($temp_file)) {
+            @unlink($temp_file);
+        }
     }
 
     private function remove_directory($directory) {

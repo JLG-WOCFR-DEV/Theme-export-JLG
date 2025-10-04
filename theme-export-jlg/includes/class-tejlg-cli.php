@@ -3,6 +3,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once __DIR__ . '/class-tejlg-export-history.php';
+
 if (!class_exists('TEJLG_CLI_WPDie_Exception')) {
     class TEJLG_CLI_WPDie_Exception extends RuntimeException {
     }
@@ -14,6 +16,7 @@ class TEJLG_CLI {
         WP_CLI::log(__('Commandes disponibles :', 'theme-export-jlg'));
         WP_CLI::log('  wp theme-export-jlg theme [--exclusions=<motifs>] [--output=<chemin>]');
         WP_CLI::log('  wp theme-export-jlg patterns [--portable] [--output=<chemin>]');
+        WP_CLI::log('  wp theme-export-jlg history [--per-page=<nombre>] [--page=<nombre>]');
     }
 
     public function theme($args, $assoc_args) {
@@ -42,13 +45,19 @@ class TEJLG_CLI {
                 ? $job['message']
                 : __('Une erreur est survenue lors de l\'export du thème.', 'theme-export-jlg');
             WP_CLI::error($this->normalize_cli_message($message));
-            TEJLG_Export::delete_job($job_id);
+            TEJLG_Export::delete_job($job_id, [
+                'origin' => 'cli',
+                'reason' => 'failure',
+            ]);
             return;
         }
 
         if (!isset($job['status']) || 'completed' !== $job['status']) {
             WP_CLI::error(__('La génération de l\'archive du thème est incomplète.', 'theme-export-jlg'));
-            TEJLG_Export::delete_job($job_id);
+            TEJLG_Export::delete_job($job_id, [
+                'origin' => 'cli',
+                'reason' => 'incomplete',
+            ]);
             return;
         }
 
@@ -56,19 +65,118 @@ class TEJLG_CLI {
 
         if ('' === $source_path || !file_exists($source_path)) {
             WP_CLI::error(__('Le fichier ZIP généré est introuvable.', 'theme-export-jlg'));
-            TEJLG_Export::delete_job($job_id);
+            TEJLG_Export::delete_job($job_id, [
+                'origin' => 'cli',
+                'reason' => 'missing_zip',
+            ]);
             return;
         }
 
         if (!$this->copy_file($source_path, $output_path)) {
-            TEJLG_Export::delete_job($job_id);
+            TEJLG_Export::delete_job($job_id, [
+                'origin' => 'cli',
+                'reason' => 'copy_failed',
+            ]);
             WP_CLI::error(sprintf(__('Impossible de copier le fichier ZIP vers %s.', 'theme-export-jlg'), $output_path));
             return;
         }
 
-        TEJLG_Export::delete_job($job_id);
+        TEJLG_Export::delete_job($job_id, [
+            'origin' => 'cli',
+            'reason' => 'exported',
+        ]);
 
         WP_CLI::success(sprintf(__('Archive du thème exportée vers %s', 'theme-export-jlg'), $output_path));
+    }
+
+    public function history($args, $assoc_args) {
+        $per_page = isset($assoc_args['per-page']) ? (int) $assoc_args['per-page'] : 10;
+        $per_page = $per_page > 0 ? $per_page : 10;
+
+        $page = isset($assoc_args['page']) ? (int) $assoc_args['page'] : 1;
+        $page = $page > 0 ? $page : 1;
+
+        $history = TEJLG_Export_History::get_entries([
+            'per_page' => $per_page,
+            'paged'    => $page,
+        ]);
+
+        $entries = isset($history['entries']) ? (array) $history['entries'] : [];
+        $total   = isset($history['total']) ? (int) $history['total'] : 0;
+        $total_pages = isset($history['total_pages']) ? (int) $history['total_pages'] : 1;
+        $total_pages = $total_pages > 0 ? $total_pages : 1;
+
+        if (empty($entries)) {
+            WP_CLI::log(__('Aucun export n\'a encore été enregistré.', 'theme-export-jlg'));
+            return;
+        }
+
+        $date_format = get_option('date_format', 'Y-m-d');
+        $time_format = get_option('time_format', 'H:i');
+        $datetime_format = trim($date_format . ' ' . $time_format);
+
+        WP_CLI::log(sprintf(
+            /* translators: 1: current page number, 2: total pages, 3: total entries. */
+            __('Historique des exports – page %1$d sur %2$d (%3$d entrées)', 'theme-export-jlg'),
+            isset($history['current_page']) ? (int) $history['current_page'] : 1,
+            $total_pages,
+            $total
+        ));
+
+        foreach ($entries as $entry) {
+            $job_id = isset($entry['job_id']) ? (string) $entry['job_id'] : '';
+
+            $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+            $formatted_date = '';
+
+            if ($timestamp > 0) {
+                if (function_exists('wp_date')) {
+                    $formatted_date = wp_date($datetime_format, $timestamp);
+                } else {
+                    $formatted_date = date_i18n($datetime_format, $timestamp);
+                }
+            }
+
+            $user_name = isset($entry['user_name']) ? (string) $entry['user_name'] : '';
+            $user_id   = isset($entry['user_id']) ? (int) $entry['user_id'] : 0;
+
+            if ('' === $user_name) {
+                $user_name = $user_id > 0
+                    ? sprintf(__('Utilisateur #%d', 'theme-export-jlg'), $user_id)
+                    : __('Système', 'theme-export-jlg');
+            }
+
+            $size_bytes = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
+            $size_label = $size_bytes > 0 ? size_format($size_bytes, 2) : __('Inconnue', 'theme-export-jlg');
+
+            $status = isset($entry['status']) && '' !== $entry['status']
+                ? (string) $entry['status']
+                : __('Inconnu', 'theme-export-jlg');
+
+            $exclusions = isset($entry['exclusions']) ? (array) $entry['exclusions'] : [];
+            $exclusions = array_map('sanitize_text_field', $exclusions);
+            $exclusions_label = !empty($exclusions)
+                ? implode(', ', $exclusions)
+                : __('Aucune exclusion', 'theme-export-jlg');
+
+            $download_url = isset($entry['persistent_url']) ? (string) $entry['persistent_url'] : '';
+
+            $line = sprintf(
+                '[%1$s] %2$s | %3$s | %4$s | %5$s | %6$s',
+                $job_id,
+                $formatted_date,
+                $user_name,
+                $size_label,
+                $status,
+                $exclusions_label
+            );
+
+            if ('' !== $download_url) {
+                $line .= ' | ' . sprintf(__('Téléchargement : %s', 'theme-export-jlg'), $download_url);
+            }
+
+            WP_CLI::log($line);
+        }
     }
 
     public function patterns($args, $assoc_args) {
