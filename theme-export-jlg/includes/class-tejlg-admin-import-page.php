@@ -556,7 +556,10 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
         }
 
         if ((int) $theme_file['error'] === UPLOAD_ERR_OK) {
-            TEJLG_Import::import_theme($theme_file);
+            $allow_overwrite = isset($_POST['tejlg_confirm_theme_overwrite'])
+                && '1' === (string) $_POST['tejlg_confirm_theme_overwrite'];
+
+            TEJLG_Import::import_theme($theme_file, $allow_overwrite);
             return;
         }
 

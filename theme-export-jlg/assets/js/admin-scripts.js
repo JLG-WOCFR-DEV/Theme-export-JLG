@@ -410,10 +410,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const themeImportForm = document.getElementById('tejlg-import-theme-form');
 
         if (themeImportForm) {
+            const overwriteField = themeImportForm.querySelector('#tejlg_confirm_theme_overwrite');
+
             themeImportForm.addEventListener('submit', function(event) {
                 if (!window.confirm(themeImportConfirmMessage)) {
+                    if (overwriteField) {
+                        overwriteField.value = '0';
+                    }
                     event.preventDefault();
                     event.stopImmediatePropagation();
+                    return;
+                }
+
+                if (overwriteField) {
+                    overwriteField.value = '1';
                 }
             });
         }

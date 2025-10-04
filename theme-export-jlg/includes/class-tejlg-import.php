@@ -116,7 +116,7 @@ class TEJLG_Import {
         ];
     }
 
-    public static function import_theme($file) {
+    public static function import_theme($file, $allow_overwrite = false) {
         if (!current_user_can('install_themes')) {
             if (isset($file['tmp_name'])) {
                 @unlink($file['tmp_name']);
@@ -188,28 +188,53 @@ class TEJLG_Import {
             'nonce' => 'tejlg-import-theme',
         ];
 
+        $install_options = [
+            'overwrite_package' => (bool) $allow_overwrite,
+        ];
+
         $upgrader = new Theme_Upgrader(new TEJLG_Silent_Theme_Installer_Skin($skin_args));
-        $result = $upgrader->install($file_upload->package, ['overwrite_package' => true]);
+        $result   = $upgrader->install($file_upload->package, $install_options);
 
         if ($file_upload instanceof File_Upload_Upgrader) {
             $file_upload->cleanup();
         }
 
+        self::finalize_theme_install_result($result, (bool) $allow_overwrite);
+    }
+
+    /**
+     * Ajoute un message d'état pour le résultat de l'installation du thème.
+     *
+     * @param mixed $result          Résultat retourné par Theme_Upgrader::install().
+     * @param bool  $allow_overwrite Indique si l'utilisateur a confirmé l'écrasement.
+     *
+     * @return mixed
+     */
+    public static function finalize_theme_install_result($result, $allow_overwrite) {
         $message_type = 'info';
         $message_text = esc_html__('Le processus d\'installation du thème a renvoyé un résultat inattendu.', 'theme-export-jlg');
 
         if (is_wp_error($result)) {
             $message_type = 'error';
             $message_text = $result->get_error_message();
+
+            if (!$allow_overwrite && 'folder_exists' === $result->get_error_code()) {
+                $message_text .= ' ' . esc_html__(
+                    'Veuillez relancer l\'import en confirmant le remplacement explicite.',
+                    'theme-export-jlg'
+                );
+            }
         } elseif (false === $result) {
             $message_type = 'error';
             $message_text = esc_html__('L\'installation du thème a échoué.', 'theme-export-jlg');
-        } elseif (false !== $result) {
+        } else {
             $message_type = 'success';
             $message_text = esc_html__('Le thème a été installé avec succès !', 'theme-export-jlg');
         }
 
         add_settings_error('tejlg_import_messages', 'theme_import_status', $message_text, $message_type);
+
+        return $result;
     }
 
     public static function import_global_styles($file) {
