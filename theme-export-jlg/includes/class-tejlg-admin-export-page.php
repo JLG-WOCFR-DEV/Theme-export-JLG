@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/class-tejlg-export-history.php';
 
 if (!class_exists('TEJLG_Redirect_Exception')) {
     class TEJLG_Redirect_Exception extends RuntimeException {
@@ -87,11 +88,45 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             $portable_mode_enabled = isset($_POST['export_portable']);
         }
 
+        $history_per_page = (int) apply_filters('tejlg_export_history_per_page', 10);
+        $history_per_page = $history_per_page > 0 ? $history_per_page : 10;
+
+        $history_page = isset($_GET['history_page']) ? absint($_GET['history_page']) : 0;
+        $history_page = $history_page > 0 ? $history_page : 1;
+
+        $history = TEJLG_Export_History::get_entries([
+            'per_page' => $history_per_page,
+            'paged'    => $history_page,
+        ]);
+
+        $history_total_pages = isset($history['total_pages']) ? (int) $history['total_pages'] : 1;
+        $history_total_pages = $history_total_pages > 0 ? $history_total_pages : 1;
+
+        $history_base_url = add_query_arg([
+            'page' => $this->page_slug,
+            'tab'  => 'export',
+        ], admin_url('admin.php'));
+
+        $history_pagination_links = paginate_links([
+            'base'      => add_query_arg('history_page', '%#%', $history_base_url),
+            'format'    => '',
+            'current'   => isset($history['current_page']) ? (int) $history['current_page'] : 1,
+            'total'     => $history_total_pages,
+            'type'      => 'array',
+            'add_args'  => false,
+        ]);
+
         $this->render_template('export.php', [
             'page_slug'                 => $this->page_slug,
             'child_theme_value'         => $child_theme_value,
             'exclusion_patterns_value'  => $exclusion_patterns_value,
             'portable_mode_enabled'     => $portable_mode_enabled,
+            'history_entries'           => isset($history['entries']) ? (array) $history['entries'] : [],
+            'history_total'             => isset($history['total']) ? (int) $history['total'] : 0,
+            'history_pagination_links'  => is_array($history_pagination_links) ? $history_pagination_links : [],
+            'history_current_page'      => isset($history['current_page']) ? (int) $history['current_page'] : 1,
+            'history_total_pages'       => $history_total_pages,
+            'history_per_page'          => $history_per_page,
         ]);
     }
 
@@ -274,7 +309,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
 
         if ('' === $zip_path || !file_exists($zip_path)) {
-            TEJLG_Export::delete_job($job_id);
+            TEJLG_Export::delete_job($job_id, [
+                'origin' => 'admin',
+                'reason' => 'missing_zip',
+            ]);
             $this->notify_and_redirect(
                 'error',
                 'theme_export_zip_missing',
@@ -322,7 +360,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $handle = fopen($zip_path, 'rb');
 
         if (false === $handle) {
-            TEJLG_Export::delete_job($job_id);
+            TEJLG_Export::delete_job($job_id, [
+                'origin' => 'admin',
+                'reason' => 'unreadable_zip',
+            ]);
             $this->notify_and_redirect(
                 'error',
                 'theme_export_zip_unreadable',
@@ -336,7 +377,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         fclose($handle);
 
-        TEJLG_Export::delete_job($job_id);
+        TEJLG_Export::delete_job($job_id, [
+            'origin' => 'admin',
+            'reason' => 'downloaded',
+        ]);
 
         flush();
         exit;

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/class-tejlg-export-history.php';
 require_once __DIR__ . '/class-tejlg-zip-writer.php';
 
 class TEJLG_Export {
@@ -95,6 +96,17 @@ class TEJLG_Export {
 
         $job_id = self::generate_job_id();
 
+        $current_user_id   = function_exists('get_current_user_id') ? (int) get_current_user_id() : 0;
+        $current_user_name = '';
+
+        if ($current_user_id > 0) {
+            $current_user = get_userdata($current_user_id);
+
+            if ($current_user instanceof WP_User) {
+                $current_user_name = $current_user->display_name;
+            }
+        }
+
         $job = [
             'id'                => $job_id,
             'status'            => 'queued',
@@ -110,6 +122,9 @@ class TEJLG_Export {
             'created_at'        => time(),
             'updated_at'        => time(),
             'message'           => '',
+            'created_by'        => $current_user_id,
+            'created_by_name'   => $current_user_name,
+            'created_via'       => (defined('WP_CLI') && WP_CLI) ? 'cli' : 'web',
         ];
 
         self::persist_job($job);
@@ -439,8 +454,12 @@ class TEJLG_Export {
         return $job;
     }
 
-    public static function delete_job($job_id) {
+    public static function delete_job($job_id, array $context = []) {
         $job = self::get_job($job_id);
+
+        if (null !== $job) {
+            TEJLG_Export_History::record_job($job, $context);
+        }
 
         if (null !== $job && !empty($job['zip_path']) && file_exists($job['zip_path'])) {
             self::delete_temp_file($job['zip_path']);
@@ -506,7 +525,9 @@ class TEJLG_Export {
                 continue;
             }
 
-            self::delete_job($job_id);
+            self::delete_job($job_id, [
+                'origin' => 'cleanup',
+            ]);
         }
     }
 
@@ -715,7 +736,10 @@ class TEJLG_Export {
         $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
 
         if ('' === $zip_path || !file_exists($zip_path)) {
-            self::delete_job($job_id);
+            self::delete_job($job_id, [
+                'origin' => 'ajax',
+                'reason' => 'missing_zip',
+            ]);
             wp_die(esc_html__('Le fichier ZIP généré est introuvable.', 'theme-export-jlg'));
         }
 
@@ -744,7 +768,10 @@ class TEJLG_Export {
         readfile($zip_path);
         flush();
 
-        self::delete_job($job_id);
+        self::delete_job($job_id, [
+            'origin' => 'ajax',
+            'reason' => 'downloaded',
+        ]);
         exit;
     }
     /**

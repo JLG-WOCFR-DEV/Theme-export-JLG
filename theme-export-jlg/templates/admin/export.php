@@ -3,6 +3,12 @@
 /** @var string $child_theme_value */
 /** @var string $exclusion_patterns_value */
 /** @var bool   $portable_mode_enabled */
+/** @var array  $history_entries */
+/** @var int    $history_total */
+/** @var array  $history_pagination_links */
+/** @var int    $history_current_page */
+/** @var int    $history_total_pages */
+/** @var int    $history_per_page */
 
 $export_tab_url = add_query_arg([
     'page' => $page_slug,
@@ -101,5 +107,99 @@ $select_patterns_url = add_query_arg([
                 <p><button type="submit" name="tejlg_create_child" class="button button-primary wp-ui-primary"><?php esc_html_e('Créer le Thème Enfant', 'theme-export-jlg'); ?></button></p>
             </form>
         </div>
+    </div>
+</div>
+
+<h2><?php esc_html_e('Historique des exports', 'theme-export-jlg'); ?></h2>
+<div class="tejlg-card components-card is-elevated">
+    <div class="components-card__body">
+        <?php if (!empty($history_entries)) : ?>
+            <table class="wp-list-table widefat striped">
+                <thead>
+                    <tr>
+                        <th scope="col"><?php esc_html_e('Tâche', 'theme-export-jlg'); ?></th>
+                        <th scope="col"><?php esc_html_e('Utilisateur', 'theme-export-jlg'); ?></th>
+                        <th scope="col"><?php esc_html_e('Date', 'theme-export-jlg'); ?></th>
+                        <th scope="col"><?php esc_html_e('Taille', 'theme-export-jlg'); ?></th>
+                        <th scope="col"><?php esc_html_e('Exclusions', 'theme-export-jlg'); ?></th>
+                        <th scope="col"><?php esc_html_e('Statut', 'theme-export-jlg'); ?></th>
+                        <th scope="col"><?php esc_html_e('Téléchargement', 'theme-export-jlg'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $date_format = get_option('date_format', 'Y-m-d');
+                    $time_format = get_option('time_format', 'H:i');
+                    $datetime_format = trim($date_format . ' ' . $time_format);
+
+                    foreach ($history_entries as $entry) :
+                        $job_id   = isset($entry['job_id']) ? (string) $entry['job_id'] : '';
+                        $file_name = isset($entry['zip_file_name']) && '' !== $entry['zip_file_name'] ? (string) $entry['zip_file_name'] : __('Archive ZIP', 'theme-export-jlg');
+                        $user_name = isset($entry['user_name']) ? (string) $entry['user_name'] : '';
+                        $user_id   = isset($entry['user_id']) ? (int) $entry['user_id'] : 0;
+
+                        if ('' === $user_name) {
+                            $user_name = $user_id > 0
+                                ? sprintf(__('Utilisateur #%d', 'theme-export-jlg'), $user_id)
+                                : __('Système', 'theme-export-jlg');
+                        }
+
+                        $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+                        $formatted_date = '';
+
+                        if ($timestamp > 0) {
+                            if (function_exists('wp_date')) {
+                                $formatted_date = wp_date($datetime_format, $timestamp);
+                            } else {
+                                $formatted_date = date_i18n($datetime_format, $timestamp);
+                            }
+                        }
+
+                        $size_bytes = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
+                        $size_label = $size_bytes > 0 ? size_format($size_bytes, 2) : __('Inconnue', 'theme-export-jlg');
+
+                        $exclusions = isset($entry['exclusions']) ? (array) $entry['exclusions'] : [];
+                        $exclusions_clean = array_map('sanitize_text_field', $exclusions);
+                        $exclusions_label = !empty($exclusions_clean)
+                            ? implode(', ', $exclusions_clean)
+                            : __('Aucune', 'theme-export-jlg');
+
+                        $status_label = isset($entry['status']) && '' !== $entry['status']
+                            ? (string) $entry['status']
+                            : __('Inconnu', 'theme-export-jlg');
+
+                        $download_url = isset($entry['persistent_url']) ? esc_url($entry['persistent_url']) : '';
+                    ?>
+                        <tr>
+                            <td>
+                                <strong><?php echo esc_html($file_name); ?></strong><br>
+                                <code><?php echo esc_html($job_id); ?></code>
+                            </td>
+                            <td><?php echo esc_html($user_name); ?></td>
+                            <td><?php echo esc_html($formatted_date); ?></td>
+                            <td><?php echo esc_html($size_label); ?></td>
+                            <td><?php echo esc_html($exclusions_label); ?></td>
+                            <td><?php echo esc_html($status_label); ?></td>
+                            <td>
+                                <?php if ('' !== $download_url) : ?>
+                                    <a href="<?php echo esc_url($download_url); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Télécharger', 'theme-export-jlg'); ?></a>
+                                <?php else : ?>
+                                    <span aria-hidden="true">—</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php if (!empty($history_pagination_links)) : ?>
+                <div class="tablenav bottom">
+                    <div class="tablenav-pages">
+                        <?php echo wp_kses_post(implode(' ', $history_pagination_links)); ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+        <?php else : ?>
+            <p><?php esc_html_e("Aucun export n'a encore été enregistré.", 'theme-export-jlg'); ?></p>
+        <?php endif; ?>
     </div>
 </div>
