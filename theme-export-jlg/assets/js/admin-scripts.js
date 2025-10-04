@@ -1506,8 +1506,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return rect.top < viewHeight && rect.bottom > 0;
         };
 
-        const previewControllers = new WeakMap();
-
         const intersectionObserver = (typeof IntersectionObserver === 'function')
             ? new IntersectionObserver(function(entries) {
                 entries.forEach(function(entry) {
