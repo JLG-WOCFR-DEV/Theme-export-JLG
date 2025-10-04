@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/class-tejlg-zip-writer.php';
+
 class TEJLG_Export {
 
     /**
@@ -14,10 +16,6 @@ class TEJLG_Export {
      *   déclenche également l'exécution immédiate.
      */
     public static function export_theme($exclusions = []) {
-        if (!class_exists('ZipArchive')) {
-            return new WP_Error('tejlg_ziparchive_missing', esc_html__('La classe ZipArchive n\'est pas disponible.', 'theme-export-jlg'));
-        }
-
         $exclusions = self::sanitize_exclusion_patterns($exclusions);
 
         $theme = wp_get_theme();
@@ -39,17 +37,21 @@ class TEJLG_Export {
             return new WP_Error('tejlg_zip_temp_cleanup_failed', esc_html__("Impossible de préparer le fichier temporaire pour l'archive ZIP.", 'theme-export-jlg'));
         }
 
-        $zip = new ZipArchive();
+        $zip_writer = TEJLG_Zip_Writer::create($zip_file_path);
 
-        if (true !== $zip->open($zip_file_path, ZipArchive::CREATE | ZipArchive::OVERWRITE)) {
+        if (is_wp_error($zip_writer)) {
             self::delete_temp_file($zip_file_path);
-            return new WP_Error('tejlg_zip_open_failed', esc_html__("Impossible de créer l'archive ZIP.", 'theme-export-jlg'));
+
+            return new WP_Error(
+                'tejlg_zip_open_failed',
+                esc_html__("Impossible de créer l'archive ZIP.", 'theme-export-jlg')
+            );
         }
 
         $zip_root_directory = rtrim($theme_slug, '/') . '/';
 
-        if (true !== $zip->addEmptyDir($zip_root_directory)) {
-            $zip->close();
+        if (true !== $zip_writer->add_directory($zip_root_directory)) {
+            $zip_writer->close();
             self::delete_temp_file($zip_file_path);
 
             return new WP_Error(
@@ -62,7 +64,7 @@ class TEJLG_Export {
             );
         }
 
-        $zip->close();
+        $zip_writer->close();
 
         $normalized_theme_dir = self::normalize_path($theme_dir_path);
 

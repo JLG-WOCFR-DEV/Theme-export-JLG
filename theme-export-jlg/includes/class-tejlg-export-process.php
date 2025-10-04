@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/class-tejlg-zip-writer.php';
+
 class TEJLG_Export_Process extends WP_Background_Process {
 
     /**
@@ -55,9 +57,9 @@ class TEJLG_Export_Process extends WP_Background_Process {
             return false;
         }
 
-        $zip = new ZipArchive();
+        $zip = TEJLG_Zip_Writer::open($zip_path);
 
-        if (true !== $zip->open($zip_path)) {
+        if (is_wp_error($zip)) {
             TEJLG_Export::mark_job_failed(
                 $job_id,
                 esc_html__("Impossible d'ouvrir l'archive temporaire.", 'theme-export-jlg')
@@ -75,7 +77,7 @@ class TEJLG_Export_Process extends WP_Background_Process {
             $zip_path_to_add = rtrim($relative_path_in_zip, '/') . '/';
 
             if (!isset($directories_added[$zip_path_to_add])) {
-                $result = $zip->addEmptyDir($zip_path_to_add);
+                $result = $zip->add_directory($zip_path_to_add);
 
                 if (true === $result) {
                     $directories_added[$zip_path_to_add] = true;
@@ -104,13 +106,13 @@ class TEJLG_Export_Process extends WP_Background_Process {
                 foreach ($segments as $segment) {
                     $current .= $segment . '/';
                     if (!isset($directories_added[$current])) {
-                        $zip->addEmptyDir($current);
+                        $zip->add_directory($current);
                         $directories_added[$current] = true;
                     }
                 }
             }
 
-            $result = $zip->addFile($real_path, $relative_path_in_zip);
+            $result = $zip->add_file($real_path, $relative_path_in_zip);
         } else {
             $zip->close();
             return false;

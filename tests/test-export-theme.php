@@ -94,4 +94,49 @@ class Test_Export_Theme extends WP_UnitTestCase {
         $this->assertNull(TEJLG_Export::get_job($job_id), 'The job should be removed once it becomes stale.');
         $this->assertFalse(file_exists($temp_file), 'Cleanup should delete the associated temporary ZIP file.');
     }
+
+    public function test_export_theme_generates_zip_when_ziparchive_is_unavailable() {
+        $filter = static function () {
+            return false;
+        };
+
+        add_filter('tejlg_zip_writer_use_ziparchive', $filter, 10, 1);
+
+        $job_id = TEJLG_Export::export_theme();
+
+        $this->assertNotWPError($job_id, 'The export job should be created successfully without ZipArchive.');
+
+        TEJLG_Export::run_pending_export_jobs();
+
+        $job = TEJLG_Export::get_export_job_status($job_id);
+
+        $this->assertIsArray($job, 'The job payload should be available.');
+        $this->assertSame('completed', isset($job['status']) ? $job['status'] : null, 'The export should complete successfully with the fallback.');
+
+        $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
+
+        $this->assertNotEmpty($zip_path, 'The fallback export should provide a ZIP path.');
+        $this->assertTrue(file_exists($zip_path), 'The fallback export should generate a ZIP file on disk.');
+
+        if (class_exists('ZipArchive')) {
+            $zip = new ZipArchive();
+            $open_result = $zip->open($zip_path);
+
+            $this->assertSame(true, $open_result, 'The generated archive should be readable as a ZIP file.');
+            $this->assertGreaterThan(0, $zip->numFiles, 'The generated archive should contain at least one file.');
+
+            $zip->close();
+        } else {
+            require_once ABSPATH . 'wp-admin/includes/class-pclzip.php';
+            $pclzip = new PclZip($zip_path);
+            $list   = $pclzip->listContent();
+
+            $this->assertIsArray($list, 'PclZip should be able to read the fallback archive.');
+            $this->assertNotEmpty($list, 'The fallback archive should contain entries.');
+        }
+
+        TEJLG_Export::delete_job($job_id);
+
+        remove_filter('tejlg_zip_writer_use_ziparchive', $filter, 10);
+    }
 }
