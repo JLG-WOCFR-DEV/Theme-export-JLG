@@ -39,6 +39,10 @@ class TEJLG_Export_Process extends WP_Background_Process {
             return false;
         }
 
+        if ('cancelled' === $job['status']) {
+            return false;
+        }
+
         $type               = isset($item['type']) ? $item['type'] : '';
         $real_path          = isset($item['real_path']) ? (string) $item['real_path'] : '';
         $relative_path_in_zip = isset($item['relative_path_in_zip']) ? (string) $item['relative_path_in_zip'] : '';

@@ -419,6 +419,79 @@ class TEJLG_Export {
         return 'tejlg_export_job_' . $job_id;
     }
 
+    private static function get_export_process_prefix() {
+        return 'wp_background_process_tejlg_theme_export';
+    }
+
+    private static function get_export_queue_option_name() {
+        return self::get_export_process_prefix() . '_queue';
+    }
+
+    private static function get_export_process_lock_key() {
+        return self::get_export_process_prefix() . '_process_lock';
+    }
+
+    private static function clear_job_from_queue($job_id) {
+        $job_id = sanitize_key((string) $job_id);
+
+        if ('' === $job_id) {
+            return;
+        }
+
+        $queue_option = self::get_export_queue_option_name();
+        $queue        = get_option($queue_option, []);
+
+        if (!is_array($queue) || empty($queue)) {
+            return;
+        }
+
+        $modified = false;
+
+        foreach ($queue as $batch_index => $batch) {
+            if (!is_array($batch) || empty($batch)) {
+                continue;
+            }
+
+            $new_batch = [];
+
+            foreach ($batch as $item) {
+                if (!is_array($item)) {
+                    $new_batch[] = $item;
+                    continue;
+                }
+
+                $item_job_id = isset($item['job_id']) ? sanitize_key((string) $item['job_id']) : '';
+
+                if ('' === $item_job_id || $item_job_id !== $job_id) {
+                    $new_batch[] = $item;
+                    continue;
+                }
+
+                $modified = true;
+            }
+
+            if (!empty($new_batch)) {
+                $queue[$batch_index] = array_values($new_batch);
+                continue;
+            }
+
+            unset($queue[$batch_index]);
+            $modified = true;
+        }
+
+        if (!$modified) {
+            return;
+        }
+
+        $queue = array_values($queue);
+
+        if (empty($queue)) {
+            delete_option($queue_option);
+        } else {
+            update_option($queue_option, $queue, false);
+        }
+    }
+
     public static function persist_job($job) {
         if (!is_array($job) || empty($job['id'])) {
             return;
@@ -494,7 +567,7 @@ class TEJLG_Export {
 
             $status = isset($job['status']) ? (string) $job['status'] : '';
 
-            if (!in_array($status, ['completed', 'failed'], true)) {
+            if (!in_array($status, ['completed', 'failed', 'cancelled'], true)) {
                 continue;
             }
 
@@ -527,6 +600,73 @@ class TEJLG_Export {
         }
 
         self::persist_job($job);
+    }
+
+    public static function cancel_job($job_id) {
+        $job_id = sanitize_key((string) $job_id);
+
+        if ('' === $job_id) {
+            return new WP_Error('tejlg_export_invalid_job', esc_html__('Identifiant de tâche manquant.', 'theme-export-jlg'));
+        }
+
+        $job = self::get_job($job_id);
+
+        if (null === $job) {
+            return new WP_Error('tejlg_export_job_not_found', esc_html__('Tâche introuvable ou expirée.', 'theme-export-jlg'));
+        }
+
+        $status = isset($job['status']) ? (string) $job['status'] : '';
+
+        if (in_array($status, ['completed', 'failed', 'cancelled'], true)) {
+            return new WP_Error(
+                'tejlg_export_job_not_cancellable',
+                esc_html__("Cette exportation ne peut plus être annulée.", 'theme-export-jlg')
+            );
+        }
+
+        $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
+
+        if ('' !== $zip_path && file_exists($zip_path)) {
+            self::delete_temp_file($zip_path);
+        }
+
+        $job['status']            = 'cancelled';
+        $job['progress']          = 0;
+        $job['processed_items']   = 0;
+        $job['directories_added'] = [];
+        $job['zip_path']          = '';
+        $job['zip_file_size']     = 0;
+        $job['message']           = esc_html__('Export annulé.', 'theme-export-jlg');
+        $job['updated_at']        = time();
+        $job['completed_at']      = time();
+
+        self::persist_job($job);
+
+        $process = self::get_export_process();
+
+        if (method_exists($process, 'cancel_process')) {
+            $process->cancel_process();
+        }
+
+        self::clear_job_from_queue($job_id);
+
+        $cron_hook = method_exists($process, 'get_cron_hook_identifier')
+            ? (string) $process->get_cron_hook_identifier()
+            : '';
+
+        if ($cron_hook && function_exists('wp_clear_scheduled_hook')) {
+            wp_clear_scheduled_hook($cron_hook);
+        }
+
+        $lock_key = self::get_export_process_lock_key();
+
+        if ($lock_key) {
+            delete_transient($lock_key);
+        }
+
+        self::clear_user_job_reference($job_id);
+
+        return $job;
     }
 
     public static function finalize_job($job) {
@@ -686,11 +826,45 @@ class TEJLG_Export {
             );
         }
 
-        if (in_array($job_status, ['completed', 'failed'], true)) {
+        if (in_array($job_status, ['completed', 'failed', 'cancelled'], true)) {
             self::clear_user_job_reference($job_id);
         }
 
         wp_send_json_success($response);
+    }
+
+    public static function ajax_cancel_theme_export() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => esc_html__('Accès refusé.', 'theme-export-jlg')], 403);
+        }
+
+        check_ajax_referer('tejlg_cancel_theme_export', 'nonce');
+
+        $job_id = isset($_POST['job_id']) ? sanitize_key(wp_unslash((string) $_POST['job_id'])) : '';
+
+        if ('' === $job_id) {
+            wp_send_json_error(['message' => esc_html__('Identifiant de tâche manquant.', 'theme-export-jlg')], 400);
+        }
+
+        $result = self::cancel_job($job_id);
+
+        if (is_wp_error($result)) {
+            $error_code = $result->get_error_code();
+            $status     = 400;
+
+            if ('tejlg_export_job_not_found' === $error_code) {
+                $status = 404;
+            } elseif ('tejlg_export_job_not_cancellable' === $error_code) {
+                $status = 409;
+            }
+
+            wp_send_json_error(['message' => $result->get_error_message()], $status);
+        }
+
+        wp_send_json_success([
+            'job_id' => $job_id,
+            'job'    => self::prepare_job_response($result),
+        ]);
     }
 
     public static function ajax_download_theme_export() {
