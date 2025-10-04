@@ -311,6 +311,19 @@ abstract class WP_Background_Process {
     }
 
     /**
+     * Cancel the background process and clear any queued items.
+     */
+    public function cancel_process() {
+        $this->data        = [];
+        $this->queue_saved = true;
+
+        delete_option($this->queue_key);
+
+        $this->clear_scheduled_event();
+        $this->unlock_process();
+    }
+
+    /**
      * Task to perform on each queue item.
      *
      * @param mixed $item Queue item.

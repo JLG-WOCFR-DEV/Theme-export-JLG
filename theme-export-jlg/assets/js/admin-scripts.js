@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const messageEl = exportForm.querySelector('[data-export-message]');
             const progressBar = exportForm.querySelector('[data-export-progress-bar]');
             const downloadLink = exportForm.querySelector('[data-export-download]');
+            const cancelButton = exportForm.querySelector('[data-export-cancel]');
             const spinner = exportForm.querySelector('[data-export-spinner]');
             const strings = typeof exportAsync.strings === 'object' ? exportAsync.strings : {};
             const pollInterval = typeof exportAsync.pollInterval === 'number' ? exportAsync.pollInterval : 4000;
@@ -116,6 +117,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     downloadLink.hidden = true;
                     downloadLink.removeAttribute('href');
                 }
+
+                if (cancelButton) {
+                    cancelButton.hidden = true;
+                    cancelButton.disabled = false;
+                }
             };
 
             const stopPolling = function() {
@@ -135,6 +141,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const updateFeedback = function(job, extra) {
                 if (!feedback || !job) {
+                    if (cancelButton) {
+                        cancelButton.hidden = true;
+                        cancelButton.disabled = false;
+                    }
                     return;
                 }
 
@@ -144,6 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 let statusLabel = strings.queued || '';
                 let description = '';
                 let progressValue = 0;
+                let shouldShowCancel = false;
 
                 if (typeof job.progress === 'number') {
                     progressValue = Math.max(0, Math.min(100, Math.round(job.progress)));
@@ -165,6 +176,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     feedback.classList.add('notice-error');
                     const failureMessage = job.message && job.message.length ? job.message : (strings.failed || '');
                     statusLabel = strings.failed ? formatString(strings.failed, { '1': failureMessage }) : failureMessage;
+                } else if (job.status === 'cancelled') {
+                    feedback.classList.add('notice-info');
+                    progressValue = 0;
+                    if (progressBar) {
+                        progressBar.value = 0;
+                    }
+                    statusLabel = strings.cancelled || '';
+                    description = job.message && job.message.length ? job.message : '';
                 } else {
                     feedback.classList.add('notice-info');
                     statusLabel = job.status === 'queued' && strings.queued
@@ -180,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (strings.progressValue) {
                             statusLabel = formatString(strings.progressValue, { '1': progressValue });
                         }
+                        shouldShowCancel = true;
                     }
                 }
 
@@ -195,14 +215,30 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (job.status === 'failed') {
                         const failureMessage = job.message && job.message.length ? job.message : (strings.unknownError || '');
                         messageEl.textContent = failureMessage;
+                    } else if (job.status === 'cancelled') {
+                        messageEl.textContent = description || strings.cancelled || '';
                     } else {
                         messageEl.textContent = description;
                     }
                 }
 
-                if (job.status !== 'completed' && downloadLink) {
-                    downloadLink.hidden = true;
-                    downloadLink.removeAttribute('href');
+                if (downloadLink) {
+                    if (job.status === 'completed') {
+                        // Link already handled above.
+                    } else {
+                        downloadLink.hidden = true;
+                        downloadLink.removeAttribute('href');
+                    }
+                }
+
+                if (cancelButton) {
+                    if (shouldShowCancel && currentJobId) {
+                        cancelButton.hidden = false;
+                        cancelButton.disabled = false;
+                    } else {
+                        cancelButton.hidden = true;
+                        cancelButton.disabled = false;
+                    }
                 }
             };
 
@@ -258,7 +294,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const extra = { downloadUrl: payload.data.download_url || '' };
                     updateFeedback(job, extra);
 
-                    if (job.status === 'completed' || job.status === 'failed') {
+                    if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
                         stopPolling();
                         setSpinner(false);
                         if (startButton) {
@@ -318,6 +354,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 const shouldFetch = ['queued', 'processing', 'completed', 'failed'].indexOf(normalizedStatus) !== -1;
 
                 if (!shouldFetch) {
+                    if (normalizedStatus === 'cancelled') {
+                        setSpinner(false);
+                        if (startButton) {
+                            startButton.disabled = false;
+                        }
+                        currentJobId = null;
+                    }
                     return;
                 }
 
@@ -396,6 +439,125 @@ document.addEventListener('DOMContentLoaded', function() {
                                 ? error.message
                                 : strings.unknownError || '';
                         handleError(message || strings.unknownError || '');
+                    });
+                });
+            }
+
+            if (cancelButton && exportAsync.actions.cancel && exportAsync.nonces.cancel) {
+                cancelButton.addEventListener('click', function(event) {
+                    if (event && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                    }
+
+                    if (!currentJobId) {
+                        return;
+                    }
+
+                    stopPolling();
+
+                    if (feedback) {
+                        feedback.hidden = false;
+                        feedback.classList.remove('notice-error', 'notice-success');
+                        feedback.classList.add('notice-info');
+                    }
+
+                    setSpinner(true);
+                    cancelButton.disabled = true;
+
+                    const cancellingLabel = strings.cancelling || '';
+
+                    if (statusText) {
+                        if (strings.statusLabel && cancellingLabel) {
+                            statusText.textContent = formatString(strings.statusLabel, { '1': cancellingLabel });
+                        } else {
+                            statusText.textContent = cancellingLabel;
+                        }
+                    }
+
+                    if (messageEl) {
+                        messageEl.textContent = '';
+                    }
+
+                    if (progressBar) {
+                        progressBar.value = 0;
+                    }
+
+                    if (downloadLink) {
+                        downloadLink.hidden = true;
+                        downloadLink.removeAttribute('href');
+                    }
+
+                    const formData = new FormData();
+                    formData.append('action', exportAsync.actions.cancel);
+                    formData.append('nonce', exportAsync.nonces.cancel);
+                    formData.append('job_id', currentJobId);
+
+                    window.fetch(exportAsync.ajaxUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        body: formData,
+                    }).then(function(response) {
+                        return response.json().catch(function() {
+                            return null;
+                        }).then(function(payload) {
+                            if (!response.ok) {
+                                const message = extractResponseMessage(payload) || strings.cancelFailed || strings.unknownError || '';
+                                return Promise.reject(message || strings.unknownError || '');
+                            }
+
+                            return payload;
+                        });
+                    }).then(function(payload) {
+                        if (!payload || !payload.success || !payload.data || !payload.data.job) {
+                            const message = extractResponseMessage(payload) || strings.cancelFailed || strings.unknownError || '';
+                            return Promise.reject(message || strings.unknownError || '');
+                        }
+
+                        stopPolling();
+                        setSpinner(false);
+                        if (startButton) {
+                            startButton.disabled = false;
+                        }
+
+                        cancelButton.disabled = false;
+                        const job = payload.data.job;
+                        currentJobId = null;
+                        updateFeedback(job, { downloadUrl: '' });
+                    }).catch(function(error) {
+                        const message = (typeof error === 'string' && error.length)
+                            ? error
+                            : (error && typeof error.message === 'string' && error.message.length)
+                                ? error.message
+                                : strings.cancelFailed || strings.unknownError || '';
+
+                        if (feedback) {
+                            feedback.hidden = false;
+                            feedback.classList.remove('notice-success');
+                            feedback.classList.add('notice-error');
+                        }
+
+                        if (statusText) {
+                            if (strings.statusLabel && message) {
+                                statusText.textContent = formatString(strings.statusLabel, { '1': message });
+                            } else {
+                                statusText.textContent = message;
+                            }
+                        }
+
+                        if (messageEl) {
+                            messageEl.textContent = message;
+                        }
+
+                        cancelButton.disabled = false;
+
+                        if (currentJobId) {
+                            scheduleNextPoll(currentJobId);
+                        } else {
+                            setSpinner(false);
+                            if (startButton) {
+                                startButton.disabled = false;
+                            }
+                        }
                     });
                 });
             }
