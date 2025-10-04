@@ -52,14 +52,25 @@ document.addEventListener('DOMContentLoaded', function() {
             const setDragState = function(isActive) {
                 if (isActive) {
                     dropzone.classList.add('is-dragover');
+                    dropzone.setAttribute('data-tejlg-dropzone-state', 'dragover');
                 } else {
                     dropzone.classList.remove('is-dragover');
+                    dropzone.setAttribute('data-tejlg-dropzone-state', 'idle');
                 }
             };
+
+            setDragState(false);
 
             ['dragenter', 'dragover'].forEach(function(eventName) {
                 dropzone.addEventListener(eventName, function(event) {
                     preventDefaults(event);
+                    if (event.dataTransfer) {
+                        try {
+                            event.dataTransfer.dropEffect = 'copy';
+                        } catch (error) {
+                            // Certains navigateurs empêchent l'écriture directe du dropEffect.
+                        }
+                    }
                     setDragState(true);
                 });
             });
@@ -91,6 +102,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+                if (typeof dropzone.focus === 'function') {
+                    try {
+                        dropzone.focus({ preventScroll: true });
+                    } catch (error) {
+                        dropzone.focus();
+                    }
+                }
+            });
+
+            dropzone.addEventListener('dragend', function() {
+                setDragState(false);
             });
 
             dropzone.addEventListener('click', function(event) {
