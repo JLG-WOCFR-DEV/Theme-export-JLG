@@ -126,14 +126,45 @@ class Test_Export_Theme extends WP_UnitTestCase {
             $this->assertGreaterThan(0, $zip->numFiles, 'The generated archive should contain at least one file.');
 
             $zip->close();
-        } else {
-            require_once ABSPATH . 'wp-admin/includes/class-pclzip.php';
-            $pclzip = new PclZip($zip_path);
-            $list   = $pclzip->listContent();
-
-            $this->assertIsArray($list, 'PclZip should be able to read the fallback archive.');
-            $this->assertNotEmpty($list, 'The fallback archive should contain entries.');
         }
+
+        if (!class_exists('PclZip')) {
+            require_once ABSPATH . 'wp-admin/includes/class-pclzip.php';
+        }
+
+        $pclzip = new PclZip($zip_path);
+        $list   = $pclzip->listContent();
+
+        $this->assertIsArray($list, 'PclZip should be able to read the fallback archive.');
+        $this->assertNotEmpty($list, 'The fallback archive should contain entries.');
+
+        $entry_names = array_values(
+            array_filter(
+                array_map(
+                    static function ($entry) {
+                        if (isset($entry['stored_filename'])) {
+                            return (string) $entry['stored_filename'];
+                        }
+
+                        if (isset($entry['filename'])) {
+                            return (string) $entry['filename'];
+                        }
+
+                        return '';
+                    },
+                    $list
+                ),
+                static function ($name) {
+                    return '' !== $name;
+                }
+            )
+        );
+
+        $theme      = wp_get_theme();
+        $theme_slug = $theme->get_stylesheet();
+        $root_entry = trailingslashit($theme_slug);
+
+        $this->assertContains($root_entry, $entry_names, 'The archive should contain the theme root directory.');
 
         TEJLG_Export::delete_job($job_id);
 
