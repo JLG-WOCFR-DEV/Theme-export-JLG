@@ -412,6 +412,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (themeImportForm) {
             const overwriteField = themeImportForm.querySelector('#tejlg_confirm_theme_overwrite');
 
+            if (overwriteField) {
+                overwriteField.value = '0';
+            }
+
             themeImportForm.addEventListener('submit', function(event) {
                 if (!window.confirm(themeImportConfirmMessage)) {
                     if (overwriteField) {

@@ -56,7 +56,7 @@ class Test_Import_Theme extends WP_UnitTestCase {
         }
     }
 
-    public function test_import_theme_requires_confirmation_before_overwriting_existing_theme() {
+    public function test_finalize_theme_install_result_requires_confirmation_before_overwriting_existing_theme() {
         $error = new WP_Error('folder_exists', 'Destination folder already exists.');
 
         TEJLG_Import::finalize_theme_install_result($error, false);
@@ -72,7 +72,7 @@ class Test_Import_Theme extends WP_UnitTestCase {
         );
     }
 
-    public function test_import_theme_reports_success_when_overwrite_allowed() {
+    public function test_finalize_theme_install_result_reports_success_when_overwrite_allowed() {
         TEJLG_Import::finalize_theme_install_result(true, true);
 
         $messages = get_settings_errors('tejlg_import_messages');
@@ -82,6 +82,22 @@ class Test_Import_Theme extends WP_UnitTestCase {
         $this->assertSame('success', $messages[0]['type']);
         $this->assertStringContainsString(
             "Le thème a été installé avec succès !",
+            $messages[0]['message']
+        );
+    }
+
+    public function test_finalize_theme_install_result_does_not_request_confirmation_when_overwrite_allowed_but_install_fails() {
+        $error = new WP_Error('folder_exists', 'Destination folder already exists.');
+
+        TEJLG_Import::finalize_theme_install_result($error, true);
+
+        $messages = get_settings_errors('tejlg_import_messages');
+
+        $this->assertNotEmpty($messages);
+        $this->assertSame('theme_import_status', $messages[0]['code']);
+        $this->assertSame('error', $messages[0]['type']);
+        $this->assertStringNotContainsString(
+            "Veuillez relancer l'import en confirmant le remplacement explicite.",
             $messages[0]['message']
         );
     }

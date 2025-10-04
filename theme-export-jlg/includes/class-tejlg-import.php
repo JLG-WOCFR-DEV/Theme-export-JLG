@@ -116,6 +116,14 @@ class TEJLG_Import {
         ];
     }
 
+    /**
+     * Importe un thème WordPress à partir d'un fichier ZIP téléchargé.
+     *
+     * @param array $file            Tableau de données de téléchargement de fichier.
+     * @param bool  $allow_overwrite Indique si l'écrasement explicite est autorisé.
+     *
+     * @return void
+     */
     public static function import_theme($file, $allow_overwrite = false) {
         if (!current_user_can('install_themes')) {
             if (isset($file['tmp_name'])) {
