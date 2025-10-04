@@ -139,6 +139,10 @@ class TEJLG_Admin {
                         'cancelled'       => esc_html__('Export annulé.', 'theme-export-jlg'),
                         'cancelling'      => esc_html__('Annulation…', 'theme-export-jlg'),
                         'cancelFailed'    => esc_html__("Impossible d'annuler l'export.", 'theme-export-jlg'),
+                        'autoFailedStatus' => esc_html__('Export interrompu pour inactivité.', 'theme-export-jlg'),
+                        'autoFailedMessage' => esc_html__('La tâche est restée inactive trop longtemps et a été arrêtée automatiquement.', 'theme-export-jlg'),
+                        'cancelledStatus' => esc_html__('Export annulé.', 'theme-export-jlg'),
+                        'cancelledMessage' => esc_html__("L'export a été annulé. Aucun fichier n'a été généré.", 'theme-export-jlg'),
                     ],
                     'previousJob' => TEJLG_Export::get_current_user_job_snapshot(),
                     'defaults'    => [

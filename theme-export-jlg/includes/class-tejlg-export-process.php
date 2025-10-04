@@ -43,6 +43,13 @@ class TEJLG_Export_Process extends WP_Background_Process {
             return false;
         }
 
+        if (isset($job['failure_code'])) {
+            unset($job['failure_code']);
+        }
+
+        $job['updated_at'] = time();
+        TEJLG_Export::persist_job($job);
+
         $type               = isset($item['type']) ? $item['type'] : '';
         $real_path          = isset($item['real_path']) ? (string) $item['real_path'] : '';
         $relative_path_in_zip = isset($item['relative_path_in_zip']) ? (string) $item['relative_path_in_zip'] : '';
