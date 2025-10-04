@@ -20,6 +20,100 @@ document.addEventListener('DOMContentLoaded', function() {
         ? localization.exportAsync
         : null;
 
+    const dropzones = document.querySelectorAll('[data-tejlg-dropzone]');
+
+    if (dropzones.length) {
+        const preventDefaults = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+        };
+
+        const buildFileList = function(files) {
+            if (!files || typeof DataTransfer === 'undefined') {
+                return files;
+            }
+
+            const dataTransfer = new DataTransfer();
+
+            Array.prototype.forEach.call(files, function(file) {
+                dataTransfer.items.add(file);
+            });
+
+            return dataTransfer.files;
+        };
+
+        dropzones.forEach(function(dropzone) {
+            const fileInput = dropzone.querySelector('input[type="file"]');
+
+            if (!fileInput) {
+                return;
+            }
+
+            const setDragState = function(isActive) {
+                if (isActive) {
+                    dropzone.classList.add('is-dragover');
+                } else {
+                    dropzone.classList.remove('is-dragover');
+                }
+            };
+
+            ['dragenter', 'dragover'].forEach(function(eventName) {
+                dropzone.addEventListener(eventName, function(event) {
+                    preventDefaults(event);
+                    setDragState(true);
+                });
+            });
+
+            dropzone.addEventListener('dragleave', function(event) {
+                preventDefaults(event);
+
+                if (event.relatedTarget && dropzone.contains(event.relatedTarget)) {
+                    return;
+                }
+
+                setDragState(false);
+            });
+
+            dropzone.addEventListener('drop', function(event) {
+                preventDefaults(event);
+                setDragState(false);
+
+                if (!event.dataTransfer || !event.dataTransfer.files || !event.dataTransfer.files.length) {
+                    return;
+                }
+
+                const files = buildFileList(event.dataTransfer.files);
+
+                try {
+                    fileInput.files = files;
+                } catch (error) {
+                    // En cas d'environnement ne permettant pas l'assignation programmée.
+                }
+
+                fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+
+            dropzone.addEventListener('click', function(event) {
+                if (event.target === fileInput) {
+                    return;
+                }
+
+                fileInput.click();
+            });
+
+            dropzone.addEventListener('keydown', function(event) {
+                if (event.target === fileInput) {
+                    return;
+                }
+
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    fileInput.click();
+                }
+            });
+        });
+    }
+
     if (exportAsync) {
         const exportForm = document.querySelector('[data-export-form]');
 
