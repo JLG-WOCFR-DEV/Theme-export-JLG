@@ -110,8 +110,9 @@ class TEJLG_Zip_Writer {
         // by creating a directory entry with no contents.
         $result = $this->zip->add([
             [
-                PCLZIP_ATT_FILE_NAME    => $directory_path,
-                PCLZIP_ATT_FILE_CONTENT => '',
+                PCLZIP_ATT_FILE_NAME          => $directory_path,
+                PCLZIP_ATT_FILE_NEW_FULL_NAME => $directory_path,
+                PCLZIP_ATT_FILE_CONTENT       => '',
             ],
         ]);
 
