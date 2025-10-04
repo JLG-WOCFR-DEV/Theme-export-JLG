@@ -59,6 +59,7 @@ $select_patterns_url = add_query_arg([
                         data-export-progress-bar
                     ></progress>
                     <p class="description" data-export-message></p>
+                    <p><button type="button" class="button button-secondary wp-ui-secondary" data-export-cancel><?php esc_html_e("Annuler l'export", 'theme-export-jlg'); ?></button></p>
                     <p><a href="#" class="button button-secondary wp-ui-secondary" data-export-download hidden target="_blank" rel="noopener"><?php esc_html_e("Télécharger l'archive ZIP", 'theme-export-jlg'); ?></a></p>
                 </div>
             </form>

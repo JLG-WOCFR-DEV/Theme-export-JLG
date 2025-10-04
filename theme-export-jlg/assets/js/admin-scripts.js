@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const progressBar = exportForm.querySelector('[data-export-progress-bar]');
             const downloadLink = exportForm.querySelector('[data-export-download]');
             const spinner = exportForm.querySelector('[data-export-spinner]');
+            const cancelButton = exportForm.querySelector('[data-export-cancel]');
             const strings = typeof exportAsync.strings === 'object' ? exportAsync.strings : {};
             const pollInterval = typeof exportAsync.pollInterval === 'number' ? exportAsync.pollInterval : 4000;
             const defaults = (typeof exportAsync.defaults === 'object' && exportAsync.defaults !== null)
@@ -89,15 +90,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
 
+            const setCancelVisibility = function(isVisible) {
+                if (!cancelButton) {
+                    return;
+                }
+
+                cancelButton.hidden = !isVisible;
+
+                if (!isVisible) {
+                    cancelButton.disabled = false;
+                }
+            };
+
+            const getKnownJobId = function() {
+                if (currentJobId && currentJobId.length) {
+                    return currentJobId;
+                }
+
+                if (feedback && feedback.dataset && typeof feedback.dataset.jobId === 'string' && feedback.dataset.jobId.length) {
+                    return feedback.dataset.jobId;
+                }
+
+                return '';
+            };
+
             const resetFeedback = function() {
                 if (!feedback) {
                     return;
                 }
 
                 feedback.hidden = true;
-                feedback.classList.remove('notice-error', 'notice-success');
+                feedback.classList.remove('notice-error', 'notice-success', 'notice-warning');
                 if (!feedback.classList.contains('notice-info')) {
                     feedback.classList.add('notice-info');
+                }
+
+                if (feedback.dataset) {
+                    feedback.dataset.jobId = '';
                 }
 
                 if (statusText) {
@@ -116,6 +145,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     downloadLink.hidden = true;
                     downloadLink.removeAttribute('href');
                 }
+
+                setCancelVisibility(false);
             };
 
             const stopPolling = function() {
@@ -139,11 +170,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 feedback.hidden = false;
-                feedback.classList.remove('notice-error', 'notice-success', 'notice-info');
+                feedback.classList.remove('notice-error', 'notice-success', 'notice-info', 'notice-warning');
+
+                if (feedback.dataset) {
+                    feedback.dataset.jobId = job.id ? job.id : '';
+                }
 
                 let statusLabel = strings.queued || '';
                 let description = '';
                 let progressValue = 0;
+                const jobStatus = typeof job.status === 'string' ? job.status : '';
+                let showCancel = false;
 
                 if (typeof job.progress === 'number') {
                     progressValue = Math.max(0, Math.min(100, Math.round(job.progress)));
@@ -153,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     progressBar.value = progressValue;
                 }
 
-                if (job.status === 'completed') {
+                if (jobStatus === 'completed') {
                     feedback.classList.add('notice-success');
                     statusLabel = strings.completed || '';
                     if (downloadLink && extra && typeof extra.downloadUrl === 'string') {
@@ -161,17 +198,24 @@ document.addEventListener('DOMContentLoaded', function() {
                         downloadLink.href = extra.downloadUrl;
                         downloadLink.textContent = strings.downloadLabel || downloadLink.textContent;
                     }
-                } else if (job.status === 'failed') {
+                } else if (jobStatus === 'failed') {
                     feedback.classList.add('notice-error');
                     const failureMessage = job.message && job.message.length ? job.message : (strings.failed || '');
                     statusLabel = strings.failed ? formatString(strings.failed, { '1': failureMessage }) : failureMessage;
+                } else if (jobStatus === 'cancelled') {
+                    feedback.classList.add('notice-warning');
+                    statusLabel = strings.cancelled || '';
+                    if (messageEl) {
+                        const cancellationMessage = job.message && job.message.length ? job.message : '';
+                        description = cancellationMessage;
+                    }
                 } else {
                     feedback.classList.add('notice-info');
-                    statusLabel = job.status === 'queued' && strings.queued
+                    statusLabel = jobStatus === 'queued' && strings.queued
                         ? strings.queued
                         : strings.initializing || '';
 
-                    if (job.status === 'processing' || job.status === 'queued') {
+                    if (jobStatus === 'processing' || jobStatus === 'queued') {
                         const processed = typeof job.processed_items === 'number' ? job.processed_items : 0;
                         const total = typeof job.total_items === 'number' ? job.total_items : 0;
                         if (strings.inProgress) {
@@ -180,6 +224,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (strings.progressValue) {
                             statusLabel = formatString(strings.progressValue, { '1': progressValue });
                         }
+                        showCancel = true;
                     }
                 }
 
@@ -192,25 +237,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 if (messageEl) {
-                    if (job.status === 'failed') {
+                    if (jobStatus === 'failed') {
                         const failureMessage = job.message && job.message.length ? job.message : (strings.unknownError || '');
                         messageEl.textContent = failureMessage;
+                    } else if (jobStatus === 'cancelled') {
+                        messageEl.textContent = description || strings.cancelled || '';
                     } else {
                         messageEl.textContent = description;
                     }
                 }
 
-                if (job.status !== 'completed' && downloadLink) {
+                if (jobStatus !== 'completed' && downloadLink) {
                     downloadLink.hidden = true;
                     downloadLink.removeAttribute('href');
                 }
+
+                setCancelVisibility(showCancel);
             };
 
             const handleError = function(message) {
                 stopPolling();
                 if (feedback) {
                     feedback.hidden = false;
-                    feedback.classList.remove('notice-info', 'notice-success');
+                    feedback.classList.remove('notice-info', 'notice-success', 'notice-warning');
                     feedback.classList.add('notice-error');
                 }
                 if (statusText) {
@@ -219,6 +268,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (messageEl) {
                     messageEl.textContent = message || strings.unknownError || '';
                 }
+
+                setCancelVisibility(false);
             };
 
             const fetchStatus = function(jobId) {
@@ -258,7 +309,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const extra = { downloadUrl: payload.data.download_url || '' };
                     updateFeedback(job, extra);
 
-                    if (job.status === 'completed' || job.status === 'failed') {
+                    if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
                         stopPolling();
                         setSpinner(false);
                         if (startButton) {
@@ -396,6 +447,109 @@ document.addEventListener('DOMContentLoaded', function() {
                                 ? error.message
                                 : strings.unknownError || '';
                         handleError(message || strings.unknownError || '');
+                    });
+                });
+            }
+
+            if (cancelButton) {
+                cancelButton.addEventListener('click', function(event) {
+                    if (event && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                    }
+
+                    if (cancelButton.disabled) {
+                        return;
+                    }
+
+                    const jobId = getKnownJobId();
+
+                    if (!jobId) {
+                        return;
+                    }
+
+                    currentJobId = jobId;
+                    stopPolling();
+                    setSpinner(true);
+                    cancelButton.disabled = true;
+
+                    if (startButton) {
+                        startButton.disabled = true;
+                    }
+
+                    if (statusText) {
+                        const cancellingLabel = strings.cancelling || '';
+                        if (cancellingLabel) {
+                            statusText.textContent = strings.statusLabel
+                                ? formatString(strings.statusLabel, { '1': cancellingLabel })
+                                : cancellingLabel;
+                        } else {
+                            statusText.textContent = '';
+                        }
+                    }
+
+                    if (messageEl) {
+                        messageEl.textContent = '';
+                    }
+
+                    const params = new URLSearchParams();
+                    params.append('action', exportAsync.actions.cancel);
+                    params.append('nonce', exportAsync.nonces.cancel);
+                    params.append('job_id', jobId);
+
+                    window.fetch(exportAsync.ajaxUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                        },
+                        body: params.toString(),
+                    }).then(function(response) {
+                        return response.json().catch(function() {
+                            return null;
+                        }).then(function(payload) {
+                            if (!response.ok) {
+                                const message = extractResponseMessage(payload) || strings.unknownError || '';
+                                return Promise.reject(message || strings.unknownError || '');
+                            }
+                            return payload;
+                        });
+                    }).then(function(payload) {
+                        if (!payload || !payload.success || !payload.data) {
+                            const message = extractResponseMessage(payload) || strings.unknownError || '';
+                            return Promise.reject(message || strings.unknownError || '');
+                        }
+
+                        const job = payload.data.job || null;
+
+                        currentJobId = null;
+                        setSpinner(false);
+                        if (startButton) {
+                            startButton.disabled = false;
+                        }
+                        cancelButton.disabled = false;
+
+                        if (job) {
+                            updateFeedback(job, { downloadUrl: '' });
+                        } else {
+                            resetFeedback();
+                        }
+
+                        stopPolling();
+                    }).catch(function(error) {
+                        const message = (typeof error === 'string' && error.length)
+                            ? error
+                            : (error && typeof error.message === 'string' && error.message.length)
+                                ? error.message
+                                : strings.unknownError || '';
+
+                        setSpinner(false);
+                        cancelButton.disabled = false;
+                        if (startButton) {
+                            startButton.disabled = true;
+                        }
+                        currentJobId = jobId;
+                        handleError(message || strings.unknownError || '');
+                        scheduleNextPoll(jobId);
                     });
                 });
             }

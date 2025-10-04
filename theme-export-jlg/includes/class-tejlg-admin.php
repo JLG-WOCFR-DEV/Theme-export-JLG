@@ -118,10 +118,12 @@ class TEJLG_Admin {
                         'start'    => 'tejlg_start_theme_export',
                         'status'   => 'tejlg_theme_export_status',
                         'download' => 'tejlg_download_theme_export',
+                        'cancel'   => 'tejlg_cancel_theme_export',
                     ],
                     'nonces' => [
-                        'start'  => wp_create_nonce('tejlg_start_theme_export'),
-                        'status' => wp_create_nonce('tejlg_theme_export_status'),
+                        'start'   => wp_create_nonce('tejlg_start_theme_export'),
+                        'status'  => wp_create_nonce('tejlg_theme_export_status'),
+                        'cancel'  => wp_create_nonce('tejlg_cancel_theme_export'),
                     ],
                     'pollInterval' => 4000,
                     'strings' => [
@@ -132,6 +134,8 @@ class TEJLG_Admin {
                         'completed'       => esc_html__('Export terminé !', 'theme-export-jlg'),
                         'failed'          => esc_html__("Échec de l'export : %1$s", 'theme-export-jlg'),
                         'downloadLabel'   => esc_html__("Télécharger l'archive ZIP", 'theme-export-jlg'),
+                        'cancelling'      => esc_html__('Annulation…', 'theme-export-jlg'),
+                        'cancelled'       => esc_html__('Export annulé.', 'theme-export-jlg'),
                         'unknownError'    => esc_html__('Une erreur inattendue est survenue.', 'theme-export-jlg'),
                         'statusLabel'     => esc_html__('Statut de la tâche : %1$s', 'theme-export-jlg'),
                     ],

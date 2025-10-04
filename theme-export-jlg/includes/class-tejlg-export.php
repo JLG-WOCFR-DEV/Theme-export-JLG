@@ -529,6 +529,50 @@ class TEJLG_Export {
         self::persist_job($job);
     }
 
+    public static function cancel_job($job_id) {
+        $job_id = sanitize_key((string) $job_id);
+
+        if ('' === $job_id) {
+            return new WP_Error('tejlg_invalid_job_id', esc_html__('Identifiant de tâche manquant.', 'theme-export-jlg'));
+        }
+
+        $job = self::get_job($job_id);
+
+        if (null === $job) {
+            self::clear_user_job_reference($job_id);
+
+            return new WP_Error('tejlg_export_job_not_found', esc_html__('Tâche introuvable ou expirée.', 'theme-export-jlg'));
+        }
+
+        if (!empty($job['zip_path']) && file_exists($job['zip_path'])) {
+            self::delete_temp_file($job['zip_path']);
+        }
+
+        $job['zip_path']        = '';
+        $job['zip_file_size']   = 0;
+        $job['directories_added'] = [];
+        $job['status']          = 'cancelled';
+        $job['progress']        = 0;
+        $job['processed_items'] = 0;
+        $job['message']         = esc_html__('Export annulé.', 'theme-export-jlg');
+        $job['cancelled_at']    = time();
+        $job['updated_at']      = time();
+
+        self::persist_job($job);
+
+        $process = self::get_export_process();
+
+        if (method_exists($process, 'cancel_process')) {
+            $process->cancel_process($job_id);
+        } elseif (method_exists($process, 'cancel_job_items')) {
+            $process->cancel_job_items($job_id);
+        }
+
+        self::clear_user_job_reference($job_id);
+
+        return $job;
+    }
+
     public static function finalize_job($job) {
         if (!is_array($job) || empty($job['id'])) {
             return;
@@ -686,11 +730,38 @@ class TEJLG_Export {
             );
         }
 
-        if (in_array($job_status, ['completed', 'failed'], true)) {
+        if (in_array($job_status, ['completed', 'failed', 'cancelled'], true)) {
             self::clear_user_job_reference($job_id);
         }
 
         wp_send_json_success($response);
+    }
+
+    public static function ajax_cancel_theme_export() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => esc_html__('Accès refusé.', 'theme-export-jlg')], 403);
+        }
+
+        check_ajax_referer('tejlg_cancel_theme_export', 'nonce');
+
+        $job_id = isset($_POST['job_id']) ? sanitize_key(wp_unslash((string) $_POST['job_id'])) : '';
+
+        if ('' === $job_id) {
+            wp_send_json_error(['message' => esc_html__('Identifiant de tâche manquant.', 'theme-export-jlg')], 400);
+        }
+
+        $result = self::cancel_job($job_id);
+
+        if (is_wp_error($result)) {
+            $status = 'tejlg_export_job_not_found' === $result->get_error_code() ? 404 : 400;
+
+            wp_send_json_error(['message' => $result->get_error_message()], $status);
+        }
+
+        wp_send_json_success([
+            'job_id' => $job_id,
+            'job'    => self::prepare_job_response($result),
+        ]);
     }
 
     public static function ajax_download_theme_export() {

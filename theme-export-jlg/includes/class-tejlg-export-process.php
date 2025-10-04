@@ -35,7 +35,7 @@ class TEJLG_Export_Process extends WP_Background_Process {
             return false;
         }
 
-        if (!isset($job['status']) || 'failed' === $job['status']) {
+        if (!isset($job['status']) || in_array($job['status'], ['failed', 'cancelled'], true)) {
             return false;
         }
 
@@ -149,6 +149,64 @@ class TEJLG_Export_Process extends WP_Background_Process {
         TEJLG_Export::persist_job($job);
 
         return false;
+    }
+
+    public function cancel_job_items($job_id) {
+        $job_id = sanitize_key((string) $job_id);
+
+        if ('' === $job_id) {
+            return;
+        }
+
+        $queue = get_option($this->queue_key, []);
+
+        if (!is_array($queue) || empty($queue)) {
+            $this->clear_scheduled_event();
+
+            return;
+        }
+
+        $modified = false;
+
+        foreach ($queue as $index => $batch) {
+            if (!is_array($batch) || empty($batch)) {
+                continue;
+            }
+
+            $filtered = array_values(array_filter($batch, static function ($item) use ($job_id) {
+                if (!is_array($item) || !isset($item['job_id'])) {
+                    return true;
+                }
+
+                return sanitize_key((string) $item['job_id']) !== $job_id;
+            }));
+
+            if (count($filtered) !== count($batch)) {
+                $modified = true;
+            }
+
+            if (empty($filtered)) {
+                unset($queue[$index]);
+            } else {
+                $queue[$index] = $filtered;
+            }
+        }
+
+        if ($modified) {
+            $queue = array_values(array_filter($queue, static function ($batch) {
+                return is_array($batch) && !empty($batch);
+            }));
+
+            if (empty($queue)) {
+                delete_option($this->queue_key);
+            } else {
+                update_option($this->queue_key, $queue, false);
+            }
+        }
+
+        if (!$this->has_items()) {
+            $this->clear_scheduled_event();
+        }
     }
 }
 
