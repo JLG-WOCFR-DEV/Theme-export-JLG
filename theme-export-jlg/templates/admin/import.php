@@ -17,6 +17,7 @@ $import_tab_url = add_query_arg([
             <p><?php echo wp_kses_post(sprintf(__('Téléversez une archive %s d\'un thème. Le plugin l\'installera (capacité WordPress « Installer des thèmes » requise). <strong>Attention :</strong> Un thème existant sera remplacé.', 'theme-export-jlg'), $theme_file_info['code'])); ?></p>
             <form id="tejlg-import-theme-form" method="post" action="<?php echo esc_url($import_tab_url); ?>" enctype="multipart/form-data">
                 <?php wp_nonce_field('tejlg_import_theme_action', 'tejlg_import_theme_nonce'); ?>
+                <input type="hidden" name="tejlg_confirm_theme_overwrite" id="tejlg_confirm_theme_overwrite" value="0">
                 <p><label for="theme_zip"><?php echo esc_html(sprintf(__('Fichier du thème (%s) :', 'theme-export-jlg'), $theme_file_info['display'])); ?></label><br><input type="file" id="theme_zip" name="theme_zip" accept="<?php echo esc_attr($theme_file_info['accept']); ?>" required></p>
                 <p><button type="submit" name="tejlg_import_theme" class="button button-primary wp-ui-primary"><?php esc_html_e('Importer le Thème', 'theme-export-jlg'); ?></button></p>
             </form>
