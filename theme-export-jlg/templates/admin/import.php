@@ -18,10 +18,12 @@ $import_tab_url = add_query_arg([
             <form id="tejlg-import-theme-form" method="post" action="<?php echo esc_url($import_tab_url); ?>" enctype="multipart/form-data">
                 <?php wp_nonce_field('tejlg_import_theme_action', 'tejlg_import_theme_nonce'); ?>
                 <input type="hidden" name="tejlg_confirm_theme_overwrite" id="tejlg_confirm_theme_overwrite" value="<?php echo esc_attr('0'); ?>">
-                <div class="tejlg-dropzone" data-tejlg-dropzone role="group" aria-labelledby="theme_zip_label" aria-describedby="theme_zip_instructions" tabindex="0">
-                    <label id="theme_zip_label" for="theme_zip"><?php echo esc_html(sprintf(__('Fichier du thème (%s) :', 'theme-export-jlg'), $theme_file_info['display'])); ?></label>
-                    <p id="theme_zip_instructions" class="tejlg-dropzone__instructions"><?php esc_html_e('Glissez-déposez votre fichier ici ou cliquez pour parcourir votre ordinateur.', 'theme-export-jlg'); ?></p>
-                    <input type="file" id="theme_zip" name="theme_zip" accept="<?php echo esc_attr($theme_file_info['accept']); ?>" required>
+                <div class="tejlg-dropzone" data-tejlg-dropzone data-tejlg-dropzone-state="idle" role="button" aria-labelledby="theme_zip_label" aria-describedby="theme_zip_instructions" tabindex="0">
+                    <div class="tejlg-dropzone__content">
+                        <label class="tejlg-dropzone__title" id="theme_zip_label" for="theme_zip"><?php echo esc_html(sprintf(__('Fichier du thème (%s)', 'theme-export-jlg'), $theme_file_info['display'])); ?></label>
+                        <p id="theme_zip_instructions" class="tejlg-dropzone__instructions"><?php esc_html_e('Glissez-déposez votre fichier ici ou utilisez la touche Entrée ou l’espace pour parcourir vos fichiers.', 'theme-export-jlg'); ?></p>
+                    </div>
+                    <input class="tejlg-dropzone__input" type="file" id="theme_zip" name="theme_zip" accept="<?php echo esc_attr($theme_file_info['accept']); ?>" required>
                 </div>
                 <p><button type="submit" name="tejlg_import_theme" class="button button-primary wp-ui-primary"><?php esc_html_e('Importer le Thème', 'theme-export-jlg'); ?></button></p>
             </form>
@@ -33,10 +35,12 @@ $import_tab_url = add_query_arg([
             <p><?php echo wp_kses_post(sprintf(__('Téléversez un fichier %s (généré par l\'export). Vous pourrez choisir quelles compositions importer à l\'étape suivante.', 'theme-export-jlg'), $patterns_file_info['code'])); ?></p>
             <form method="post" action="<?php echo esc_url($import_tab_url); ?>" enctype="multipart/form-data">
                 <?php wp_nonce_field('tejlg_import_patterns_step1_action', 'tejlg_import_patterns_step1_nonce'); ?>
-                <div class="tejlg-dropzone" data-tejlg-dropzone role="group" aria-labelledby="patterns_json_label" aria-describedby="patterns_json_instructions" tabindex="0">
-                    <label id="patterns_json_label" for="patterns_json"><?php echo esc_html(sprintf(__('Fichier des compositions (%s) :', 'theme-export-jlg'), $patterns_file_info['display'])); ?></label>
-                    <p id="patterns_json_instructions" class="tejlg-dropzone__instructions"><?php esc_html_e('Glissez-déposez votre fichier ici ou cliquez pour parcourir votre ordinateur.', 'theme-export-jlg'); ?></p>
-                    <input type="file" id="patterns_json" name="patterns_json" accept="<?php echo esc_attr($patterns_file_info['accept']); ?>" required>
+                <div class="tejlg-dropzone" data-tejlg-dropzone data-tejlg-dropzone-state="idle" role="button" aria-labelledby="patterns_json_label" aria-describedby="patterns_json_instructions" tabindex="0">
+                    <div class="tejlg-dropzone__content">
+                        <label class="tejlg-dropzone__title" id="patterns_json_label" for="patterns_json"><?php echo esc_html(sprintf(__('Fichier des compositions (%s)', 'theme-export-jlg'), $patterns_file_info['display'])); ?></label>
+                        <p id="patterns_json_instructions" class="tejlg-dropzone__instructions"><?php esc_html_e('Glissez-déposez votre fichier ici ou utilisez la touche Entrée ou l’espace pour parcourir vos fichiers.', 'theme-export-jlg'); ?></p>
+                    </div>
+                    <input class="tejlg-dropzone__input" type="file" id="patterns_json" name="patterns_json" accept="<?php echo esc_attr($patterns_file_info['accept']); ?>" required>
                 </div>
                 <p><button type="submit" name="tejlg_import_patterns_step1" class="button button-primary wp-ui-primary"><?php esc_html_e('Analyser et prévisualiser', 'theme-export-jlg'); ?></button></p>
             </form>
@@ -48,10 +52,12 @@ $import_tab_url = add_query_arg([
             <p><?php echo wp_kses_post(sprintf(__('Téléversez le fichier exporté des réglages globaux (%s) pour appliquer les mêmes paramètres <code>theme.json</code> sur ce site.', 'theme-export-jlg'), $global_styles_file_info['code'])); ?></p>
             <form method="post" action="<?php echo esc_url($import_tab_url); ?>" enctype="multipart/form-data">
                 <?php wp_nonce_field('tejlg_import_global_styles_action', 'tejlg_import_global_styles_nonce'); ?>
-                <div class="tejlg-dropzone" data-tejlg-dropzone role="group" aria-labelledby="global_styles_json_label" aria-describedby="global_styles_json_instructions" tabindex="0">
-                    <label id="global_styles_json_label" for="global_styles_json"><?php echo esc_html(sprintf(__('Fichier des styles globaux (%s) :', 'theme-export-jlg'), $global_styles_file_info['display'])); ?></label>
-                    <p id="global_styles_json_instructions" class="tejlg-dropzone__instructions"><?php esc_html_e('Glissez-déposez votre fichier ici ou cliquez pour parcourir votre ordinateur.', 'theme-export-jlg'); ?></p>
-                    <input type="file" id="global_styles_json" name="global_styles_json" accept="<?php echo esc_attr($global_styles_file_info['accept']); ?>" required>
+                <div class="tejlg-dropzone" data-tejlg-dropzone data-tejlg-dropzone-state="idle" role="button" aria-labelledby="global_styles_json_label" aria-describedby="global_styles_json_instructions" tabindex="0">
+                    <div class="tejlg-dropzone__content">
+                        <label class="tejlg-dropzone__title" id="global_styles_json_label" for="global_styles_json"><?php echo esc_html(sprintf(__('Fichier des styles globaux (%s)', 'theme-export-jlg'), $global_styles_file_info['display'])); ?></label>
+                        <p id="global_styles_json_instructions" class="tejlg-dropzone__instructions"><?php esc_html_e('Glissez-déposez votre fichier ici ou utilisez la touche Entrée ou l’espace pour parcourir vos fichiers.', 'theme-export-jlg'); ?></p>
+                    </div>
+                    <input class="tejlg-dropzone__input" type="file" id="global_styles_json" name="global_styles_json" accept="<?php echo esc_attr($global_styles_file_info['accept']); ?>" required>
                 </div>
                 <p><button type="submit" name="tejlg_import_global_styles" class="button button-primary wp-ui-primary"><?php esc_html_e('Importer les styles globaux', 'theme-export-jlg'); ?></button></p>
             </form>
