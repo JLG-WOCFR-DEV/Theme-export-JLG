@@ -103,4 +103,105 @@ class Test_Export_Job_Persistence extends WP_Ajax_UnitTestCase {
 
         wp_set_current_user(0);
     }
+
+    public function test_cleanup_marks_stale_processing_jobs_as_failed_and_releases_resources() {
+        $user_id = self::factory()->user->create([
+            'role' => 'administrator',
+        ]);
+
+        wp_set_current_user($user_id);
+
+        $job_id    = sanitize_key('stale_job_' . wp_generate_uuid4());
+        $temp_file = wp_tempnam('tejlg-export-stale');
+
+        $this->assertIsString($temp_file, 'Temporary file path should be created.');
+        $this->assertNotEmpty($temp_file, 'Temporary file path should not be empty.');
+
+        file_put_contents($temp_file, 'incomplete data');
+
+        $this->assertFileExists($temp_file, 'Temporary export file should exist before cleanup.');
+
+        update_user_meta($user_id, '_tejlg_last_theme_export_job_id', $job_id);
+
+        $stale_timestamp = time() - (2 * HOUR_IN_SECONDS);
+
+        $job_payload = [
+            'id'              => $job_id,
+            'status'          => 'processing',
+            'progress'        => 10,
+            'processed_items' => 1,
+            'total_items'     => 10,
+            'zip_path'        => $temp_file,
+            'zip_file_name'   => basename($temp_file),
+            'created_at'      => time() - DAY_IN_SECONDS,
+            'updated_at'      => $stale_timestamp,
+            'created_by'      => $user_id,
+        ];
+
+        update_option('tejlg_export_job_' . $job_id, $job_payload, false);
+
+        $queue_option = 'wp_background_process_tejlg_theme_export_queue';
+
+        update_option($queue_option, [
+            [
+                [
+                    'job_id'               => $job_id,
+                    'type'                 => 'file',
+                    'real_path'            => $temp_file,
+                    'relative_path_in_zip' => 'stale/file.txt',
+                ],
+            ],
+        ], false);
+
+        TEJLG_Export::cleanup_stale_jobs(HOUR_IN_SECONDS);
+
+        $job_after_cleanup = TEJLG_Export::get_job($job_id);
+
+        $this->assertIsArray($job_after_cleanup, 'The stale job should still be stored after being marked as failed.');
+        $this->assertSame('failed', $job_after_cleanup['status'], 'Stale jobs should be marked as failed.');
+        $this->assertSame(
+            'timeout',
+            isset($job_after_cleanup['failure_code']) ? $job_after_cleanup['failure_code'] : '',
+            'The failure code should indicate a timeout.'
+        );
+        $this->assertStringContainsString(
+            'inactive',
+            isset($job_after_cleanup['message']) ? strtolower($job_after_cleanup['message']) : '',
+            'The failure message should mention inactivity.'
+        );
+
+        $this->assertFalse(file_exists($temp_file), 'Cleanup should delete the stale temporary file.');
+
+        $queue_after_cleanup = get_option($queue_option, []);
+
+        if (is_array($queue_after_cleanup)) {
+            foreach ($queue_after_cleanup as $batch) {
+                if (!is_array($batch)) {
+                    continue;
+                }
+
+                foreach ($batch as $item) {
+                    if (!is_array($item)) {
+                        continue;
+                    }
+
+                    $this->assertNotSame(
+                        $job_id,
+                        isset($item['job_id']) ? $item['job_id'] : '',
+                        'The background queue should no longer contain items for the stale job.'
+                    );
+                }
+            }
+        }
+
+        $this->assertSame(
+            '',
+            get_user_meta($user_id, '_tejlg_last_theme_export_job_id', true),
+            'The stored job reference should be cleared for the job owner.'
+        );
+
+        TEJLG_Export::delete_job($job_id);
+
+        wp_set_current_user(0);
+    }
 }

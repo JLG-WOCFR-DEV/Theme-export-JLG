@@ -155,6 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 let description = '';
                 let progressValue = 0;
                 let shouldShowCancel = false;
+                const failureCode = typeof job.failure_code === 'string' ? job.failure_code : '';
 
                 if (typeof job.progress === 'number') {
                     progressValue = Math.max(0, Math.min(100, Math.round(job.progress)));
@@ -174,16 +175,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } else if (job.status === 'failed') {
                     feedback.classList.add('notice-error');
-                    const failureMessage = job.message && job.message.length ? job.message : (strings.failed || '');
-                    statusLabel = strings.failed ? formatString(strings.failed, { '1': failureMessage }) : failureMessage;
+                    if (failureCode === 'timeout' && strings.autoFailedStatus) {
+                        statusLabel = strings.autoFailedStatus;
+                    } else {
+                        const failureMessage = job.message && job.message.length ? job.message : (strings.failed || '');
+                        statusLabel = strings.failed ? formatString(strings.failed, { '1': failureMessage }) : failureMessage;
+                    }
                 } else if (job.status === 'cancelled') {
                     feedback.classList.add('notice-info');
                     progressValue = 0;
                     if (progressBar) {
                         progressBar.value = 0;
                     }
-                    statusLabel = strings.cancelled || '';
-                    description = job.message && job.message.length ? job.message : '';
+                    statusLabel = strings.cancelledStatus || strings.cancelled || '';
+                    description = job.message && job.message.length ? job.message : (strings.cancelledMessage || '');
                 } else {
                     feedback.classList.add('notice-info');
                     statusLabel = job.status === 'queued' && strings.queued
@@ -213,10 +218,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (messageEl) {
                     if (job.status === 'failed') {
-                        const failureMessage = job.message && job.message.length ? job.message : (strings.unknownError || '');
-                        messageEl.textContent = failureMessage;
+                        if (failureCode === 'timeout') {
+                            const autoFailureMessage = job.message && job.message.length
+                                ? job.message
+                                : (strings.autoFailedMessage || strings.unknownError || '');
+                            messageEl.textContent = autoFailureMessage;
+                        } else {
+                            const failureMessage = job.message && job.message.length ? job.message : (strings.unknownError || '');
+                            messageEl.textContent = failureMessage;
+                        }
                     } else if (job.status === 'cancelled') {
-                        messageEl.textContent = description || strings.cancelled || '';
+                        const cancelledMessage = description && description.length
+                            ? description
+                            : (strings.cancelledMessage || strings.cancelled || '');
+                        messageEl.textContent = cancelledMessage;
                     } else {
                         messageEl.textContent = description;
                     }

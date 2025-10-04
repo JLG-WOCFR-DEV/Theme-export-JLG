@@ -585,13 +585,31 @@ class TEJLG_Export {
             }
 
             $status = isset($job['status']) ? (string) $job['status'] : '';
+            $updated_at = isset($job['updated_at']) ? (int) $job['updated_at'] : 0;
+
+            if (in_array($status, ['queued', 'processing'], true)) {
+                if ($updated_at > 0 && $updated_at <= $threshold) {
+                    $message = esc_html__('Export interrompu automatiquement : la tâche est restée inactive trop longtemps.', 'theme-export-jlg');
+
+                    self::mark_job_failed(
+                        $job_id,
+                        $message,
+                        [
+                            'failure_code' => 'timeout',
+                        ]
+                    );
+
+                    continue;
+                }
+
+                continue;
+            }
 
             if (!in_array($status, ['completed', 'failed', 'cancelled'], true)) {
                 continue;
             }
 
             $completed_at = isset($job['completed_at']) ? (int) $job['completed_at'] : 0;
-            $updated_at   = isset($job['updated_at']) ? (int) $job['updated_at'] : 0;
             $reference    = $completed_at > 0 ? $completed_at : $updated_at;
 
             if ($reference <= 0 || $reference > $threshold) {
@@ -604,7 +622,7 @@ class TEJLG_Export {
         }
     }
 
-    public static function mark_job_failed($job_id, $message) {
+    public static function mark_job_failed($job_id, $message, $context = []) {
         $job = self::get_job($job_id);
 
         if (null === $job) {
@@ -615,9 +633,29 @@ class TEJLG_Export {
         $job['message']  = is_string($message) ? $message : '';
         $job['progress'] = isset($job['progress']) ? (int) $job['progress'] : 0;
         $job['updated_at'] = time();
+        $job['completed_at'] = time();
+
+        if (is_array($context) && isset($context['failure_code'])) {
+            $failure_code = (string) $context['failure_code'];
+            if ('' !== $failure_code) {
+                $job['failure_code'] = $failure_code;
+            } else {
+                unset($job['failure_code']);
+            }
+        } else {
+            unset($job['failure_code']);
+        }
 
         if (!empty($job['zip_path']) && file_exists($job['zip_path'])) {
             self::delete_temp_file($job['zip_path']);
+        }
+
+        self::clear_job_from_queue($job_id);
+
+        $job_owner = isset($job['created_by']) ? (int) $job['created_by'] : 0;
+
+        if ($job_owner > 0) {
+            self::clear_user_job_reference($job_id, $job_owner);
         }
 
         self::persist_job($job);
@@ -756,6 +794,7 @@ class TEJLG_Export {
             'zip_file_name'    => isset($job['zip_file_name']) ? (string) $job['zip_file_name'] : '',
             'created_at'       => isset($job['created_at']) ? (int) $job['created_at'] : 0,
             'updated_at'       => isset($job['updated_at']) ? (int) $job['updated_at'] : 0,
+            'failure_code'     => isset($job['failure_code']) ? (string) $job['failure_code'] : '',
         ];
     }
 
