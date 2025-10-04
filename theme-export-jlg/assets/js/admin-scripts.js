@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 feedback.hidden = true;
-                feedback.classList.remove('notice-error', 'notice-success');
+                feedback.classList.remove('notice-error', 'notice-success', 'notice-warning');
                 if (!feedback.classList.contains('notice-info')) {
                     feedback.classList.add('notice-info');
                 }
@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 feedback.hidden = false;
-                feedback.classList.remove('notice-error', 'notice-success', 'notice-info');
+                feedback.classList.remove('notice-error', 'notice-success', 'notice-info', 'notice-warning');
 
                 let statusLabel = strings.queued || '';
                 let description = '';
@@ -161,10 +161,26 @@ document.addEventListener('DOMContentLoaded', function() {
                         downloadLink.href = extra.downloadUrl;
                         downloadLink.textContent = strings.downloadLabel || downloadLink.textContent;
                     }
+                } else if (job.status === 'cancelled') {
+                    feedback.classList.add('notice-warning');
+                    const cancellationMessage = job.message && job.message.length
+                        ? job.message
+                        : (strings.cancelledDetails || strings.cancelled || '');
+                    statusLabel = strings.cancelled || cancellationMessage;
+                    description = cancellationMessage;
                 } else if (job.status === 'failed') {
-                    feedback.classList.add('notice-error');
-                    const failureMessage = job.message && job.message.length ? job.message : (strings.failed || '');
-                    statusLabel = strings.failed ? formatString(strings.failed, { '1': failureMessage }) : failureMessage;
+                    const hasAutoFailure = !!job.auto_failed;
+                    const fallbackMessage = strings.unknownError || '';
+                    const jobMessage = job.message && job.message.length ? job.message : '';
+                    const failureMessage = hasAutoFailure
+                        ? (strings.autoFailed || jobMessage || fallbackMessage)
+                        : (jobMessage || fallbackMessage);
+
+                    feedback.classList.add(hasAutoFailure ? 'notice-warning' : 'notice-error');
+                    statusLabel = strings.failed
+                        ? formatString(strings.failed, { '1': failureMessage })
+                        : failureMessage;
+                    description = failureMessage;
                 } else {
                     feedback.classList.add('notice-info');
                     statusLabel = job.status === 'queued' && strings.queued
@@ -193,7 +209,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (messageEl) {
                     if (job.status === 'failed') {
-                        const failureMessage = job.message && job.message.length ? job.message : (strings.unknownError || '');
+                        const hasAutoFailure = !!job.auto_failed;
+                        const fallbackMessage = strings.unknownError || '';
+                        const jobMessage = job.message && job.message.length ? job.message : '';
+                        const failureMessage = hasAutoFailure
+                            ? (strings.autoFailed || jobMessage || fallbackMessage)
+                            : (jobMessage || fallbackMessage);
                         messageEl.textContent = failureMessage;
                     } else {
                         messageEl.textContent = description;
@@ -210,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 stopPolling();
                 if (feedback) {
                     feedback.hidden = false;
-                    feedback.classList.remove('notice-info', 'notice-success');
+                    feedback.classList.remove('notice-info', 'notice-success', 'notice-warning');
                     feedback.classList.add('notice-error');
                 }
                 if (statusText) {
@@ -258,7 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const extra = { downloadUrl: payload.data.download_url || '' };
                     updateFeedback(job, extra);
 
-                    if (job.status === 'completed' || job.status === 'failed') {
+                    if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
                         stopPolling();
                         setSpinner(false);
                         if (startButton) {
@@ -315,7 +336,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const normalizedStatus = statusFromSnapshot.toLowerCase();
 
-                const shouldFetch = ['queued', 'processing', 'completed', 'failed'].indexOf(normalizedStatus) !== -1;
+                const shouldFetch = ['queued', 'processing', 'completed', 'failed', 'cancelled'].indexOf(normalizedStatus) !== -1;
 
                 if (!shouldFetch) {
                     return;

@@ -35,9 +35,12 @@ class TEJLG_Export_Process extends WP_Background_Process {
             return false;
         }
 
-        if (!isset($job['status']) || 'failed' === $job['status']) {
+        if (!isset($job['status']) || in_array($job['status'], ['failed', 'cancelled'], true)) {
             return false;
         }
+
+        $job['updated_at'] = time();
+        TEJLG_Export::persist_job($job);
 
         $type               = isset($item['type']) ? $item['type'] : '';
         $real_path          = isset($item['real_path']) ? (string) $item['real_path'] : '';

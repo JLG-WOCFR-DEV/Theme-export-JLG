@@ -110,6 +110,7 @@ class TEJLG_Export {
             'created_at'        => time(),
             'updated_at'        => time(),
             'message'           => '',
+            'auto_failed'       => false,
         ];
 
         self::persist_job($job);
@@ -494,7 +495,26 @@ class TEJLG_Export {
 
             $status = isset($job['status']) ? (string) $job['status'] : '';
 
-            if (!in_array($status, ['completed', 'failed'], true)) {
+            if (in_array($status, ['queued', 'processing'], true)) {
+                $updated_at = isset($job['updated_at']) ? (int) $job['updated_at'] : 0;
+
+                if ($updated_at <= 0 || $updated_at > $threshold) {
+                    continue;
+                }
+
+                $job['status']      = 'failed';
+                $job['message']     = self::get_stale_job_failure_message();
+                $job['auto_failed'] = true;
+                $job['updated_at']  = time();
+
+                self::cleanup_job_resources($job);
+
+                self::persist_job($job);
+
+                continue;
+            }
+
+            if (!in_array($status, ['completed', 'failed', 'cancelled'], true)) {
                 continue;
             }
 
@@ -510,21 +530,22 @@ class TEJLG_Export {
         }
     }
 
-    public static function mark_job_failed($job_id, $message) {
+    public static function mark_job_failed($job_id, $message, $context = []) {
         $job = self::get_job($job_id);
 
         if (null === $job) {
             return;
         }
 
-        $job['status']   = 'failed';
-        $job['message']  = is_string($message) ? $message : '';
-        $job['progress'] = isset($job['progress']) ? (int) $job['progress'] : 0;
-        $job['updated_at'] = time();
+        $job['status']      = 'failed';
+        $job['message']     = is_string($message) ? $message : '';
+        $job['progress']    = isset($job['progress']) ? (int) $job['progress'] : 0;
+        $job['updated_at']  = time();
+        $job['auto_failed'] = is_array($context) && isset($context['auto_failed'])
+            ? (bool) $context['auto_failed']
+            : false;
 
-        if (!empty($job['zip_path']) && file_exists($job['zip_path'])) {
-            self::delete_temp_file($job['zip_path']);
-        }
+        self::cleanup_job_resources($job);
 
         self::persist_job($job);
     }
@@ -561,6 +582,7 @@ class TEJLG_Export {
         $job['directories_added'] = [];
         $job['completed_at']      = time();
         $job['updated_at']        = time();
+        $job['auto_failed']       = false;
 
         self::persist_job($job);
     }
@@ -595,7 +617,31 @@ class TEJLG_Export {
             'zip_file_name'    => isset($job['zip_file_name']) ? (string) $job['zip_file_name'] : '',
             'created_at'       => isset($job['created_at']) ? (int) $job['created_at'] : 0,
             'updated_at'       => isset($job['updated_at']) ? (int) $job['updated_at'] : 0,
+            'auto_failed'      => !empty($job['auto_failed']),
         ];
+    }
+
+    public static function get_stale_job_failure_message() {
+        return esc_html__("La tâche est restée inactive trop longtemps et a été arrêtée automatiquement.", 'theme-export-jlg');
+    }
+
+    private static function cleanup_job_resources(&$job) {
+        if (!is_array($job)) {
+            return;
+        }
+
+        $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
+
+        if ('' !== $zip_path && file_exists($zip_path)) {
+            self::delete_temp_file($zip_path);
+        }
+
+        if ('' === $zip_path || !file_exists($zip_path)) {
+            $job['zip_path'] = '';
+        }
+
+        $job['zip_file_size']     = 0;
+        $job['directories_added'] = [];
     }
 
     public static function ajax_start_theme_export() {
@@ -686,7 +732,7 @@ class TEJLG_Export {
             );
         }
 
-        if (in_array($job_status, ['completed', 'failed'], true)) {
+        if (in_array($job_status, ['completed', 'failed', 'cancelled'], true)) {
             self::clear_user_job_reference($job_id);
         }
 

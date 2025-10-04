@@ -103,4 +103,67 @@ class Test_Export_Job_Persistence extends WP_Ajax_UnitTestCase {
 
         wp_set_current_user(0);
     }
+
+    public function test_cleanup_stale_jobs_marks_inactive_job_failed_and_cleans_resources() {
+        $job_id = sanitize_key('stale_' . wp_generate_uuid4());
+        $temp_file = wp_tempnam('tejlg-stale-job');
+
+        $this->assertIsString($temp_file, 'A temporary file should be created for the stale job.');
+        $this->assertNotEmpty($temp_file, 'The temporary file path should not be empty.');
+
+        file_put_contents($temp_file, 'stale job zip content');
+
+        $this->assertFileExists($temp_file, 'The temporary file should exist before cleanup.');
+
+        $stale_job = [
+            'id'                => $job_id,
+            'status'            => 'processing',
+            'zip_path'          => $temp_file,
+            'zip_file_name'     => basename($temp_file),
+            'directories_added' => ['theme/' => true],
+            'processed_items'   => 3,
+            'total_items'       => 10,
+            'created_at'        => time() - (2 * HOUR_IN_SECONDS),
+            'updated_at'        => time() - (2 * HOUR_IN_SECONDS),
+            'auto_failed'       => false,
+        ];
+
+        TEJLG_Export::persist_job($stale_job);
+
+        TEJLG_Export::cleanup_stale_jobs(HOUR_IN_SECONDS);
+
+        $updated_job = TEJLG_Export::get_job($job_id);
+
+        $this->assertIsArray($updated_job, 'The stale job should still be persisted after being marked as failed.');
+        $this->assertSame('failed', isset($updated_job['status']) ? $updated_job['status'] : null, 'The stale job should be marked as failed.');
+        $this->assertTrue(!empty($updated_job['auto_failed']), 'The stale job should be flagged as automatically failed.');
+        $this->assertSame(
+            TEJLG_Export::get_stale_job_failure_message(),
+            isset($updated_job['message']) ? $updated_job['message'] : '',
+            'The stale job should display the automatic failure message.'
+        );
+        $this->assertSame('', isset($updated_job['zip_path']) ? $updated_job['zip_path'] : null, 'Temporary paths should be cleared after automatic failure.');
+        $this->assertSame([], isset($updated_job['directories_added']) ? $updated_job['directories_added'] : null, 'Temporary metadata should be reset after automatic failure.');
+        $this->assertFalse(file_exists($temp_file), 'The stale job cleanup should remove the temporary file from disk.');
+
+        TEJLG_Export::delete_job($job_id);
+    }
+
+    public function test_cleanup_stale_jobs_removes_cancelled_job_after_threshold() {
+        $job_id = sanitize_key('cancelled_' . wp_generate_uuid4());
+
+        $cancelled_job = [
+            'id'         => $job_id,
+            'status'     => 'cancelled',
+            'message'    => 'Job cancelled by user.',
+            'created_at' => time() - (2 * HOUR_IN_SECONDS),
+            'updated_at' => time() - (2 * HOUR_IN_SECONDS),
+        ];
+
+        TEJLG_Export::persist_job($cancelled_job);
+
+        TEJLG_Export::cleanup_stale_jobs(HOUR_IN_SECONDS);
+
+        $this->assertNull(TEJLG_Export::get_job($job_id), 'Cancelled jobs should be purged once they become stale.');
+    }
 }
