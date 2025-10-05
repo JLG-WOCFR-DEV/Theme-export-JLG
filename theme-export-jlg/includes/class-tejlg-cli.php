@@ -4,6 +4,7 @@ if (!defined('ABSPATH')) {
 }
 
 require_once __DIR__ . '/class-tejlg-export-history.php';
+require_once __DIR__ . '/class-tejlg-import.php';
 
 if (!class_exists('TEJLG_CLI_WPDie_Exception')) {
     class TEJLG_CLI_WPDie_Exception extends RuntimeException {
@@ -16,6 +17,8 @@ class TEJLG_CLI {
         WP_CLI::log(__('Commandes disponibles :', 'theme-export-jlg'));
         WP_CLI::log('  wp theme-export-jlg theme [--exclusions=<motifs>] [--output=<chemin>]');
         WP_CLI::log('  wp theme-export-jlg patterns [--portable] [--output=<chemin>]');
+        WP_CLI::log('  wp theme-export-jlg import theme <chemin_zip> [--overwrite]');
+        WP_CLI::log('  wp theme-export-jlg import patterns <chemin_json>');
         WP_CLI::log('  wp theme-export-jlg history [--per-page=<nombre>] [--page=<nombre>]');
     }
 
@@ -225,6 +228,201 @@ class TEJLG_CLI {
         }
 
         WP_CLI::success(sprintf(__('Fichier JSON des compositions exporté vers %s', 'theme-export-jlg'), $output_path));
+    }
+
+    public function import($args, $assoc_args) {
+        if (empty($args)) {
+            WP_CLI::error(__('Veuillez préciser la sous-commande d\'import (theme ou patterns).', 'theme-export-jlg'));
+        }
+
+        $subcommand = array_shift($args);
+        $subcommand = is_string($subcommand) ? strtolower($subcommand) : '';
+
+        if ('theme' === $subcommand) {
+            $this->run_theme_import($args, $assoc_args);
+            return;
+        }
+
+        if ('patterns' === $subcommand) {
+            $this->run_patterns_import($args, $assoc_args);
+            return;
+        }
+
+        WP_CLI::error(__('Sous-commande inconnue. Utilisez "theme" ou "patterns".', 'theme-export-jlg'));
+    }
+
+    private function run_theme_import($args, $assoc_args) {
+        if (empty($args)) {
+            WP_CLI::error(__('Veuillez fournir le chemin du fichier ZIP du thème à importer.', 'theme-export-jlg'));
+        }
+
+        $source_path = $this->validate_import_file_path(array_shift($args), 'theme');
+        $allow_overwrite = $this->get_bool_flag($assoc_args, 'overwrite');
+
+        $temporary_file = wp_tempnam('tejlg-cli-theme-import');
+
+        if (false === $temporary_file || !@copy($source_path, $temporary_file)) {
+            if (false !== $temporary_file && file_exists($temporary_file)) {
+                @unlink($temporary_file);
+            }
+
+            WP_CLI::error(sprintf(__('Impossible de préparer le fichier %s pour l\'import.', 'theme-export-jlg'), $source_path));
+        }
+
+        $file_size = @filesize($source_path);
+        $file_size = false === $file_size ? 0 : (int) $file_size;
+
+        $file_array = [
+            'name'     => basename($source_path),
+            'type'     => 'application/zip',
+            'tmp_name' => $temporary_file,
+            'error'    => UPLOAD_ERR_OK,
+            'size'     => $file_size,
+        ];
+
+        $previous_files = isset($_FILES['theme_zip']) ? $_FILES['theme_zip'] : null;
+        $_FILES['theme_zip'] = $file_array;
+
+        try {
+            $result = TEJLG_Import::import_theme($file_array, $allow_overwrite);
+        } finally {
+            if (null === $previous_files) {
+                unset($_FILES['theme_zip']);
+            } else {
+                $_FILES['theme_zip'] = $previous_files;
+            }
+
+            if (file_exists($temporary_file)) {
+                @unlink($temporary_file);
+            }
+        }
+
+        if (is_wp_error($result)) {
+            WP_CLI::error($this->normalize_cli_message($result->get_error_message()));
+        }
+
+        if (false === $result || null === $result) {
+            WP_CLI::error(__('L\'installation du thème a échoué.', 'theme-export-jlg'));
+        }
+
+        WP_CLI::success(__('Le thème a été installé avec succès !', 'theme-export-jlg'));
+    }
+
+    private function run_patterns_import($args, $assoc_args) {
+        if (empty($args)) {
+            WP_CLI::error(__('Veuillez fournir le chemin du fichier JSON des compositions à importer.', 'theme-export-jlg'));
+        }
+
+        $source_path = $this->validate_import_file_path(array_shift($args), 'patterns');
+
+        $json_content = file_get_contents($source_path);
+
+        if (false === $json_content) {
+            WP_CLI::error(sprintf(__('Impossible de lire le fichier %s.', 'theme-export-jlg'), $source_path));
+        }
+
+        $patterns = TEJLG_Import::prepare_patterns_from_json($json_content);
+
+        if (is_wp_error($patterns)) {
+            WP_CLI::error($this->normalize_cli_message($patterns->get_error_message()));
+        }
+
+        $result = TEJLG_Import::import_patterns_collection($patterns);
+
+        $imported_count = isset($result['imported_count']) ? (int) $result['imported_count'] : 0;
+        $errors = isset($result['errors']) && is_array($result['errors']) ? $result['errors'] : [];
+
+        if (!empty($errors)) {
+            foreach ($errors as $message) {
+                WP_CLI::warning($this->normalize_cli_message($message));
+            }
+        }
+
+        if ($imported_count > 0) {
+            WP_CLI::success(sprintf(
+                _n('%d composition a été enregistrée avec succès.', '%d compositions ont été enregistrées avec succès.', $imported_count, 'theme-export-jlg'),
+                $imported_count
+            ));
+
+            return;
+        }
+
+        WP_CLI::error(__('Aucune composition n\'a pu être enregistrée (elles existent peut-être déjà ou des erreurs sont survenues).', 'theme-export-jlg'));
+    }
+
+    private function validate_import_file_path($path, $type) {
+        $resolved = $this->resolve_input_file_path($path);
+
+        if (!file_exists($resolved)) {
+            WP_CLI::error(sprintf(__('Le fichier %s est introuvable.', 'theme-export-jlg'), $resolved));
+        }
+
+        if (!is_file($resolved)) {
+            WP_CLI::error(sprintf(__('Le chemin %s ne correspond pas à un fichier.', 'theme-export-jlg'), $resolved));
+        }
+
+        if (!is_readable($resolved)) {
+            WP_CLI::error(sprintf(__('Le fichier %s n\'est pas lisible.', 'theme-export-jlg'), $resolved));
+        }
+
+        if ('patterns' === $type) {
+            $max_size = (int) apply_filters('tejlg_import_patterns_max_filesize', 5 * 1024 * 1024);
+
+            if ($max_size < 1) {
+                $max_size = 5 * 1024 * 1024;
+            }
+
+            $file_size = @filesize($resolved);
+            $file_size = false === $file_size ? 0 : (int) $file_size;
+
+            if ($file_size > $max_size) {
+                WP_CLI::error(sprintf(
+                    __('Erreur : Le fichier est trop volumineux. La taille maximale autorisée est de %s Mo.', 'theme-export-jlg'),
+                    number_format_i18n($max_size / (1024 * 1024), 2)
+                ));
+            }
+        }
+
+        $config = TEJLG_Import::get_import_file_type($type);
+        $allowed_mime_map = isset($config['mime_types']) && is_array($config['mime_types']) ? $config['mime_types'] : [];
+
+        if (!empty($allowed_mime_map)) {
+            $filetype = wp_check_filetype_and_ext($resolved, basename($resolved), $allowed_mime_map);
+
+            $ext  = isset($filetype['ext']) ? (string) $filetype['ext'] : '';
+            $mime = isset($filetype['type']) ? (string) $filetype['type'] : '';
+            $expected_mime = isset($allowed_mime_map[$ext]) ? (string) $allowed_mime_map[$ext] : '';
+
+            $is_valid_type = '' !== $ext && '' !== $mime && '' !== $expected_mime && $expected_mime === $mime;
+
+            if (!$is_valid_type) {
+                if ('patterns' === $type) {
+                    WP_CLI::error(__('Erreur : Le fichier téléchargé doit être un fichier JSON valide.', 'theme-export-jlg'));
+                } else {
+                    WP_CLI::error(__('Erreur : Le fichier fourni doit être une archive ZIP valide.', 'theme-export-jlg'));
+                }
+            }
+        }
+
+        return $resolved;
+    }
+
+    private function resolve_input_file_path($path) {
+        $provided = is_string($path) ? $path : '';
+        $provided = trim($provided);
+
+        if ('' === $provided) {
+            WP_CLI::error(__('Veuillez indiquer un chemin de fichier valide.', 'theme-export-jlg'));
+        }
+
+        $normalized = $this->normalize_path($provided);
+
+        if (!path_is_absolute($normalized)) {
+            $base = $this->normalize_path(getcwd());
+            $normalized = trailingslashit($base) . ltrim($normalized, '/');
+        }
+
+        return $normalized;
     }
 
     private function parse_exclusions($assoc_args) {
