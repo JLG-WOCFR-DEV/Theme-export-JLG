@@ -373,17 +373,51 @@ class TEJLG_Export {
 
         $persistence = self::persist_export_archive($job);
 
+        $persistent_path = isset($persistence['path']) ? (string) $persistence['path'] : '';
+        $persistent_url  = isset($persistence['url']) ? (string) $persistence['url'] : '';
+
+        if ('' === $persistent_path || '' === $persistent_url) {
+            $failure_message = esc_html__("Impossible de conserver l'archive de l'export planifié.", 'theme-export-jlg');
+
+            self::mark_job_failed(
+                $job_id,
+                $failure_message,
+                [
+                    'failure_code' => 'persistence_failed',
+                ]
+            );
+
+            $failed_job = self::get_job($job_id);
+
+            if (!is_array($failed_job)) {
+                $failed_job = $job;
+                $failed_job['status']  = 'failed';
+                $failed_job['message'] = $failure_message;
+            }
+
+            TEJLG_Export_History::record_job(
+                $failed_job,
+                [
+                    'origin' => 'schedule',
+                ]
+            );
+
+            self::notify_scheduled_export_failure($failure_message, $settings, $failed_job, null, $exclusions);
+
+            return;
+        }
+
         $delete_context = [
             'origin' => 'schedule',
             'reason' => 'persisted',
         ];
 
-        if (!empty($persistence['path'])) {
-            $delete_context['persistent_path'] = $persistence['path'];
+        if ('' !== $persistent_path) {
+            $delete_context['persistent_path'] = $persistent_path;
         }
 
-        if (!empty($persistence['url'])) {
-            $delete_context['download_url'] = $persistence['url'];
+        if ('' !== $persistent_url) {
+            $delete_context['download_url'] = $persistent_url;
         }
 
         self::delete_job($job_id, $delete_context);
