@@ -5,6 +5,7 @@ use RuntimeException;
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-import.php';
+require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin-debug-page.php';
 
 /**
  * @group admin
@@ -71,5 +72,50 @@ class Test_Admin_Export_Tab extends WP_UnitTestCase {
             $output,
             'The progress bar should reference the status text for screen readers.'
         );
+    }
+
+    public function test_debug_report_download_requires_manage_options() {
+        $template_dir = dirname(__DIR__) . '/theme-export-jlg/templates/admin/';
+        $debug_page   = new TEJLG_Admin_Debug_Page($template_dir, 'theme-export-jlg');
+
+        $editor_id = self::factory()->user->create(['role' => 'editor']);
+        wp_set_current_user($editor_id);
+
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_POST[TEJLG_Admin_Debug_Page::DOWNLOAD_REQUEST_FLAG] = '1';
+        $_POST[TEJLG_Admin_Debug_Page::DOWNLOAD_NONCE_FIELD]  = wp_create_nonce(TEJLG_Admin_Debug_Page::DOWNLOAD_NONCE_ACTION);
+
+        ob_start();
+        $debug_page->handle_request();
+        $output = ob_get_clean();
+
+        $headers = headers_list();
+        $has_download_header = false;
+
+        foreach ($headers as $header) {
+            if (stripos($header, 'Content-Disposition:') === 0) {
+                $has_download_header = true;
+                break;
+            }
+        }
+
+        $this->assertSame('', $output, 'Editors must not receive the debug report stream.');
+        $this->assertFalse($has_download_header, 'Editors must not receive download headers.');
+
+        foreach ($headers as $header) {
+            $parts = explode(':', $header, 2);
+
+            if (!empty($parts[0])) {
+                header_remove(trim($parts[0]));
+            }
+        }
+
+        unset(
+            $_SERVER['REQUEST_METHOD'],
+            $_POST[TEJLG_Admin_Debug_Page::DOWNLOAD_REQUEST_FLAG],
+            $_POST[TEJLG_Admin_Debug_Page::DOWNLOAD_NONCE_FIELD]
+        );
+
+        wp_set_current_user(0);
     }
 }

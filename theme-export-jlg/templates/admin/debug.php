@@ -34,6 +34,20 @@
 </div>
 <div class="tejlg-card components-card is-elevated">
     <div class="components-card__body">
+        <form method="post" action="" class="debug-report-download-form">
+            <?php wp_nonce_field('tejlg_debug_download_report_action', 'tejlg_debug_download_report_nonce'); ?>
+            <input type="hidden" name="tejlg_debug_download_report" value="1">
+            <button type="submit" class="button button-primary wp-ui-primary">
+                <?php esc_html_e('Télécharger le rapport', 'theme-export-jlg'); ?>
+            </button>
+            <p class="description">
+                <?php esc_html_e('Génère un rapport JSON compressé contenant les informations listées ci-dessous.', 'theme-export-jlg'); ?>
+            </p>
+        </form>
+    </div>
+</div>
+<div class="tejlg-card components-card is-elevated">
+    <div class="components-card__body">
         <div class="metrics-badge" role="group" aria-label="<?php esc_attr_e('Indicateurs de performance', 'theme-export-jlg'); ?>">
             <div class="metric metric-fps">
                 <span class="metric-icon metric-icon-fps dashicons dashicons-dashboard" aria-hidden="true"></span>
