@@ -695,11 +695,26 @@ class TEJLG_Export {
         $job = self::get_job($job_id);
 
         if (null !== $job) {
+            if (isset($context['persistent_path']) && is_string($context['persistent_path']) && '' !== $context['persistent_path']) {
+                $job['persistent_path'] = $context['persistent_path'];
+            }
+
+            if (isset($context['download_url']) && is_string($context['download_url']) && '' !== $context['download_url']) {
+                $job['persistent_url'] = $context['download_url'];
+            }
+
             TEJLG_Export_History::record_job($job, $context);
         }
 
         if (null !== $job && !empty($job['zip_path']) && file_exists($job['zip_path'])) {
-            self::delete_temp_file($job['zip_path']);
+            $zip_path         = (string) $job['zip_path'];
+            $persistent_path  = isset($job['persistent_path']) ? (string) $job['persistent_path'] : '';
+            $normalized_zip   = self::normalize_path($zip_path);
+            $normalized_persi = '' !== $persistent_path ? self::normalize_path($persistent_path) : '';
+
+            if ('' === $normalized_persi || $normalized_zip !== $normalized_persi) {
+                self::delete_temp_file($zip_path);
+            }
         }
 
         delete_option(self::get_job_option_name($job_id));
@@ -1145,11 +1160,132 @@ class TEJLG_Export {
         readfile($zip_path);
         flush();
 
-        self::delete_job($job_id, [
+        $persistence = self::persist_export_archive($job);
+
+        $delete_context = [
             'origin' => 'ajax',
             'reason' => 'downloaded',
-        ]);
+        ];
+
+        if (!empty($persistence['path'])) {
+            $delete_context['persistent_path'] = $persistence['path'];
+        }
+
+        if (!empty($persistence['url'])) {
+            $delete_context['download_url'] = $persistence['url'];
+        }
+
+        self::delete_job($job_id, $delete_context);
         exit;
+    }
+
+    /**
+     * Persists a generated ZIP archive into the public uploads directory.
+     *
+     * @param array|string $job Job array or ZIP file path.
+     *
+     * @return array{path:string,url:string}
+     */
+    public static function persist_export_archive($job) {
+        $zip_path               = '';
+        $zip_file_name         = '';
+        $job_id                = '';
+        $existing_persistent   = '';
+        $existing_persistent_url = '';
+
+        if (is_array($job)) {
+            $zip_path       = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
+            $zip_file_name  = isset($job['zip_file_name']) ? (string) $job['zip_file_name'] : '';
+            $job_id         = isset($job['id']) ? (string) $job['id'] : '';
+            $existing_persistent = isset($job['persistent_path']) ? (string) $job['persistent_path'] : '';
+            $existing_persistent_url = isset($job['persistent_url']) ? (string) $job['persistent_url'] : '';
+        } elseif (is_string($job)) {
+            $zip_path = $job;
+        }
+
+        if ('' !== $existing_persistent && file_exists($existing_persistent)) {
+            return [
+                'path' => $existing_persistent,
+                'url'  => $existing_persistent_url,
+            ];
+        }
+
+        if ('' === $zip_path || !file_exists($zip_path)) {
+            return [
+                'path' => '',
+                'url'  => '',
+            ];
+        }
+
+        if ('' === $zip_file_name) {
+            $zip_file_name = basename($zip_path);
+        }
+
+        $uploads = wp_upload_dir();
+
+        if (!is_array($uploads) || !empty($uploads['error'])) {
+            return [
+                'path' => '',
+                'url'  => '',
+            ];
+        }
+
+        $base_dir = isset($uploads['basedir']) ? (string) $uploads['basedir'] : '';
+        $base_url = isset($uploads['baseurl']) ? (string) $uploads['baseurl'] : '';
+
+        if ('' === $base_dir || '' === $base_url) {
+            return [
+                'path' => '',
+                'url'  => '',
+            ];
+        }
+
+        $target_directory = trailingslashit($base_dir) . 'theme-export-jlg/';
+
+        if (!wp_mkdir_p($target_directory)) {
+            return [
+                'path' => '',
+                'url'  => '',
+            ];
+        }
+
+        $target_directory = trailingslashit($target_directory);
+
+        $filename = $zip_file_name;
+
+        if ('' !== $job_id) {
+            $filename = sprintf('%s-%s', $job_id, $filename);
+        }
+
+        $filename = wp_unique_filename($target_directory, $filename);
+        $destination = $target_directory . $filename;
+
+        if (self::normalize_path($zip_path) === self::normalize_path($destination)) {
+            return [
+                'path' => $destination,
+                'url'  => trailingslashit($base_url) . 'theme-export-jlg/' . rawurlencode($filename),
+            ];
+        }
+
+        if (!copy($zip_path, $destination)) {
+            return [
+                'path' => '',
+                'url'  => '',
+            ];
+        }
+
+        $file_perms = apply_filters('tejlg_export_persisted_file_permissions', 0644, $destination, $job);
+
+        if (is_int($file_perms)) {
+            @chmod($destination, $file_perms); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        }
+
+        $url = trailingslashit($base_url) . 'theme-export-jlg/' . rawurlencode($filename);
+
+        return [
+            'path' => $destination,
+            'url'  => $url,
+        ];
     }
     /**
      * Aborts the ZIP export, cleans up temporary files and stops execution.
