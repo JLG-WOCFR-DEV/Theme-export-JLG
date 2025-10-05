@@ -155,6 +155,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const defaults = (typeof exportAsync.defaults === 'object' && exportAsync.defaults !== null)
                 ? exportAsync.defaults
                 : null;
+            const patternTester = (typeof exportAsync.patternTester === 'object' && exportAsync.patternTester !== null)
+                ? exportAsync.patternTester
+                : null;
             const extractResponseMessage = function(payload) {
                 if (!payload || typeof payload !== 'object') {
                     return '';
@@ -194,6 +197,259 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 return formatted.replace(/%%/g, '%');
             };
+
+            if (patternTester && patternTester.action && patternTester.nonce) {
+                const patternTestContainer = exportForm.querySelector('[data-pattern-test]');
+
+                if (patternTestContainer) {
+                    const patternStrings = typeof patternTester.strings === 'object' ? patternTester.strings : {};
+                    const patternTestButton = patternTestContainer.querySelector('[data-pattern-test-trigger]');
+                    const patternTestSpinner = patternTestContainer.querySelector('[data-pattern-test-spinner]');
+                    const patternTestFeedback = patternTestContainer.querySelector('[data-pattern-test-feedback]');
+                    const patternTestSummary = patternTestContainer.querySelector('[data-pattern-test-summary]');
+                    const patternTestMessage = patternTestContainer.querySelector('[data-pattern-test-message]');
+                    const patternTestIncluded = patternTestContainer.querySelector('[data-pattern-test-included]');
+                    const patternTestExcluded = patternTestContainer.querySelector('[data-pattern-test-excluded]');
+                    const patternTestInvalid = patternTestContainer.querySelector('[data-pattern-test-invalid]');
+                    const patternTestLists = patternTestContainer.querySelector('[data-pattern-test-lists]');
+
+                    const togglePatternSpinner = function(isActive) {
+                        if (!patternTestSpinner) {
+                            return;
+                        }
+
+                        if (isActive) {
+                            patternTestSpinner.classList.add('is-active');
+                        } else {
+                            patternTestSpinner.classList.remove('is-active');
+                        }
+                    };
+
+                    const setTextareaValidity = function(invalidPatterns) {
+                        if (!textarea) {
+                            return;
+                        }
+
+                        const hasInvalid = Array.isArray(invalidPatterns) && invalidPatterns.length > 0;
+
+                        if (hasInvalid) {
+                            textarea.classList.add('has-pattern-error');
+                            textarea.setAttribute('aria-invalid', 'true');
+                        } else {
+                            textarea.classList.remove('has-pattern-error');
+                            textarea.removeAttribute('aria-invalid');
+                        }
+
+                        if (patternTestInvalid) {
+                            if (hasInvalid) {
+                                const separator = typeof patternStrings.listSeparator === 'string'
+                                    ? patternStrings.listSeparator
+                                    : ', ';
+                                const invalidMessage = patternStrings.invalidPatterns
+                                    ? formatString(patternStrings.invalidPatterns, {
+                                        '1': invalidPatterns.join(separator)
+                                    })
+                                    : invalidPatterns.join(separator);
+                                patternTestInvalid.textContent = invalidMessage;
+                                patternTestInvalid.hidden = false;
+                            } else {
+                                patternTestInvalid.textContent = '';
+                                patternTestInvalid.hidden = true;
+                            }
+                        }
+                    };
+
+                    const renderList = function(target, items) {
+                        if (!target) {
+                            return;
+                        }
+
+                        target.innerHTML = '';
+
+                        if (!Array.isArray(items) || !items.length) {
+                            const emptyItem = document.createElement('li');
+                            emptyItem.classList.add('is-empty');
+                            emptyItem.textContent = patternStrings.emptyList || '';
+                            target.appendChild(emptyItem);
+                            return;
+                        }
+
+                        items.forEach(function(item) {
+                            const li = document.createElement('li');
+                            li.textContent = item;
+                            target.appendChild(li);
+                        });
+                    };
+
+                    const resetPatternFeedback = function() {
+                        if (patternTestFeedback) {
+                            patternTestFeedback.hidden = true;
+                            patternTestFeedback.classList.remove('notice-error');
+                            if (!patternTestFeedback.classList.contains('notice-info')) {
+                                patternTestFeedback.classList.add('notice-info');
+                            }
+                        }
+
+                        if (patternTestSummary) {
+                            patternTestSummary.textContent = '';
+                        }
+
+                        if (patternTestMessage) {
+                            patternTestMessage.textContent = '';
+                        }
+
+                        if (patternTestIncluded) {
+                            patternTestIncluded.innerHTML = '';
+                        }
+
+                        if (patternTestExcluded) {
+                            patternTestExcluded.innerHTML = '';
+                        }
+
+                        if (patternTestLists) {
+                            patternTestLists.removeAttribute('hidden');
+                        }
+
+                        setTextareaValidity([]);
+                    };
+
+                    const showPatternError = function(message, invalidPatterns) {
+                        if (!patternTestFeedback) {
+                            return;
+                        }
+
+                        patternTestFeedback.hidden = false;
+                        patternTestFeedback.classList.remove('notice-info');
+                        patternTestFeedback.classList.add('notice-error');
+
+                        if (patternTestSummary) {
+                            patternTestSummary.textContent = '';
+                        }
+
+                        if (patternTestMessage) {
+                            patternTestMessage.textContent = message || (patternStrings.unknownError || '');
+                        }
+
+                        if (patternTestLists) {
+                            patternTestLists.setAttribute('hidden', 'hidden');
+                        }
+
+                        if (Array.isArray(invalidPatterns) && invalidPatterns.length) {
+                            setTextareaValidity(invalidPatterns);
+                        } else {
+                            setTextareaValidity([]);
+                        }
+                    };
+
+                    const showPatternSuccess = function(payload) {
+                        if (!patternTestFeedback) {
+                            return;
+                        }
+
+                        patternTestFeedback.hidden = false;
+                        patternTestFeedback.classList.remove('notice-error');
+                        if (!patternTestFeedback.classList.contains('notice-info')) {
+                            patternTestFeedback.classList.add('notice-info');
+                        }
+
+                        const included = Array.isArray(payload.included) ? payload.included : [];
+                        const excluded = Array.isArray(payload.excluded) ? payload.excluded : [];
+                        const includedCount = typeof payload.includedCount === 'number'
+                            ? payload.includedCount
+                            : included.length;
+                        const excludedCount = typeof payload.excludedCount === 'number'
+                            ? payload.excludedCount
+                            : excluded.length;
+
+                        if (patternTestSummary && patternStrings.summary) {
+                            patternTestSummary.textContent = formatString(patternStrings.summary, {
+                                '1': includedCount,
+                                '2': excludedCount
+                            });
+                        } else if (patternTestSummary) {
+                            patternTestSummary.textContent = '';
+                        }
+
+                        if (patternTestMessage) {
+                            patternTestMessage.textContent = patternStrings.successMessage || '';
+                        }
+
+                        renderList(patternTestIncluded, included);
+                        renderList(patternTestExcluded, excluded);
+
+                        if (patternTestLists) {
+                            patternTestLists.removeAttribute('hidden');
+                        }
+
+                        setTextareaValidity([]);
+                    };
+
+                    if (patternTestButton) {
+                        patternTestButton.addEventListener('click', function() {
+                            if (!exportAsync.ajaxUrl) {
+                                return;
+                            }
+
+                            togglePatternSpinner(true);
+                            patternTestButton.disabled = true;
+                            resetPatternFeedback();
+
+                            const params = new URLSearchParams();
+                            params.append('action', patternTester.action);
+                            params.append('nonce', patternTester.nonce);
+                            params.append('patterns', textarea ? textarea.value : '');
+
+                            window.fetch(exportAsync.ajaxUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                                },
+                                body: params.toString(),
+                                credentials: 'same-origin'
+                            }).then(function(response) {
+                                return response.json().catch(function() {
+                                    return null;
+                                }).then(function(data) {
+                                    return {
+                                        ok: response.ok,
+                                        status: response.status,
+                                        payload: data
+                                    };
+                                });
+                            }).then(function(result) {
+                                togglePatternSpinner(false);
+                                patternTestButton.disabled = false;
+
+                                if (!result || !result.payload) {
+                                    showPatternError(patternStrings.unknownError || '', []);
+                                    return;
+                                }
+
+                                if (result.payload.success) {
+                                    showPatternSuccess(result.payload.data || {});
+                                    return;
+                                }
+
+                                const errorPayload = result.payload.data && typeof result.payload.data === 'object'
+                                    ? result.payload.data
+                                    : {};
+                                const invalidPatterns = Array.isArray(errorPayload.invalid_patterns)
+                                    ? errorPayload.invalid_patterns
+                                    : (Array.isArray(errorPayload.invalidPatterns) ? errorPayload.invalidPatterns : []);
+                                const message = extractResponseMessage(result.payload)
+                                    || patternStrings.unknownError
+                                    || '';
+
+                                showPatternError(message, invalidPatterns);
+                            }).catch(function() {
+                                togglePatternSpinner(false);
+                                patternTestButton.disabled = false;
+                                showPatternError(patternStrings.requestFailed || patternStrings.unknownError || '', []);
+                            });
+                        });
+                    }
+                }
+            }
 
             const setSpinner = function(isActive) {
                 if (!spinner) {

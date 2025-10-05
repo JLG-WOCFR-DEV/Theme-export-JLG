@@ -268,4 +268,31 @@ test.describe('Pattern export selection screen', () => {
     await expect(visibleItems).toHaveCount(1);
     await expect(fallbackItem).toBeVisible();
   });
+
+  test('shows an error when exclusion patterns are invalid', async ({ admin, page, requestUtils }) => {
+    await requestUtils.activatePlugin('theme-export-jlg/theme-export-jlg.php');
+
+    await admin.visitAdminPage('admin.php', 'page=theme-export-jlg&tab=export');
+
+    const textarea = page.locator('#tejlg_exclusion_patterns');
+    const testButton = page.locator('[data-pattern-test-trigger]');
+    const invalidNotice = page.locator('[data-pattern-test-invalid]');
+    const feedback = page.locator('[data-pattern-test-feedback]');
+
+    await textarea.fill('foo[bar');
+
+    await Promise.all([
+      page.waitForResponse((response) =>
+        response.url().includes('admin-ajax.php') && response.request().postData().includes('tejlg_preview_exclusion_patterns')
+      ),
+      testButton.click(),
+    ]);
+
+    await expect(testButton).toBeEnabled();
+    await expect(feedback).toBeVisible();
+    await expect(feedback).toHaveClass(/notice-error/);
+    await expect(invalidNotice).toBeVisible();
+    await expect(invalidNotice).toContainText('Motifs invalides');
+    await expect(textarea).toHaveClass(/has-pattern-error/);
+  });
 });
