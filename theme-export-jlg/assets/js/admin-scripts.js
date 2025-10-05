@@ -1211,6 +1211,16 @@ document.addEventListener('DOMContentLoaded', function() {
         previewControllers.set(wrapper, controller);
     };
 
+    const clearPreviewController = function(wrapper) {
+        if (!previewControllers || !wrapper) {
+            return;
+        }
+
+        if (typeof previewControllers.delete === 'function') {
+            previewControllers.delete(wrapper);
+        }
+    };
+
     const previewWidthControl = document.querySelector('[data-preview-width-control]');
     if (previewWidthControl && previewWrappers.length) {
         const previewWidthStrings = (typeof localization.previewWidth === 'object' && localization.previewWidth !== null)
@@ -2306,7 +2316,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             showCompact();
 
-            return {
+            const controller = {
                 requestLoad: requestLoad,
                 collapse: collapsePreview,
                 onIntersection: onIntersection,
@@ -2321,8 +2331,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
 
                     cleanupPreview();
+                    clearPreviewController(wrapper);
                 },
             };
+
+            setPreviewController(wrapper, controller);
+
+            return controller;
         };
 
         previewWrappers.forEach(function(wrapper) {
@@ -2331,8 +2346,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!controller) {
                 return;
             }
-
-            setPreviewController(wrapper, controller);
 
             if (intersectionObserver) {
                 intersectionObserver.observe(wrapper);
