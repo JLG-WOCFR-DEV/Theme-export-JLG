@@ -30,6 +30,7 @@ class TEJLG_Export {
             'frequency'      => 'disabled',
             'exclusions'     => '',
             'retention_days' => 30,
+            'run_time'       => '00:00',
         ];
     }
 
@@ -72,10 +73,21 @@ class TEJLG_Export {
             $retention = 0;
         }
 
+        $default_run_time = isset($defaults['run_time']) ? (string) $defaults['run_time'] : '00:00';
+        $run_time         = isset($settings['run_time']) ? (string) $settings['run_time'] : $default_run_time;
+        $run_time         = trim($run_time);
+
+        if (!preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', $run_time, $matches)) {
+            $run_time = $default_run_time;
+        } else {
+            $run_time = sprintf('%02d:%02d', (int) $matches[1], (int) $matches[2]);
+        }
+
         return [
             'frequency'      => $frequency,
             'exclusions'     => $exclusions,
             'retention_days' => $retention,
+            'run_time'       => $run_time,
         ];
     }
 
@@ -97,7 +109,11 @@ class TEJLG_Export {
             return;
         }
 
-        $first_run = time() + MINUTE_IN_SECONDS;
+        $first_run = self::calculate_next_schedule_timestamp($settings);
+
+        if (!is_int($first_run)) {
+            $first_run = time() + MINUTE_IN_SECONDS;
+        }
 
         /**
          * Filtre l'horodatage du premier export planifié.
@@ -106,6 +122,14 @@ class TEJLG_Export {
          * @param array $settings  Réglages de planification.
          */
         $first_run = apply_filters('tejlg_export_schedule_first_run', $first_run, $settings);
+
+        /**
+         * Filtre l'horodatage final utilisé pour la planification de l'export.
+         *
+         * @param int   $first_run Horodatage en secondes.
+         * @param array $settings  Réglages de planification normalisés.
+         */
+        $first_run = apply_filters('tejlg_export_schedule_timestamp', $first_run, $settings);
 
         if (!is_int($first_run) || $first_run <= time()) {
             $first_run = time() + MINUTE_IN_SECONDS;
@@ -133,6 +157,72 @@ class TEJLG_Export {
         }
 
         return wp_next_scheduled(self::SCHEDULE_EVENT_HOOK);
+    }
+
+    public static function calculate_next_schedule_timestamp($settings, $reference_time = null) {
+        if (!is_array($settings)) {
+            $settings = [];
+        }
+
+        $normalized = self::normalize_schedule_settings($settings);
+
+        if (!isset($normalized['frequency']) || 'disabled' === $normalized['frequency']) {
+            return null;
+        }
+
+        $reference_time = is_int($reference_time) ? $reference_time : time();
+
+        $timezone = self::get_site_timezone();
+
+        try {
+            $now = (new \DateTimeImmutable('@' . $reference_time))->setTimezone($timezone);
+        } catch (\Exception $e) {
+            $now = new \DateTimeImmutable('@' . $reference_time);
+        }
+
+        $run_time_parts = explode(':', isset($normalized['run_time']) ? (string) $normalized['run_time'] : '00:00');
+        $hour           = isset($run_time_parts[0]) ? (int) $run_time_parts[0] : 0;
+        $minute         = isset($run_time_parts[1]) ? (int) $run_time_parts[1] : 0;
+
+        $next_run = $now->setTime($hour, $minute, 0);
+
+        if ($next_run->getTimestamp() < $reference_time) {
+            if ('weekly' === $normalized['frequency']) {
+                $next_run = $next_run->modify('+1 week');
+            } else {
+                $next_run = $next_run->modify('+1 day');
+            }
+        }
+
+        return (int) $next_run->getTimestamp();
+    }
+
+    private static function get_site_timezone() {
+        if (function_exists('wp_timezone')) {
+            return wp_timezone();
+        }
+
+        $timezone_string = get_option('timezone_string');
+
+        if (is_string($timezone_string) && '' !== $timezone_string) {
+            try {
+                return new \DateTimeZone($timezone_string);
+            } catch (\Exception $e) {
+                // Fallback to offset handling below.
+            }
+        }
+
+        $offset   = (float) get_option('gmt_offset', 0);
+        $hours    = (int) $offset;
+        $minutes  = (int) round(abs($offset - $hours) * 60);
+        $sign     = $offset < 0 ? '-' : '+';
+        $timezone = sprintf('%s%02d:%02d', $sign, abs($hours), abs($minutes));
+
+        try {
+            return new \DateTimeZone($timezone);
+        } catch (\Exception $e) {
+            return new \DateTimeZone('UTC');
+        }
     }
 
     public static function ensure_cleanup_event_scheduled() {
