@@ -81,10 +81,22 @@ class TEJLG_CLI {
             return;
         }
 
-        TEJLG_Export::delete_job($job_id, [
+        $persistence = TEJLG_Export::persist_export_archive($job);
+
+        $delete_context = [
             'origin' => 'cli',
             'reason' => 'exported',
-        ]);
+        ];
+
+        if (!empty($persistence['path'])) {
+            $delete_context['persistent_path'] = $persistence['path'];
+        }
+
+        if (!empty($persistence['url'])) {
+            $delete_context['download_url'] = $persistence['url'];
+        }
+
+        TEJLG_Export::delete_job($job_id, $delete_context);
 
         WP_CLI::success(sprintf(__('Archive du thème exportée vers %s', 'theme-export-jlg'), $output_path));
     }
