@@ -130,14 +130,16 @@ class TEJLG_Import {
                 @unlink($file['tmp_name']);
             }
 
+            $message = esc_html__('Vous n\'avez pas l\'autorisation d\'installer des thèmes sur ce site.', 'theme-export-jlg');
+
             add_settings_error(
                 'tejlg_import_messages',
                 'theme_import_cap_missing',
-                esc_html__('Vous n\'avez pas l\'autorisation d\'installer des thèmes sur ce site.', 'theme-export-jlg'),
+                $message,
                 'error'
             );
 
-            return;
+            return new WP_Error('tejlg_import_theme_cap_missing', $message);
         }
 
         if (
@@ -148,14 +150,16 @@ class TEJLG_Import {
                 @unlink($file['tmp_name']);
             }
 
+            $message = esc_html__('Erreur : Les modifications de fichiers sont désactivées sur ce site.', 'theme-export-jlg');
+
             add_settings_error(
                 'tejlg_import_messages',
                 'theme_import_file_mods_disabled',
-                esc_html__('Erreur : Les modifications de fichiers sont désactivées sur ce site.', 'theme-export-jlg'),
+                $message,
                 'error'
             );
 
-            return;
+            return new WP_Error('tejlg_import_theme_file_mods_disabled', $message);
         }
 
         require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
@@ -180,13 +184,27 @@ class TEJLG_Import {
         );
 
         if (false === $filesystem_credentials) {
-            return;
+            if (defined('WP_CLI') && WP_CLI) {
+                return new WP_Error(
+                    'tejlg_import_theme_missing_credentials',
+                    esc_html__("Erreur : Impossible d'obtenir les identifiants du système de fichiers.", 'theme-export-jlg')
+                );
+            }
+
+            return null;
         }
 
         if (!WP_Filesystem($filesystem_credentials, $theme_root)) {
             request_filesystem_credentials($page_url, '', true, $theme_root, [$package_param]);
 
-            return;
+            if (defined('WP_CLI') && WP_CLI) {
+                return new WP_Error(
+                    'tejlg_import_theme_fs_initialization_failed',
+                    esc_html__("Erreur : L'initialisation du système de fichiers a échoué.", 'theme-export-jlg')
+                );
+            }
+
+            return null;
         }
 
         $skin_args = [
@@ -207,7 +225,7 @@ class TEJLG_Import {
             $file_upload->cleanup();
         }
 
-        self::finalize_theme_install_result($result, (bool) $allow_overwrite);
+        return self::finalize_theme_install_result($result, (bool) $allow_overwrite);
     }
 
     /**
@@ -446,6 +464,44 @@ class TEJLG_Import {
         );
     }
 
+    public static function prepare_patterns_from_json($json_content) {
+        if (!is_string($json_content) || '' === $json_content) {
+            return new WP_Error(
+                'tejlg_import_patterns_invalid_json',
+                __('Erreur : Le fichier n\'est pas un fichier JSON valide.', 'theme-export-jlg')
+            );
+        }
+
+        $patterns = json_decode($json_content, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($patterns)) {
+            return new WP_Error(
+                'tejlg_import_patterns_invalid_json',
+                __('Erreur : Le fichier n\'est pas un fichier JSON valide.', 'theme-export-jlg')
+            );
+        }
+
+        $patterns = array_values(
+            array_filter(
+                $patterns,
+                static function ($pattern) {
+                    return is_array($pattern)
+                        && array_key_exists('title', $pattern)
+                        && array_key_exists('content', $pattern);
+                }
+            )
+        );
+
+        if (empty($patterns)) {
+            return new WP_Error(
+                'tejlg_import_patterns_empty',
+                __('Erreur : Aucune composition valide (titre + contenu) n\'a été trouvée dans le fichier fourni.', 'theme-export-jlg')
+            );
+        }
+
+        return $patterns;
+    }
+
     public static function handle_patterns_upload_step1($file) {
         if (!isset($file['tmp_name']) || '' === $file['tmp_name']) {
             add_settings_error(
@@ -549,50 +605,39 @@ class TEJLG_Import {
 
         @unlink($file['tmp_name']);
 
-        $patterns = json_decode($json_content, true);
+        $patterns = self::prepare_patterns_from_json($json_content);
 
-        if (json_last_error() !== JSON_ERROR_NONE || !is_array($patterns)) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Erreur : Le fichier n\'est pas un fichier JSON valide.', 'theme-export-jlg'), 'error');
-            return;
-        }
+        if (is_wp_error($patterns)) {
+            $message = $patterns->get_error_message();
 
-        $patterns = array_values(
-            array_filter(
-                $patterns,
-                static function ($pattern) {
-                    return is_array($pattern)
-                        && array_key_exists('title', $pattern)
-                        && array_key_exists('content', $pattern);
-                }
-            )
-        );
-
-        $transient_id = 'tejlg_' . md5(uniqid('', true));
-
-        if (empty($patterns)) {
-            delete_transient($transient_id);
             add_settings_error(
                 'tejlg_import_messages',
                 'patterns_import_status',
-                esc_html__('Erreur : Aucune composition valide (titre + contenu) n\'a été trouvée dans le fichier fourni.', 'theme-export-jlg'),
+                esc_html(self::sanitize_error_message($message)),
                 'error'
             );
 
-            $errors = get_settings_errors('tejlg_import_messages');
-            set_transient('settings_errors', $errors, 30);
+            if ('tejlg_import_patterns_empty' === $patterns->get_error_code()) {
+                $errors = get_settings_errors('tejlg_import_messages');
+                set_transient('settings_errors', $errors, 30);
 
-            $redirect_url = add_query_arg(
-                'settings-updated',
-                'false',
-                admin_url('admin.php?page=theme-export-jlg&tab=import')
-            );
+                $redirect_url = add_query_arg(
+                    'settings-updated',
+                    'false',
+                    admin_url('admin.php?page=theme-export-jlg&tab=import')
+                );
 
-            $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
-            $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+                $fallback_url = admin_url('admin.php?page=theme-export-jlg&tab=import');
+                $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
 
-            wp_safe_redirect($redirect_url);
-            exit;
+                wp_safe_redirect($redirect_url);
+                exit;
+            }
+
+            return;
         }
+
+        $transient_id = 'tejlg_' . md5(uniqid('', true));
 
         $storage_result = self::persist_patterns_session($transient_id, $patterns);
 
@@ -627,61 +672,15 @@ class TEJLG_Import {
         exit;
     }
 
-    public static function handle_patterns_import_step2($transient_id, $selected_indices) {
-        $transient_id = (string) $transient_id;
-
-        if ('' === $transient_id || 0 !== strpos($transient_id, 'tejlg_')) {
-            add_settings_error(
-                'tejlg_import_messages',
-                'patterns_import_status',
-                esc_html__("Erreur : L'identifiant de session est invalide. Veuillez réessayer.", 'theme-export-jlg'),
-                'error'
-            );
-
-            return;
-        }
-
-        $storage = get_transient($transient_id);
-
-        if (false === $storage) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Erreur : La session d\'importation a expiré. Veuillez réessayer.', 'theme-export-jlg'), 'error');
-            return;
-        }
-
-        $all_patterns = self::retrieve_patterns_from_storage($storage);
-
-        if (is_wp_error($all_patterns)) {
-            $message = $all_patterns->get_error_message();
-            $message = '' !== $message ? $message : __('Erreur : Impossible de récupérer les données de la session d\'importation.', 'theme-export-jlg');
-
-            add_settings_error(
-                'tejlg_import_messages',
-                'patterns_import_status',
-                esc_html(self::sanitize_error_message($message)),
-                'error'
-            );
-
-            self::delete_patterns_storage($transient_id, $storage);
-
-            return;
-        }
-
-        if (!is_array($selected_indices)) {
-            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Erreur : La sélection des compositions est invalide.', 'theme-export-jlg'), 'error');
-            return;
-        }
-
+    public static function import_patterns_collection(array $patterns) {
         $imported_count = 0;
         $errors = [];
         $failed_patterns = [];
 
-        foreach ($selected_indices as $index) {
-            $index = intval($index);
-            if (!isset($all_patterns[$index]) || !is_array($all_patterns[$index])) {
+        foreach ($patterns as $index => $pattern) {
+            if (!is_array($pattern)) {
                 continue;
             }
-
-            $pattern = $all_patterns[$index];
 
             $raw_slug_sources = [];
 
@@ -757,43 +756,34 @@ class TEJLG_Import {
                 }
 
                 $normalized_slug_sources[] = $candidate;
-
-                if ('' === $slug) {
-                    $sanitized_candidate = sanitize_title($candidate);
-
-                    if ('' !== $sanitized_candidate) {
-                        $slug = $sanitized_candidate;
-                        $primary_slug_source = $candidate;
-                    }
-                }
-            }
-
-            if ('' === $slug) {
-                $errors[] = self::sanitize_error_message(
-                    sprintf(__('La composition à l\'index %d ne possède pas de slug valide.', 'theme-export-jlg'), $index)
-                );
-                $failed_patterns[$index] = $pattern;
-                continue;
             }
 
             $candidate_slugs = [];
 
-            foreach ($normalized_slug_sources as $candidate) {
-                $candidate_slugs[] = $candidate;
+            if (!empty($normalized_slug_sources)) {
+                $slug = sanitize_title(current($normalized_slug_sources));
 
-                $sanitized_candidate = sanitize_title($candidate);
+                foreach ($normalized_slug_sources as $source) {
+                    $sanitized_candidate = sanitize_title($source);
 
-                if ('' !== $sanitized_candidate) {
+                    if ('' === $sanitized_candidate) {
+                        continue;
+                    }
+
                     $candidate_slugs[] = $sanitized_candidate;
-                    $candidate_slugs[] = 'custom-patterns/' . $sanitized_candidate;
+
+                    if ('' === $primary_slug_source) {
+                        $primary_slug_source = $sanitized_candidate;
+                    }
                 }
             }
 
-            $candidate_slugs[] = $slug;
-            $candidate_slugs[] = 'custom-patterns/' . $slug;
+            if ('' === $slug && '' !== $title) {
+                $slug = sanitize_title($title);
+            }
 
-            if ('' !== $primary_slug_source) {
-                $candidate_slugs[] = $primary_slug_source;
+            if ('' === $slug) {
+                $slug = wp_unique_id('custom-pattern-');
             }
 
             $candidate_slugs = array_values(
@@ -822,8 +812,8 @@ class TEJLG_Import {
 
                 $allowed_statuses = ['publish', 'draft', 'pending', 'future', 'private', 'trash'];
 
-                $slug_placeholders      = implode(', ', array_fill(0, count($candidate_slugs), '%s'));
-                $status_placeholders    = implode(', ', array_fill(0, count($allowed_statuses), '%s'));
+                $slug_placeholders       = implode(', ', array_fill(0, count($candidate_slugs), '%s'));
+                $status_placeholders     = implode(', ', array_fill(0, count($allowed_statuses), '%s'));
                 $order_slug_placeholders = $slug_placeholders;
 
                 $sql = "SELECT ID FROM {$wpdb->posts}
@@ -847,7 +837,6 @@ class TEJLG_Import {
                 }
             }
 
-            // Always store the sanitized slug without the legacy "custom-patterns/" prefix.
             $post_data = [
                 'post_title'   => $title,
                 'post_content' => $content,
@@ -958,6 +947,90 @@ class TEJLG_Import {
 
             $imported_count++;
         }
+
+        $errors = array_values(
+            array_filter(
+                array_unique(
+                    array_map([__CLASS__, 'sanitize_error_message'], $errors)
+                ),
+                static function ($message) {
+                    return '' !== $message;
+                }
+            )
+        );
+
+        return [
+            'imported_count' => $imported_count,
+            'errors'         => $errors,
+            'failed_patterns' => $failed_patterns,
+        ];
+    }
+
+
+    public static function handle_patterns_import_step2($transient_id, $selected_indices) {
+        $transient_id = (string) $transient_id;
+
+        if ('' === $transient_id || 0 !== strpos($transient_id, 'tejlg_')) {
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html__("Erreur : L'identifiant de session est invalide. Veuillez réessayer.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $storage = get_transient($transient_id);
+
+        if (false === $storage) {
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Erreur : La session d\'importation a expiré. Veuillez réessayer.', 'theme-export-jlg'), 'error');
+            return;
+        }
+
+        $all_patterns = self::retrieve_patterns_from_storage($storage);
+
+        if (is_wp_error($all_patterns)) {
+            $message = $all_patterns->get_error_message();
+            $message = '' !== $message ? $message : __('Erreur : Impossible de récupérer les données de la session d\'importation.', 'theme-export-jlg');
+
+            add_settings_error(
+                'tejlg_import_messages',
+                'patterns_import_status',
+                esc_html(self::sanitize_error_message($message)),
+                'error'
+            );
+
+            self::delete_patterns_storage($transient_id, $storage);
+
+            return;
+        }
+
+        if (!is_array($selected_indices)) {
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Erreur : La sélection des compositions est invalide.', 'theme-export-jlg'), 'error');
+            return;
+        }
+
+        $patterns_to_import = [];
+
+        foreach ($selected_indices as $index) {
+            $index = intval($index);
+
+            if (isset($all_patterns[$index]) && is_array($all_patterns[$index])) {
+                $patterns_to_import[$index] = $all_patterns[$index];
+            }
+        }
+
+        if (empty($patterns_to_import)) {
+            add_settings_error('tejlg_import_messages', 'patterns_import_status', esc_html__('Erreur : La sélection des compositions est invalide.', 'theme-export-jlg'), 'error');
+            return;
+        }
+
+        $result = self::import_patterns_collection($patterns_to_import);
+
+        $imported_count  = isset($result['imported_count']) ? (int) $result['imported_count'] : 0;
+        $errors          = isset($result['errors']) && is_array($result['errors']) ? $result['errors'] : [];
+        $failed_patterns = isset($result['failed_patterns']) && is_array($result['failed_patterns']) ? $result['failed_patterns'] : [];
 
         if (!empty($errors)) {
             add_settings_error('tejlg_import_messages', 'patterns_import_errors', esc_html(implode(' ', array_unique($errors))), 'error');
