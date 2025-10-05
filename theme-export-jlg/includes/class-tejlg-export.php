@@ -187,18 +187,27 @@ class TEJLG_Export {
         $next_run  = $now->setTime($hour, $minute, 0);
         $frequency = isset($normalized['frequency']) ? (string) $normalized['frequency'] : 'daily';
 
+        if ('hourly' === $frequency || 'twicedaily' === $frequency) {
+            $interval = 'hourly' === $frequency ? HOUR_IN_SECONDS : 12 * HOUR_IN_SECONDS;
+
+            if ($next_run->getTimestamp() > $reference_time) {
+                $diff = $next_run->getTimestamp() - $reference_time;
+                $steps = (int) floor($diff / $interval);
+
+                if ($diff > $interval && $steps > 0) {
+                    $next_run = $next_run->modify(sprintf('-%d seconds', $steps * $interval));
+                }
+            }
+
+            if ($next_run->getTimestamp() <= $reference_time) {
+                $next_run = self::advance_to_next_interval($next_run, (int) $reference_time, $interval);
+            }
+
+            return (int) $next_run->getTimestamp();
+        }
+
         if ($next_run->getTimestamp() < $reference_time) {
             switch ($frequency) {
-                case 'hourly':
-                    $next_run = self::advance_to_next_interval($next_run, (int) $reference_time, HOUR_IN_SECONDS);
-
-                    break;
-
-                case 'twicedaily':
-                    $next_run = self::advance_to_next_interval($next_run, (int) $reference_time, 12 * HOUR_IN_SECONDS);
-
-                    break;
-
                 case 'weekly':
                     $next_run = $next_run->modify('+1 week');
 
