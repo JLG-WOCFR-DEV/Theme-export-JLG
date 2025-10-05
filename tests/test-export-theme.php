@@ -170,4 +170,95 @@ class Test_Export_Theme extends WP_UnitTestCase {
 
         remove_filter('tejlg_zip_writer_use_ziparchive', $filter, 10);
     }
+
+    public function test_run_scheduled_theme_export_handles_persistence_failure() {
+        TEJLG_Export_History::clear_history();
+
+        $original_settings = TEJLG_Export::get_schedule_settings();
+        $modified_settings = $original_settings;
+        $modified_settings['frequency'] = 'daily';
+
+        TEJLG_Export::update_schedule_settings($modified_settings);
+
+        $original_admin_email = get_option('admin_email');
+        update_option('admin_email', 'admin@example.com');
+
+        $uploads_filter = static function ($uploads) {
+            return [
+                'path'    => '',
+                'url'     => '',
+                'subdir'  => '',
+                'basedir' => '',
+                'baseurl' => '',
+                'error'   => 'Simulated failure',
+            ];
+        };
+
+        add_filter('wp_upload_dir', $uploads_filter, 10, 1);
+
+        $sent_emails = [];
+
+        $mail_filter = static function ($args) use (&$sent_emails) {
+            $sent_emails[] = $args;
+
+            return $args;
+        };
+
+        add_filter('wp_mail', $mail_filter, 10, 1);
+
+        TEJLG_Export::run_scheduled_theme_export();
+
+        remove_filter('wp_upload_dir', $uploads_filter, 10);
+        remove_filter('wp_mail', $mail_filter, 10);
+
+        $history = TEJLG_Export_History::get_entries(['per_page' => 1]);
+
+        $this->assertNotEmpty($history['entries'], 'A history entry should be recorded for the failed scheduled export.');
+
+        $entry = $history['entries'][0];
+
+        $this->assertSame('failed', $entry['status'], 'The history entry should record the failure.');
+        $this->assertNotEmpty($entry['job_id'], 'The failure entry should keep the job identifier.');
+
+        $job = TEJLG_Export::get_export_job_status($entry['job_id']);
+
+        $this->assertIsArray($job, 'The failed job should remain stored.');
+        $this->assertSame('failed', isset($job['status']) ? $job['status'] : null, 'The job should be marked as failed.');
+        $this->assertStringContainsString(
+            "Impossible de conserver l'archive",
+            isset($job['message']) ? (string) $job['message'] : '',
+            'The failure message should mention the persistence error.'
+        );
+
+        $success_notifications = array_filter(
+            $sent_emails,
+            static function ($mail) {
+                if (!is_array($mail) || empty($mail['subject'])) {
+                    return false;
+                }
+
+                return false !== strpos((string) $mail['subject'], 'réussi');
+            }
+        );
+
+        $this->assertEmpty($success_notifications, 'No success notification should be sent when persistence fails.');
+
+        $failure_notifications = array_filter(
+            $sent_emails,
+            static function ($mail) {
+                if (!is_array($mail) || empty($mail['subject'])) {
+                    return false;
+                }
+
+                return false !== strpos((string) $mail['subject'], 'Échec');
+            }
+        );
+
+        $this->assertNotEmpty($failure_notifications, 'A failure notification should be sent when persistence fails.');
+
+        TEJLG_Export::delete_job($entry['job_id']);
+        TEJLG_Export::update_schedule_settings($original_settings);
+        update_option('admin_email', $original_admin_email);
+        TEJLG_Export_History::clear_history();
+    }
 }
