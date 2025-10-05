@@ -4,6 +4,401 @@ require_once __DIR__ . '/class-tejlg-zip-writer.php';
 
 class TEJLG_Export {
 
+    const SCHEDULE_SETTINGS_OPTION = 'tejlg_export_schedule_settings';
+    const SCHEDULE_EVENT_HOOK      = 'tejlg_scheduled_theme_export';
+    const CLEANUP_EVENT_HOOK       = 'tejlg_cleanup_theme_exports';
+
+    public static function get_available_schedule_frequencies() {
+        $frequencies = [
+            'disabled'   => __('Désactivé', 'theme-export-jlg'),
+            'hourly'     => __('Toutes les heures', 'theme-export-jlg'),
+            'twicedaily' => __('Deux fois par jour', 'theme-export-jlg'),
+            'daily'      => __('Une fois par jour', 'theme-export-jlg'),
+            'weekly'     => __('Une fois par semaine', 'theme-export-jlg'),
+        ];
+
+        /**
+         * Permet de modifier la liste des fréquences proposées pour la planification.
+         *
+         * @param array<string,string> $frequencies
+         */
+        return apply_filters('tejlg_export_schedule_frequencies', $frequencies);
+    }
+
+    public static function get_default_schedule_settings() {
+        return [
+            'frequency'      => 'disabled',
+            'exclusions'     => '',
+            'retention_days' => 30,
+        ];
+    }
+
+    public static function get_schedule_settings() {
+        $stored = get_option(self::SCHEDULE_SETTINGS_OPTION, []);
+
+        if (!is_array($stored)) {
+            $stored = [];
+        }
+
+        $settings = array_merge(self::get_default_schedule_settings(), $stored);
+
+        return self::normalize_schedule_settings($settings);
+    }
+
+    public static function update_schedule_settings($settings) {
+        $normalized = self::normalize_schedule_settings($settings);
+
+        update_option(self::SCHEDULE_SETTINGS_OPTION, $normalized, false);
+
+        return $normalized;
+    }
+
+    private static function normalize_schedule_settings($settings) {
+        $defaults    = self::get_default_schedule_settings();
+        $frequencies = array_keys(self::get_available_schedule_frequencies());
+
+        $frequency = isset($settings['frequency']) ? sanitize_key((string) $settings['frequency']) : $defaults['frequency'];
+
+        if (!in_array($frequency, $frequencies, true)) {
+            $frequency = $defaults['frequency'];
+        }
+
+        $exclusions = isset($settings['exclusions']) ? (string) $settings['exclusions'] : $defaults['exclusions'];
+        $exclusions = (string) wp_unslash($exclusions);
+
+        $retention = isset($settings['retention_days']) ? (int) $settings['retention_days'] : (int) $defaults['retention_days'];
+
+        if ($retention < 0) {
+            $retention = 0;
+        }
+
+        return [
+            'frequency'      => $frequency,
+            'exclusions'     => $exclusions,
+            'retention_days' => $retention,
+        ];
+    }
+
+    public static function maybe_schedule_theme_export_event() {
+        if (!function_exists('wp_next_scheduled') || !function_exists('wp_schedule_event')) {
+            return;
+        }
+
+        $settings  = self::get_schedule_settings();
+        $frequency = isset($settings['frequency']) ? (string) $settings['frequency'] : 'disabled';
+
+        if ('disabled' === $frequency) {
+            self::clear_scheduled_theme_export_event();
+
+            return;
+        }
+
+        if (false !== wp_next_scheduled(self::SCHEDULE_EVENT_HOOK)) {
+            return;
+        }
+
+        $first_run = time() + MINUTE_IN_SECONDS;
+
+        /**
+         * Filtre l'horodatage du premier export planifié.
+         *
+         * @param int   $first_run Horodatage en secondes.
+         * @param array $settings  Réglages de planification.
+         */
+        $first_run = apply_filters('tejlg_export_schedule_first_run', $first_run, $settings);
+
+        if (!is_int($first_run) || $first_run <= time()) {
+            $first_run = time() + MINUTE_IN_SECONDS;
+        }
+
+        wp_schedule_event($first_run, $frequency, self::SCHEDULE_EVENT_HOOK);
+    }
+
+    public static function reschedule_theme_export_event() {
+        self::clear_scheduled_theme_export_event();
+        self::maybe_schedule_theme_export_event();
+    }
+
+    public static function clear_scheduled_theme_export_event() {
+        if (!function_exists('wp_clear_scheduled_hook')) {
+            return;
+        }
+
+        wp_clear_scheduled_hook(self::SCHEDULE_EVENT_HOOK);
+    }
+
+    public static function get_next_scheduled_export_timestamp() {
+        if (!function_exists('wp_next_scheduled')) {
+            return false;
+        }
+
+        return wp_next_scheduled(self::SCHEDULE_EVENT_HOOK);
+    }
+
+    public static function ensure_cleanup_event_scheduled() {
+        if (!function_exists('wp_next_scheduled') || !function_exists('wp_schedule_event')) {
+            return;
+        }
+
+        if (false !== wp_next_scheduled(self::CLEANUP_EVENT_HOOK)) {
+            return;
+        }
+
+        wp_schedule_event(time() + DAY_IN_SECONDS, 'daily', self::CLEANUP_EVENT_HOOK);
+    }
+
+    public static function clear_cleanup_event() {
+        if (!function_exists('wp_clear_scheduled_hook')) {
+            return;
+        }
+
+        wp_clear_scheduled_hook(self::CLEANUP_EVENT_HOOK);
+    }
+
+    private static function get_schedule_exclusion_list($settings) {
+        $raw = isset($settings['exclusions']) ? (string) $settings['exclusions'] : '';
+
+        if ('' === trim($raw)) {
+            return [];
+        }
+
+        $split = preg_split('/[,\n]+/', $raw);
+
+        if (false === $split) {
+            return [];
+        }
+
+        $patterns = array_values(array_filter(
+            array_map(
+                static function ($pattern) {
+                    if (!is_scalar($pattern)) {
+                        return '';
+                    }
+
+                    return trim((string) $pattern);
+                },
+                $split
+            ),
+            static function ($pattern) {
+                return '' !== $pattern;
+            }
+        ));
+
+        return self::sanitize_exclusion_patterns($patterns);
+    }
+
+    public static function run_scheduled_theme_export() {
+        $settings  = self::get_schedule_settings();
+        $frequency = isset($settings['frequency']) ? (string) $settings['frequency'] : 'disabled';
+
+        if ('disabled' === $frequency) {
+            self::clear_scheduled_theme_export_event();
+
+            return;
+        }
+
+        $exclusions = self::get_schedule_exclusion_list($settings);
+        $result     = self::export_theme($exclusions);
+
+        if (is_wp_error($result)) {
+            self::notify_scheduled_export_failure($result->get_error_message(), $settings, null, $result, $exclusions);
+
+            return;
+        }
+
+        $job_id = (string) $result;
+        $job    = self::get_job($job_id);
+
+        if (is_array($job)) {
+            $job['created_via'] = 'schedule';
+            self::persist_job($job);
+        }
+
+        self::run_pending_export_jobs();
+
+        $job = self::get_job($job_id);
+
+        if (!is_array($job)) {
+            self::notify_scheduled_export_failure(
+                esc_html__("L'export planifié a échoué : la tâche générée est introuvable.", 'theme-export-jlg'),
+                $settings,
+                null,
+                null,
+                $exclusions
+            );
+
+            return;
+        }
+
+        $status = isset($job['status']) ? (string) $job['status'] : '';
+
+        if ('completed' !== $status) {
+            $message = isset($job['message']) && is_string($job['message']) && '' !== $job['message']
+                ? $job['message']
+                : esc_html__("L'export planifié n'a pas pu être finalisé.", 'theme-export-jlg');
+
+            self::notify_scheduled_export_failure($message, $settings, $job, null, $exclusions);
+
+            return;
+        }
+
+        $persistence = self::persist_export_archive($job);
+
+        $delete_context = [
+            'origin' => 'schedule',
+            'reason' => 'persisted',
+        ];
+
+        if (!empty($persistence['path'])) {
+            $delete_context['persistent_path'] = $persistence['path'];
+        }
+
+        if (!empty($persistence['url'])) {
+            $delete_context['download_url'] = $persistence['url'];
+        }
+
+        self::delete_job($job_id, $delete_context);
+
+        self::cleanup_persisted_archives();
+
+        self::notify_scheduled_export_success($job, $settings, $persistence, $exclusions);
+    }
+
+    private static function notify_scheduled_export_success($job, $settings, $persistence, array $exclusions) {
+        $context = [
+            'type'        => 'success',
+            'job'         => $job,
+            'settings'    => $settings,
+            'persistence' => $persistence,
+            'exclusions'  => $exclusions,
+        ];
+
+        $recipient = self::get_scheduled_notification_recipient('success', $context);
+
+        if (!$recipient) {
+            return;
+        }
+
+        $blogname = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
+
+        $subject = sprintf(__('Export de thème programmé réussi – %s', 'theme-export-jlg'), $blogname);
+
+        $completed_at = isset($job['completed_at']) ? (int) $job['completed_at'] : time();
+        $date_format  = get_option('date_format', 'Y-m-d');
+        $time_format  = get_option('time_format', 'H:i');
+        $datetime     = trim($date_format . ' ' . $time_format);
+
+        if (function_exists('wp_date')) {
+            $formatted_date = wp_date($datetime, $completed_at);
+        } else {
+            $formatted_date = date_i18n($datetime, $completed_at);
+        }
+
+        $download_url = isset($persistence['url']) ? (string) $persistence['url'] : '';
+        $retention    = isset($settings['retention_days']) ? (int) $settings['retention_days'] : 0;
+
+        $paragraphs = [
+            sprintf(__('Un export planifié du thème a été généré le %s.', 'theme-export-jlg'), $formatted_date),
+        ];
+
+        if ('' !== $download_url) {
+            $paragraphs[] = sprintf(__('Téléchargez l’archive : %s', 'theme-export-jlg'), $download_url);
+        }
+
+        if (!empty($exclusions)) {
+            $paragraphs[] = sprintf(__('Motifs d’exclusion appliqués : %s', 'theme-export-jlg'), implode(', ', $exclusions));
+        }
+
+        if ($retention > 0) {
+            $paragraphs[] = sprintf(__('Les archives sont conservées pendant %d jours.', 'theme-export-jlg'), $retention);
+        }
+
+        $body = implode("\n\n", $paragraphs) . "\n\n" . __('— Theme Export JLG', 'theme-export-jlg');
+
+        $context['subject'] = $subject;
+        $context['body']    = $body;
+
+        $subject = apply_filters('tejlg_scheduled_export_notification_subject', $subject, $context);
+        $body    = apply_filters('tejlg_scheduled_export_notification_body', $body, $context);
+
+        wp_mail($recipient, $subject, $body);
+    }
+
+    private static function notify_scheduled_export_failure($message, $settings, $job = null, $error = null, array $exclusions = []) {
+        $context = [
+            'type'       => 'error',
+            'settings'   => $settings,
+            'job'        => $job,
+            'error'      => $error,
+            'exclusions' => $exclusions,
+        ];
+
+        $recipient = self::get_scheduled_notification_recipient('error', $context);
+
+        if (!$recipient) {
+            return;
+        }
+
+        $blogname = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
+        $subject  = sprintf(__('Échec de l’export de thème programmé – %s', 'theme-export-jlg'), $blogname);
+
+        $message = is_string($message) ? trim(wp_strip_all_tags($message)) : '';
+
+        if ('' === $message) {
+            $message = __('Une erreur inconnue est survenue lors de la génération de l’archive.', 'theme-export-jlg');
+        }
+
+        $paragraphs = [
+            __('L’export planifié du thème a échoué.', 'theme-export-jlg'),
+            $message,
+        ];
+
+        if (is_array($job) && isset($job['id'])) {
+            $paragraphs[] = sprintf(__('Identifiant de tâche : %s', 'theme-export-jlg'), (string) $job['id']);
+        }
+
+        if (!empty($exclusions)) {
+            $paragraphs[] = sprintf(__('Motifs d’exclusion appliqués : %s', 'theme-export-jlg'), implode(', ', $exclusions));
+        }
+
+        $paragraphs[] = sprintf(__('Site : %s', 'theme-export-jlg'), home_url());
+
+        $body = implode("\n\n", $paragraphs) . "\n\n" . __('— Theme Export JLG', 'theme-export-jlg');
+
+        $context['subject'] = $subject;
+        $context['body']    = $body;
+
+        $subject = apply_filters('tejlg_scheduled_export_notification_subject', $subject, $context);
+        $body    = apply_filters('tejlg_scheduled_export_notification_body', $body, $context);
+
+        wp_mail($recipient, $subject, $body);
+    }
+
+    private static function get_scheduled_notification_recipient($type, array $context) {
+        $recipient = get_option('admin_email');
+
+        /**
+         * Permet de modifier le destinataire des notifications d’export planifié.
+         *
+         * @param string|false $recipient Adresse e-mail du destinataire.
+         * @param string       $type      Type de notification (success|error).
+         * @param array        $context   Contexte de la notification.
+         */
+        $recipient = apply_filters('tejlg_scheduled_export_notification_recipient', $recipient, $type, $context);
+
+        if (!is_string($recipient)) {
+            return false;
+        }
+
+        $recipient = trim($recipient);
+
+        if ('' === $recipient || !is_email($recipient)) {
+            return false;
+        }
+
+        return $recipient;
+    }
+
     /**
      * Crée et télécharge l'archive ZIP du thème actif.
      *
@@ -720,6 +1115,76 @@ class TEJLG_Export {
         delete_option(self::get_job_option_name($job_id));
     }
 
+    public static function cleanup_persisted_archives($retention_days = null) {
+        $settings = self::get_schedule_settings();
+
+        if (null === $retention_days) {
+            $retention_days = isset($settings['retention_days']) ? (int) $settings['retention_days'] : 0;
+        }
+
+        $retention_days = (int) apply_filters('tejlg_export_retention_days', $retention_days, $settings);
+
+        if ($retention_days <= 0) {
+            return;
+        }
+
+        $uploads = wp_upload_dir();
+
+        if (!is_array($uploads) || !empty($uploads['error'])) {
+            return;
+        }
+
+        $base_dir = isset($uploads['basedir']) ? (string) $uploads['basedir'] : '';
+
+        if ('' === $base_dir) {
+            return;
+        }
+
+        $target_directory = trailingslashit($base_dir) . 'theme-export-jlg/';
+
+        if (!is_dir($target_directory)) {
+            return;
+        }
+
+        $threshold = time() - ($retention_days * DAY_IN_SECONDS);
+
+        if ($threshold <= 0) {
+            return;
+        }
+
+        try {
+            $iterator = new DirectoryIterator($target_directory);
+        } catch (UnexpectedValueException $exception) {
+            return;
+        }
+
+        foreach ($iterator as $fileinfo) {
+            if ($fileinfo->isDot() || !$fileinfo->isFile()) {
+                continue;
+            }
+
+            $mtime = $fileinfo->getMTime();
+
+            if ($mtime > 0 && $mtime <= $threshold) {
+                $path = $fileinfo->getPathname();
+
+                if (is_string($path) && '' !== $path) {
+                    @unlink($path); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+                }
+            }
+        }
+
+        try {
+            $cleanup_iterator = new FilesystemIterator($target_directory);
+        } catch (UnexpectedValueException $exception) {
+            return;
+        }
+
+        if (!$cleanup_iterator->valid()) {
+            @rmdir($target_directory); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        }
+    }
+
     public static function cleanup_stale_jobs($max_age = null) {
         global $wpdb;
 
@@ -799,6 +1264,8 @@ class TEJLG_Export {
                 'origin' => 'cleanup',
             ]);
         }
+
+        self::cleanup_persisted_archives();
     }
 
     public static function mark_job_failed($job_id, $message, $context = []) {
