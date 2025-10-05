@@ -65,14 +65,26 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $raw_frequency  = isset($_POST['tejlg_schedule_frequency']) ? sanitize_key((string) $_POST['tejlg_schedule_frequency']) : 'disabled';
         $raw_exclusions = isset($_POST['tejlg_schedule_exclusions']) ? wp_unslash((string) $_POST['tejlg_schedule_exclusions']) : '';
         $raw_retention  = isset($_POST['tejlg_schedule_retention']) ? wp_unslash((string) $_POST['tejlg_schedule_retention']) : '';
+        $raw_run_time   = isset($_POST['tejlg_schedule_run_time']) ? wp_unslash((string) $_POST['tejlg_schedule_run_time']) : '';
 
         $retention = is_numeric($raw_retention) ? (int) $raw_retention : 0;
         $retention = $retention < 0 ? 0 : $retention;
+
+        $run_time = '';
+
+        if (is_string($raw_run_time)) {
+            $raw_run_time = trim($raw_run_time);
+
+            if (preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', $raw_run_time, $matches)) {
+                $run_time = sprintf('%02d:%02d', (int) $matches[1], (int) $matches[2]);
+            }
+        }
 
         $settings = [
             'frequency'      => $raw_frequency,
             'exclusions'     => $raw_exclusions,
             'retention_days' => $retention,
+            'run_time'       => $run_time,
         ];
 
         $normalized = TEJLG_Export::update_schedule_settings($settings);

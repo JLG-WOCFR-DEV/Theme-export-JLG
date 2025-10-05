@@ -27,6 +27,21 @@ $select_patterns_url = add_query_arg([
 $schedule_frequency_value  = isset($schedule_settings['frequency']) ? (string) $schedule_settings['frequency'] : 'disabled';
 $schedule_exclusions_value = isset($schedule_settings['exclusions']) ? (string) $schedule_settings['exclusions'] : '';
 $schedule_retention_value  = isset($schedule_settings['retention_days']) ? (int) $schedule_settings['retention_days'] : 0;
+$schedule_run_time_value   = isset($schedule_settings['run_time']) ? (string) $schedule_settings['run_time'] : '00:00';
+
+if (!preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', $schedule_run_time_value)) {
+    $schedule_run_time_value = '00:00';
+}
+
+$site_timezone_string = function_exists('wp_timezone_string') ? wp_timezone_string() : get_option('timezone_string');
+
+if (!is_string($site_timezone_string) || '' === $site_timezone_string) {
+    $offset          = (float) get_option('gmt_offset', 0);
+    $offset_hours    = (int) $offset;
+    $offset_minutes  = (int) round(abs($offset - $offset_hours) * 60);
+    $offset_sign     = $offset < 0 ? '-' : '+';
+    $site_timezone_string = sprintf('%s%02d:%02d', $offset_sign, abs($offset_hours), abs($offset_minutes));
+}
 ?>
 <h2><?php esc_html_e('Actions sur le Thème Actif', 'theme-export-jlg'); ?></h2>
 <div class="tejlg-cards-container">
@@ -153,6 +168,28 @@ $schedule_retention_value  = isset($schedule_settings['retention_days']) ? (int)
                                         ?>
                                     </p>
                                 <?php endif; ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">
+                                <label for="tejlg_schedule_run_time"><?php esc_html_e("Heure d’exécution", 'theme-export-jlg'); ?></label>
+                            </th>
+                            <td>
+                                <input
+                                    type="time"
+                                    id="tejlg_schedule_run_time"
+                                    name="tejlg_schedule_run_time"
+                                    value="<?php echo esc_attr($schedule_run_time_value); ?>"
+                                    step="60"
+                                >
+                                <p class="description">
+                                    <?php
+                                    printf(
+                                        esc_html__('Fuseau horaire du site : %s', 'theme-export-jlg'),
+                                        esc_html($site_timezone_string)
+                                    );
+                                    ?>
+                                </p>
                             </td>
                         </tr>
                         <tr>

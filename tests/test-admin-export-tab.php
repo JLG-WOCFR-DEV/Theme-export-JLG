@@ -118,4 +118,107 @@ class Test_Admin_Export_Tab extends WP_UnitTestCase {
 
         wp_set_current_user(0);
     }
+
+    public function test_schedule_settings_accept_valid_run_time() {
+        delete_option(TEJLG_Export::SCHEDULE_SETTINGS_OPTION);
+
+        $normalized = TEJLG_Export::update_schedule_settings([
+            'frequency' => 'daily',
+            'run_time'  => '07:05',
+        ]);
+
+        $this->assertArrayHasKey('run_time', $normalized);
+        $this->assertSame('07:05', $normalized['run_time']);
+
+        delete_option(TEJLG_Export::SCHEDULE_SETTINGS_OPTION);
+    }
+
+    public function test_schedule_settings_reject_invalid_run_time() {
+        delete_option(TEJLG_Export::SCHEDULE_SETTINGS_OPTION);
+
+        $normalized = TEJLG_Export::update_schedule_settings([
+            'frequency' => 'daily',
+            'run_time'  => '26:90',
+        ]);
+
+        $this->assertArrayHasKey('run_time', $normalized);
+        $this->assertSame('00:00', $normalized['run_time']);
+
+        delete_option(TEJLG_Export::SCHEDULE_SETTINGS_OPTION);
+    }
+
+    public function test_calculate_next_schedule_timestamp_respects_run_time() {
+        $previous_timezone = get_option('timezone_string');
+        update_option('timezone_string', 'UTC');
+
+        try {
+            $reference = gmmktime(12, 0, 0, 1, 1, 2024);
+
+            $settings = [
+                'frequency' => 'daily',
+                'run_time'  => '23:45',
+            ];
+
+            $first_run = TEJLG_Export::calculate_next_schedule_timestamp($settings, $reference);
+            $this->assertSame(gmmktime(23, 45, 0, 1, 1, 2024), $first_run);
+
+            $settings['run_time'] = '08:15';
+            $next_run             = TEJLG_Export::calculate_next_schedule_timestamp($settings, $reference);
+            $this->assertSame(gmmktime(8, 15, 0, 1, 2, 2024), $next_run);
+
+            $settings['frequency'] = 'weekly';
+            $settings['run_time']  = '07:30';
+            $weekly_run            = TEJLG_Export::calculate_next_schedule_timestamp($settings, $reference);
+            $this->assertSame(gmmktime(7, 30, 0, 1, 8, 2024), $weekly_run);
+        } finally {
+            if (false === $previous_timezone || '' === $previous_timezone) {
+                delete_option('timezone_string');
+            } else {
+                update_option('timezone_string', $previous_timezone);
+            }
+        }
+    }
+
+    public function test_maybe_schedule_theme_export_event_applies_timestamp_filter() {
+        $previous_timezone = get_option('timezone_string');
+        update_option('timezone_string', 'UTC');
+
+        delete_option(TEJLG_Export::SCHEDULE_SETTINGS_OPTION);
+        TEJLG_Export::clear_scheduled_theme_export_event();
+
+        $settings = [
+            'frequency'      => 'daily',
+            'run_time'       => '00:00',
+            'retention_days' => 0,
+        ];
+
+        TEJLG_Export::update_schedule_settings($settings);
+
+        $captured_timestamp = null;
+
+        $filter = static function ($timestamp) use (&$captured_timestamp) {
+            $captured_timestamp = $timestamp + 90;
+            return $captured_timestamp;
+        };
+
+        add_filter('tejlg_export_schedule_timestamp', $filter);
+
+        try {
+            TEJLG_Export::maybe_schedule_theme_export_event();
+
+            $scheduled = wp_next_scheduled(TEJLG_Export::SCHEDULE_EVENT_HOOK);
+
+            $this->assertNotNull($captured_timestamp, 'The timestamp filter should capture a value.');
+            $this->assertSame($captured_timestamp, $scheduled, 'The scheduled event should use the filtered timestamp.');
+        } finally {
+            remove_filter('tejlg_export_schedule_timestamp', $filter);
+            TEJLG_Export::clear_scheduled_theme_export_event();
+
+            if (false === $previous_timezone || '' === $previous_timezone) {
+                delete_option('timezone_string');
+            } else {
+                update_option('timezone_string', $previous_timezone);
+            }
+        }
+    }
 }
