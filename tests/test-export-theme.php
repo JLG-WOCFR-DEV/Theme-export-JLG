@@ -225,7 +225,7 @@ class Test_Export_Theme extends WP_UnitTestCase {
         $this->assertIsArray($job, 'The failed job should remain stored.');
         $this->assertSame('failed', isset($job['status']) ? $job['status'] : null, 'The job should be marked as failed.');
         $this->assertStringContainsString(
-            "Impossible de conserver l'archive",
+            "Impossible de conserver l'archive de l'export planifié :",
             isset($job['message']) ? (string) $job['message'] : '',
             'The failure message should mention the persistence error.'
         );

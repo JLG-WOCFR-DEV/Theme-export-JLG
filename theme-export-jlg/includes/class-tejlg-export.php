@@ -386,7 +386,10 @@ class TEJLG_Export {
         $persistent_url  = isset($persistence['url']) ? (string) $persistence['url'] : '';
 
         if ('' === $persistent_path || '' === $persistent_url) {
-            $failure_message = esc_html__("Impossible de conserver l'archive de l'export planifié.", 'theme-export-jlg');
+            $failure_message = esc_html__(
+                "Impossible de conserver l'archive de l'export planifié : aucune destination valide n'a été générée.",
+                'theme-export-jlg'
+            );
 
             self::mark_job_failed(
                 $job_id,
@@ -411,7 +414,15 @@ class TEJLG_Export {
                 ]
             );
 
-            self::notify_scheduled_export_failure($failure_message, $settings, $failed_job, null, $exclusions);
+            $error = new WP_Error(
+                'tejlg_persist_export_archive_missing_destination',
+                $failure_message,
+                [
+                    'persistence' => $persistence,
+                ]
+            );
+
+            self::notify_scheduled_export_failure($failure_message, $settings, $failed_job, $error, $exclusions);
 
             return;
         }
