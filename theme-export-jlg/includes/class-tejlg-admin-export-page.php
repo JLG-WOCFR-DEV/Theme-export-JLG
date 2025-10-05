@@ -27,6 +27,8 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
     }
 
     public function handle_request() {
+        $this->handle_schedule_settings_submission();
+
         $theme_export_result = $this->handle_theme_export_form_submission();
 
         if (null !== $theme_export_result) {
@@ -42,6 +44,49 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $this->handle_global_styles_export_request();
         $this->handle_selected_patterns_export_request();
         $this->handle_child_theme_request();
+    }
+
+    private function handle_schedule_settings_submission() {
+        if (!isset($_POST['tejlg_schedule_settings_nonce']) || !wp_verify_nonce($_POST['tejlg_schedule_settings_nonce'], 'tejlg_schedule_settings_action')) {
+            return;
+        }
+
+        if (!current_user_can('manage_options')) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'schedule_settings_permissions',
+                esc_html__("Erreur : vous n'avez pas l'autorisation de modifier la planification des exports.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $raw_frequency  = isset($_POST['tejlg_schedule_frequency']) ? sanitize_key((string) $_POST['tejlg_schedule_frequency']) : 'disabled';
+        $raw_exclusions = isset($_POST['tejlg_schedule_exclusions']) ? wp_unslash((string) $_POST['tejlg_schedule_exclusions']) : '';
+        $raw_retention  = isset($_POST['tejlg_schedule_retention']) ? wp_unslash((string) $_POST['tejlg_schedule_retention']) : '';
+
+        $retention = is_numeric($raw_retention) ? (int) $raw_retention : 0;
+        $retention = $retention < 0 ? 0 : $retention;
+
+        $settings = [
+            'frequency'      => $raw_frequency,
+            'exclusions'     => $raw_exclusions,
+            'retention_days' => $retention,
+        ];
+
+        $normalized = TEJLG_Export::update_schedule_settings($settings);
+
+        TEJLG_Export::reschedule_theme_export_event();
+        TEJLG_Export::ensure_cleanup_event_scheduled();
+        TEJLG_Export::cleanup_persisted_archives($normalized['retention_days']);
+
+        add_settings_error(
+            'tejlg_admin_messages',
+            'schedule_settings_saved',
+            esc_html__('Les réglages de planification ont été enregistrés.', 'theme-export-jlg'),
+            'updated'
+        );
     }
 
     public function render() {
@@ -88,6 +133,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             $portable_mode_enabled = isset($_POST['export_portable']);
         }
 
+        $schedule_settings   = TEJLG_Export::get_schedule_settings();
+        $schedule_frequencies = TEJLG_Export::get_available_schedule_frequencies();
+        $schedule_next_run    = TEJLG_Export::get_next_scheduled_export_timestamp();
+
         $history_per_page = (int) apply_filters('tejlg_export_history_per_page', 10);
         $history_per_page = $history_per_page > 0 ? $history_per_page : 10;
 
@@ -121,6 +170,9 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'child_theme_value'         => $child_theme_value,
             'exclusion_patterns_value'  => $exclusion_patterns_value,
             'portable_mode_enabled'     => $portable_mode_enabled,
+            'schedule_settings'         => $schedule_settings,
+            'schedule_frequencies'      => $schedule_frequencies,
+            'schedule_next_run'         => $schedule_next_run,
             'history_entries'           => isset($history['entries']) ? (array) $history['entries'] : [],
             'history_total'             => isset($history['total']) ? (int) $history['total'] : 0,
             'history_pagination_links'  => is_array($history_pagination_links) ? $history_pagination_links : [],

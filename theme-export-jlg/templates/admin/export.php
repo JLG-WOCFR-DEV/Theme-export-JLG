@@ -3,6 +3,9 @@
 /** @var string $child_theme_value */
 /** @var string $exclusion_patterns_value */
 /** @var bool   $portable_mode_enabled */
+/** @var array  $schedule_settings */
+/** @var array  $schedule_frequencies */
+/** @var int|false $schedule_next_run */
 /** @var array  $history_entries */
 /** @var int    $history_total */
 /** @var array  $history_pagination_links */
@@ -20,6 +23,10 @@ $select_patterns_url = add_query_arg([
     'tab'    => 'export',
     'action' => 'select_patterns',
 ], admin_url('admin.php'));
+
+$schedule_frequency_value  = isset($schedule_settings['frequency']) ? (string) $schedule_settings['frequency'] : 'disabled';
+$schedule_exclusions_value = isset($schedule_settings['exclusions']) ? (string) $schedule_settings['exclusions'] : '';
+$schedule_retention_value  = isset($schedule_settings['retention_days']) ? (int) $schedule_settings['retention_days'] : 0;
 ?>
 <h2><?php esc_html_e('Actions sur le Thème Actif', 'theme-export-jlg'); ?></h2>
 <div class="tejlg-cards-container">
@@ -107,6 +114,81 @@ $select_patterns_url = add_query_arg([
                     <p><button type="button" class="button button-secondary wp-ui-secondary" data-export-cancel hidden><?php esc_html_e("Annuler l'export", 'theme-export-jlg'); ?></button></p>
                     <p><a href="#" class="button button-secondary wp-ui-secondary" data-export-download hidden target="_blank" rel="noopener"><?php esc_html_e("Télécharger l'archive ZIP", 'theme-export-jlg'); ?></a></p>
                 </div>
+            </form>
+        </div>
+    </div>
+    <div class="tejlg-card components-card is-elevated">
+        <div class="components-card__body">
+            <h3><?php esc_html_e('Planification des exports de thème', 'theme-export-jlg'); ?></h3>
+            <p><?php esc_html_e('Automatisez la génération d’archives ZIP du thème actif et contrôlez leur conservation.', 'theme-export-jlg'); ?></p>
+            <form method="post" action="<?php echo esc_url($export_tab_url); ?>">
+                <?php wp_nonce_field('tejlg_schedule_settings_action', 'tejlg_schedule_settings_nonce'); ?>
+                <table class="form-table">
+                    <tbody>
+                        <tr>
+                            <th scope="row">
+                                <label for="tejlg_schedule_frequency"><?php esc_html_e('Fréquence', 'theme-export-jlg'); ?></label>
+                            </th>
+                            <td>
+                                <select name="tejlg_schedule_frequency" id="tejlg_schedule_frequency">
+                                    <?php foreach ($schedule_frequencies as $frequency_value => $frequency_label) : ?>
+                                        <option value="<?php echo esc_attr($frequency_value); ?>" <?php selected($schedule_frequency_value, $frequency_value); ?>>
+                                            <?php echo esc_html($frequency_label); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php if (!empty($schedule_next_run)) : ?>
+                                    <p class="description">
+                                        <?php
+                                        $next_run_format = trim(get_option('date_format', 'Y-m-d') . ' ' . get_option('time_format', 'H:i'));
+                                        if (function_exists('wp_date')) {
+                                            $next_run_label = wp_date($next_run_format, (int) $schedule_next_run);
+                                        } else {
+                                            $next_run_label = date_i18n($next_run_format, (int) $schedule_next_run);
+                                        }
+                                        printf(
+                                            esc_html__('Prochaine exécution prévue : %s', 'theme-export-jlg'),
+                                            esc_html($next_run_label)
+                                        );
+                                        ?>
+                                    </p>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">
+                                <label for="tejlg_schedule_exclusions"><?php esc_html_e('Motifs d’exclusion', 'theme-export-jlg'); ?></label>
+                            </th>
+                            <td>
+                                <textarea
+                                    name="tejlg_schedule_exclusions"
+                                    id="tejlg_schedule_exclusions"
+                                    class="large-text code"
+                                    rows="4"
+                                    placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"
+                                ><?php echo esc_textarea($schedule_exclusions_value); ?></textarea>
+                                <p class="description"><?php esc_html_e('Un motif par ligne ou séparé par des virgules. Ces exclusions s’appliquent uniquement aux exports planifiés.', 'theme-export-jlg'); ?></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">
+                                <label for="tejlg_schedule_retention"><?php esc_html_e('Rétention (jours)', 'theme-export-jlg'); ?></label>
+                            </th>
+                            <td>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    class="small-text"
+                                    name="tejlg_schedule_retention"
+                                    id="tejlg_schedule_retention"
+                                    value="<?php echo esc_attr($schedule_retention_value); ?>"
+                                >
+                                <p class="description"><?php esc_html_e('Durée de conservation des archives stockées dans la médiathèque. Indiquez 0 pour désactiver le nettoyage automatique.', 'theme-export-jlg'); ?></p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p><button type="submit" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Enregistrer la planification', 'theme-export-jlg'); ?></button></p>
             </form>
         </div>
     </div>
