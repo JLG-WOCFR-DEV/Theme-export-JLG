@@ -27,6 +27,23 @@ class Test_Export_Schedule extends WP_UnitTestCase {
         $this->assertLessThanOrEqual($reference->getTimestamp() + HOUR_IN_SECONDS, $timestamp);
     }
 
+    public function test_hourly_schedule_wraps_across_midnight() {
+        $settings = [
+            'frequency' => 'hourly',
+            'run_time'  => '23:15',
+        ];
+
+        $reference = new DateTimeImmutable('2023-10-10 01:00:00', new DateTimeZone('Europe/Paris'));
+
+        $timestamp = TEJLG_Export::calculate_next_schedule_timestamp($settings, $reference->getTimestamp());
+
+        $next_run = (new DateTimeImmutable('@' . $timestamp))->setTimezone(new DateTimeZone('Europe/Paris'));
+
+        $this->assertSame('15', $next_run->format('i'), 'Minute should match run_time setting.');
+        $this->assertGreaterThan($reference->getTimestamp(), $timestamp);
+        $this->assertLessThanOrEqual($reference->getTimestamp() + HOUR_IN_SECONDS, $timestamp);
+    }
+
     public function test_twicedaily_schedule_uses_twelve_hour_increments() {
         $settings = [
             'frequency' => 'twicedaily',
@@ -41,6 +58,23 @@ class Test_Export_Schedule extends WP_UnitTestCase {
 
         $this->assertSame('2023-11-15 17:20', $next_run->format('Y-m-d H:i'));
         $this->assertSame('20', $next_run->format('i'), 'Minute should match run_time setting.');
+        $this->assertGreaterThan($reference->getTimestamp(), $timestamp);
+        $this->assertLessThanOrEqual($reference->getTimestamp() + (12 * HOUR_IN_SECONDS), $timestamp);
+    }
+
+    public function test_twicedaily_schedule_adjusts_when_first_slot_is_far_in_future() {
+        $settings = [
+            'frequency' => 'twicedaily',
+            'run_time'  => '20:40',
+        ];
+
+        $reference = new DateTimeImmutable('2023-11-15 06:00:00', new DateTimeZone('Europe/Paris'));
+
+        $timestamp = TEJLG_Export::calculate_next_schedule_timestamp($settings, $reference->getTimestamp());
+
+        $next_run = (new DateTimeImmutable('@' . $timestamp))->setTimezone(new DateTimeZone('Europe/Paris'));
+
+        $this->assertSame('40', $next_run->format('i'), 'Minute should match run_time setting.');
         $this->assertGreaterThan($reference->getTimestamp(), $timestamp);
         $this->assertLessThanOrEqual($reference->getTimestamp() + (12 * HOUR_IN_SECONDS), $timestamp);
     }
