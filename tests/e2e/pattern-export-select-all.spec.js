@@ -294,5 +294,6 @@ test.describe('Pattern export selection screen', () => {
     await expect(invalidNotice).toBeVisible();
     await expect(invalidNotice).toContainText('Motifs invalides');
     await expect(textarea).toHaveClass(/has-pattern-error/);
+    await expect(textarea).toHaveAttribute('aria-invalid', 'true');
   });
 });

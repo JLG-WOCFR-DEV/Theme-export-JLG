@@ -57,8 +57,20 @@ $select_patterns_url = add_query_arg([
                             <span class="spinner" aria-hidden="true" data-pattern-test-spinner></span>
                         </div>
                         <p id="tejlg-pattern-test-help" class="description"><?php esc_html_e('Vérifiez les fichiers inclus/exclus avant de lancer un export.', 'theme-export-jlg'); ?></p>
-                        <p class="tejlg-pattern-test__invalid" data-pattern-test-invalid hidden></p>
-                        <div class="tejlg-pattern-test__feedback notice notice-info" data-pattern-test-feedback hidden>
+                        <p
+                            class="tejlg-pattern-test__invalid"
+                            data-pattern-test-invalid
+                            role="alert"
+                            aria-live="polite"
+                            hidden
+                        ></p>
+                        <div
+                            class="tejlg-pattern-test__feedback notice notice-info"
+                            data-pattern-test-feedback
+                            role="status"
+                            aria-live="polite"
+                            hidden
+                        >
                             <p class="tejlg-pattern-test__summary" data-pattern-test-summary></p>
                             <p class="tejlg-pattern-test__message" data-pattern-test-message></p>
                             <div class="tejlg-pattern-test__lists" data-pattern-test-lists>
