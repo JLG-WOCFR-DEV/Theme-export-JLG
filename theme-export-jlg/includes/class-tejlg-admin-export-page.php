@@ -464,4 +464,49 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         return array_values($sanitized);
     }
+
+    public static function ajax_preview_exclusion_patterns() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error([
+                'message' => esc_html__("Erreur : vous n'avez pas l'autorisation d'effectuer cette action.", 'theme-export-jlg'),
+            ], 403);
+        }
+
+        check_ajax_referer('tejlg_preview_exclusion_patterns', 'nonce');
+
+        $raw_patterns = isset($_POST['patterns'])
+            ? wp_unslash((string) $_POST['patterns'])
+            : '';
+
+        $preview = TEJLG_Export::preview_theme_export_files($raw_patterns);
+
+        if (is_wp_error($preview)) {
+            $data = [
+                'message' => $preview->get_error_message(),
+            ];
+
+            $error_data = $preview->get_error_data();
+
+            if (is_array($error_data)) {
+                if (isset($error_data['invalid_patterns'])) {
+                    $invalid_patterns = array_map('strval', (array) $error_data['invalid_patterns']);
+                    $data['invalid_patterns'] = array_values(array_unique($invalid_patterns));
+                }
+
+                if (isset($error_data['message']) && !empty($error_data['message']) && is_string($error_data['message'])) {
+                    $data['message'] = $error_data['message'];
+                }
+            }
+
+            $status = is_array($error_data) && isset($error_data['status']) ? (int) $error_data['status'] : 400;
+
+            if ($status < 200 || $status >= 600) {
+                $status = 400;
+            }
+
+            wp_send_json_error($data, $status);
+        }
+
+        wp_send_json_success($preview);
+    }
 }

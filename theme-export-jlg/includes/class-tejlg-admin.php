@@ -148,6 +148,19 @@ class TEJLG_Admin {
                     'defaults'    => [
                         'exclusions' => $saved_exclusions,
                     ],
+                    'patternTester' => [
+                        'action' => 'tejlg_preview_exclusion_patterns',
+                        'nonce'  => wp_create_nonce('tejlg_preview_exclusion_patterns'),
+                        'strings' => [
+                            'summary'        => esc_html__('%1$d fichier(s) inclus, %2$d exclu(s).', 'theme-export-jlg'),
+                            'emptyList'      => esc_html__('Aucun fichier listé.', 'theme-export-jlg'),
+                            'invalidPatterns' => esc_html__('Motifs invalides : %1$s', 'theme-export-jlg'),
+                            'unknownError'   => esc_html__('Une erreur inattendue est survenue lors du test des motifs.', 'theme-export-jlg'),
+                            'requestFailed'  => esc_html__('La requête a échoué. Veuillez réessayer.', 'theme-export-jlg'),
+                            'successMessage' => esc_html__('Aperçu généré avec succès.', 'theme-export-jlg'),
+                            'listSeparator'  => esc_html__(', ', 'theme-export-jlg'),
+                        ],
+                    ],
                 ],
             ]
         );

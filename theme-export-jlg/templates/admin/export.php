@@ -46,6 +46,33 @@ $select_patterns_url = add_query_arg([
                         aria-describedby="tejlg_exclusion_patterns_description"
                     ><?php echo esc_textarea($exclusion_patterns_value); ?></textarea>
                     <span id="tejlg_exclusion_patterns_description" class="description"><?php esc_html_e('Indiquez un motif par ligne ou séparez-les par des virgules (joker * accepté).', 'theme-export-jlg'); ?></span>
+                    <div class="tejlg-pattern-test" data-pattern-test>
+                        <div class="tejlg-pattern-test__actions">
+                            <button
+                                type="button"
+                                class="button button-secondary wp-ui-secondary"
+                                data-pattern-test-trigger
+                                aria-describedby="tejlg-pattern-test-help"
+                            ><?php esc_html_e('Tester les motifs', 'theme-export-jlg'); ?></button>
+                            <span class="spinner" aria-hidden="true" data-pattern-test-spinner></span>
+                        </div>
+                        <p id="tejlg-pattern-test-help" class="description"><?php esc_html_e('Vérifiez les fichiers inclus/exclus avant de lancer un export.', 'theme-export-jlg'); ?></p>
+                        <p class="tejlg-pattern-test__invalid" data-pattern-test-invalid hidden></p>
+                        <div class="tejlg-pattern-test__feedback notice notice-info" data-pattern-test-feedback hidden>
+                            <p class="tejlg-pattern-test__summary" data-pattern-test-summary></p>
+                            <p class="tejlg-pattern-test__message" data-pattern-test-message></p>
+                            <div class="tejlg-pattern-test__lists" data-pattern-test-lists>
+                                <div class="tejlg-pattern-test__list">
+                                    <h4><?php esc_html_e('Fichiers inclus', 'theme-export-jlg'); ?></h4>
+                                    <ul data-pattern-test-included></ul>
+                                </div>
+                                <div class="tejlg-pattern-test__list">
+                                    <h4><?php esc_html_e('Fichiers exclus', 'theme-export-jlg'); ?></h4>
+                                    <ul data-pattern-test-excluded></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </p>
                 <p class="tejlg-theme-export-actions">
                     <button type="submit" class="button button-primary wp-ui-primary" data-export-start><?php esc_html_e("Lancer l'export du thème", 'theme-export-jlg'); ?></button>

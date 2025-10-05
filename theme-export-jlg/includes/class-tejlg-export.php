@@ -202,6 +202,170 @@ class TEJLG_Export {
         );
     }
 
+    public static function preview_theme_export_files($raw_patterns) {
+        $raw_input = is_string($raw_patterns) ? $raw_patterns : '';
+
+        $entries = [];
+
+        if ('' !== $raw_input) {
+            $split = preg_split('/[,\n]+/', $raw_input);
+
+            if (false !== $split) {
+                foreach ($split as $pattern) {
+                    if (!is_scalar($pattern)) {
+                        continue;
+                    }
+
+                    $trimmed = trim((string) $pattern);
+
+                    if ('' === $trimmed) {
+                        continue;
+                    }
+
+                    $entries[] = [
+                        'original'  => $trimmed,
+                        'sanitized' => ltrim($trimmed, '/'),
+                    ];
+                }
+            }
+        }
+
+        $sanitized_inputs = array_map(
+            static function ($entry) {
+                return isset($entry['sanitized']) ? (string) $entry['sanitized'] : '';
+            },
+            $entries
+        );
+
+        $sanitized_patterns = self::sanitize_exclusion_patterns($sanitized_inputs);
+
+        $display_map = [];
+
+        foreach ($entries as $entry) {
+            $sanitized = isset($entry['sanitized']) ? (string) $entry['sanitized'] : '';
+
+            if ('' === $sanitized) {
+                continue;
+            }
+
+            if (!isset($display_map[$sanitized])) {
+                $display_map[$sanitized] = isset($entry['original']) ? (string) $entry['original'] : $sanitized;
+            }
+        }
+
+        $invalid_patterns = [];
+
+        foreach ($entries as $entry) {
+            $sanitized = isset($entry['sanitized']) ? (string) $entry['sanitized'] : '';
+
+            if ('' === $sanitized) {
+                $invalid_patterns[] = isset($entry['original']) ? (string) $entry['original'] : '';
+            }
+        }
+
+        foreach ($sanitized_patterns as $pattern) {
+            if (!self::is_valid_exclusion_pattern($pattern)) {
+                $invalid_patterns[] = isset($display_map[$pattern]) ? $display_map[$pattern] : $pattern;
+            }
+        }
+
+        $invalid_patterns = array_values(
+            array_filter(
+                array_unique(array_map('strval', $invalid_patterns)),
+                static function ($pattern) {
+                    return '' !== $pattern;
+                }
+            )
+        );
+
+        if (!empty($invalid_patterns)) {
+            return new WP_Error(
+                'tejlg_invalid_exclusion_patterns',
+                esc_html__("Erreur : certains motifs sont invalides. Corrigez-les puis réessayez.", 'theme-export-jlg'),
+                [
+                    'invalid_patterns' => $invalid_patterns,
+                    'status'           => 422,
+                ]
+            );
+        }
+
+        $theme = wp_get_theme();
+        $theme_dir_path = $theme->get_stylesheet_directory();
+
+        if (!is_dir($theme_dir_path) || !is_readable($theme_dir_path)) {
+            return new WP_Error(
+                'tejlg_theme_directory_unreadable',
+                esc_html__("Impossible d'accéder au dossier du thème actif.", 'theme-export-jlg')
+            );
+        }
+
+        $theme_slug = $theme->get_stylesheet();
+        $zip_root_directory = rtrim($theme_slug, '/') . '/';
+        $normalized_theme_dir = self::normalize_path($theme_dir_path);
+
+        try {
+            $queue = self::collect_theme_export_items(
+                $theme_dir_path,
+                $normalized_theme_dir,
+                $zip_root_directory,
+                $sanitized_patterns
+            );
+        } catch (RuntimeException $exception) {
+            return new WP_Error(
+                'tejlg_theme_export_queue_failed',
+                $exception->getMessage()
+            );
+        }
+
+        $included = [];
+
+        if (isset($queue['items']) && is_array($queue['items'])) {
+            foreach ($queue['items'] as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $type = isset($item['type']) ? (string) $item['type'] : '';
+
+                if ('file' !== $type) {
+                    continue;
+                }
+
+                $relative_in_zip = isset($item['relative_path_in_zip']) ? (string) $item['relative_path_in_zip'] : '';
+
+                if ('' === $relative_in_zip) {
+                    continue;
+                }
+
+                if ('' !== $zip_root_directory && 0 === strpos($relative_in_zip, $zip_root_directory)) {
+                    $relative_in_zip = substr($relative_in_zip, strlen($zip_root_directory));
+                }
+
+                $relative = ltrim($relative_in_zip, '/');
+
+                if ('' === $relative) {
+                    continue;
+                }
+
+                $included[] = $relative;
+            }
+        }
+
+        $included = array_values(array_unique(array_map('strval', $included)));
+        sort($included, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $all_files = self::list_theme_files($theme_dir_path, $normalized_theme_dir);
+
+        $excluded = array_values(array_diff($all_files, $included));
+
+        return [
+            'included'      => $included,
+            'excluded'      => $excluded,
+            'includedCount' => count($included),
+            'excludedCount' => count($excluded),
+        ];
+    }
+
     private static function collect_theme_export_items($theme_dir_path, $normalized_theme_dir, $zip_root_directory, $exclusions) {
         try {
             $directory_iterator = new RecursiveDirectoryIterator(
@@ -1415,6 +1579,62 @@ class TEJLG_Export {
         }
 
         return false;
+    }
+
+    private static function list_theme_files($theme_dir_path, $normalized_theme_dir) {
+        $files = [];
+
+        try {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($theme_dir_path, FilesystemIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::LEAVES_ONLY,
+                RecursiveIteratorIterator::CATCH_GET_CHILD
+            );
+        } catch (UnexpectedValueException $exception) {
+            return [];
+        }
+
+        foreach ($iterator as $file) {
+            if (!$file instanceof SplFileInfo || !$file->isFile()) {
+                continue;
+            }
+
+            $real_path = $file->getRealPath();
+
+            if (false === $real_path) {
+                continue;
+            }
+
+            $normalized_file_path = self::normalize_path($real_path);
+
+            if (!self::is_path_within_base($normalized_file_path, $normalized_theme_dir)) {
+                continue;
+            }
+
+            $relative_path = self::get_relative_path($normalized_file_path, $normalized_theme_dir);
+
+            if ('' === $relative_path) {
+                continue;
+            }
+
+            $files[] = $relative_path;
+        }
+
+        sort($files, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $files;
+    }
+
+    private static function is_valid_exclusion_pattern($pattern) {
+        if (!is_string($pattern) || '' === $pattern) {
+            return false;
+        }
+
+        if (false !== strpos($pattern, '..')) {
+            return false;
+        }
+
+        return !preg_match('/[^A-Za-z0-9._\-\/\* ]/u', $pattern);
     }
 
     /**
