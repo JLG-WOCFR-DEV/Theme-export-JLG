@@ -8,6 +8,29 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
         $this->page_slug = $page_slug;
     }
 
+    private function normalize_overwrite_flag($value) {
+        $can_use_wp_validate_boolean = function_exists('wp_validate_boolean');
+
+        if (
+            $can_use_wp_validate_boolean
+            && (!defined('TEJLG_FORCE_FALLBACK_BOOLEAN_VALIDATION') || false === TEJLG_FORCE_FALLBACK_BOOLEAN_VALIDATION)
+        ) {
+            return wp_validate_boolean($value);
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (!is_scalar($value)) {
+            return false;
+        }
+
+        $value = strtolower((string) $value);
+
+        return in_array($value, ['1', 'true', 'yes', 'on'], true);
+    }
+
     public function handle_request() {
         $this->handle_theme_import_request();
         $this->handle_patterns_import_step1_request();
@@ -557,7 +580,7 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
 
         if ((int) $theme_file['error'] === UPLOAD_ERR_OK) {
             $allow_overwrite = isset($_POST['tejlg_confirm_theme_overwrite'])
-                ? wp_validate_boolean(wp_unslash($_POST['tejlg_confirm_theme_overwrite']))
+                ? $this->normalize_overwrite_flag(wp_unslash($_POST['tejlg_confirm_theme_overwrite']))
                 : false;
 
             TEJLG_Import::import_theme($theme_file, $allow_overwrite);

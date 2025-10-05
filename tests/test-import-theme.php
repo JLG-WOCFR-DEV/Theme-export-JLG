@@ -1,5 +1,7 @@
 <?php
 
+require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin-page.php';
+require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin-import-page.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-import.php';
 
 /**
@@ -100,5 +102,49 @@ class Test_Import_Theme extends WP_UnitTestCase {
             "Veuillez relancer l'import en confirmant le remplacement explicite.",
             $messages[0]['message']
         );
+    }
+
+    public function test_normalize_overwrite_flag_uses_wp_validate_boolean_when_available() {
+        $page = new TEJLG_Admin_Import_Page(
+            dirname(__DIR__) . '/theme-export-jlg/templates/admin',
+            'theme-export-jlg-import'
+        );
+
+        $method = new ReflectionMethod(TEJLG_Admin_Import_Page::class, 'normalize_overwrite_flag');
+        $method->setAccessible(true);
+
+        $this->assertTrue($method->invoke($page, true));
+        $this->assertTrue($method->invoke($page, '1'));
+        $this->assertTrue($method->invoke($page, 'YeS'));
+        $this->assertTrue($method->invoke($page, 'on'));
+
+        $this->assertFalse($method->invoke($page, false));
+        $this->assertFalse($method->invoke($page, '0'));
+        $this->assertFalse($method->invoke($page, 'off'));
+        $this->assertFalse($method->invoke($page, 'random-value'));
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_normalize_overwrite_flag_falls_back_when_wp_validate_boolean_disabled() {
+        define('TEJLG_FORCE_FALLBACK_BOOLEAN_VALIDATION', true);
+
+        $page = new TEJLG_Admin_Import_Page(
+            dirname(__DIR__) . '/theme-export-jlg/templates/admin',
+            'theme-export-jlg-import'
+        );
+
+        $method = new ReflectionMethod(TEJLG_Admin_Import_Page::class, 'normalize_overwrite_flag');
+        $method->setAccessible(true);
+
+        $this->assertTrue($method->invoke($page, 'TRUE'));
+        $this->assertTrue($method->invoke($page, 'yes'));
+        $this->assertTrue($method->invoke($page, 'On'));
+
+        $this->assertFalse($method->invoke($page, 'no'));
+        $this->assertFalse($method->invoke($page, 'maybe'));
+        $this->assertFalse($method->invoke($page, []));
     }
 }
