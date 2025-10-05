@@ -800,6 +800,21 @@ textarea.has-pattern-error {
     border-bottom: 1px solid color-mix(in srgb, var(--tejlg-border-color) 90%, transparent);
 }
 
+.pattern-selection-list .pattern-item {
+    border: 0;
+    margin: 0 0 1.25rem;
+    background: transparent;
+    padding: 0;
+}
+
+.pattern-selection-list .pattern-item:last-child {
+    margin-bottom: 0;
+}
+
+.pattern-selection-list .pattern-preview-wrapper {
+    margin-top: 0.75rem;
+}
+
 .pattern-selection-list li:last-child {
     border-bottom: 0;
 }
