@@ -937,7 +937,23 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     const previewWrappers = document.querySelectorAll('.pattern-preview-wrapper');
-    const previewControllers = new WeakMap();
+    const previewControllers = (typeof WeakMap === 'function') ? new WeakMap() : null;
+
+    const getPreviewController = function(wrapper) {
+        if (!previewControllers) {
+            return null;
+        }
+
+        return previewControllers.get(wrapper) || null;
+    };
+
+    const setPreviewController = function(wrapper, controller) {
+        if (!previewControllers || !wrapper || !controller) {
+            return;
+        }
+
+        previewControllers.set(wrapper, controller);
+    };
 
     const previewWidthControl = document.querySelector('[data-preview-width-control]');
     if (previewWidthControl && previewWrappers.length) {
@@ -1152,7 +1168,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             forEachWrapper(function(wrapper) {
-                const controller = previewControllers.get(wrapper);
+                const controller = getPreviewController(wrapper);
                 if (controller && typeof controller.syncHeight === 'function') {
                     controller.syncHeight();
                 }
@@ -1532,7 +1548,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const intersectionObserver = (typeof IntersectionObserver === 'function')
             ? new IntersectionObserver(function(entries) {
                 entries.forEach(function(entry) {
-                    const controller = previewControllers.get(entry.target);
+                    const controller = getPreviewController(entry.target);
                     if (!controller) {
                         return;
                     }
@@ -2060,7 +2076,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            previewControllers.set(wrapper, controller);
+            setPreviewController(wrapper, controller);
 
             if (intersectionObserver) {
                 intersectionObserver.observe(wrapper);
