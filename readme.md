@@ -109,6 +109,12 @@ Pour combler ces écarts tout en conservant l’esprit « in‑dashboard »,
 4. **Automatisation multi‑sites légère** : permettre l’import/export d’un fichier de configuration du plugin (planning, exclusions, mapping des catégories) pour dupliquer rapidement la configuration sur plusieurs installations sans passer par un service externe.
 5. **Contrôles de cohérence supplémentaires** : intégrer des vérifications avant import (versions minimales de thème parent, compatibilité de schéma `theme.json`) et afficher des recommandations similaires à celles de WP Migrate.
 
+### Améliorations structurantes supplémentaires
+
+- **Capacités dédiées et filtres d’autorisation** : aujourd’hui toutes les actions du plugin reposent sur la capacité générique `manage_options`. Introduire des capacités personnalisées (par exemple `tejlg_manage_exports` / `tejlg_manage_imports`) et des filtres documentés permettrait de déléguer plus finement les tâches aux rôles personnalisés utilisés par les agences.【F:theme-export-jlg/includes/class-tejlg-admin.php†L36-L177】
+- **Intégration aux rapports Site Health** : l’onglet Débogage agrège déjà des métriques détaillées (versions, extensions critiques, état de WP-Cron, résumés des compositions) mais elles ne sont visibles qu’à l’intérieur du plugin. Publier ces informations via l’API Site Health (`debug_data`, tests asynchrones) faciliterait le support en centralisant les alertes et en les rendant exportables nativement.【F:theme-export-jlg/includes/class-tejlg-admin-debug-page.php†L140-L210】【F:theme-export-jlg/includes/class-tejlg-admin-debug-page.php†L298-L356】
+- **WP-CLI orienté orchestration** : la commande `wp theme-export-jlg` couvre l’export ponctuel, les imports et la consultation de l’historique mais ne pilote pas la planification. Ajouter des sous-commandes pour configurer les fréquences, lancer un export programmé à la demande ou envoyer un rapport renforcerait l’automatisation dans les pipelines CI/CD.【F:theme-export-jlg/includes/class-tejlg-cli.php†L16-L195】【F:theme-export-jlg/includes/class-tejlg-export.php†L7-L159】【F:theme-export-jlg/includes/class-tejlg-export.php†L328-L447】
+
 ## Tests
 
 Préparez l’environnement de test WordPress (par exemple avec [`wp-env`](https://developer.wordpress.org/block-editor/reference-guides/packages/packages-env/)) puis installez les dépendances JavaScript :
