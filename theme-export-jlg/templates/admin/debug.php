@@ -138,69 +138,75 @@
                 hidden
                 aria-hidden="true"
             >
-            <?php
-            $current_user_id = get_current_user_id();
-            $custom_patterns_query = new WP_Query(
-                array(
-                    'post_type'      => 'wp_block',
-                    'post_status'    => 'publish',
-                    'posts_per_page' => -1,
-                    'orderby'        => 'title',
-                    'order'          => 'ASC',
-                    'meta_query'     => array(
-                        'relation' => 'OR',
-                        array(
-                            'key'     => 'wp_block_type',
-                            'value'   => 'pattern',
-                            'compare' => '=',
-                        ),
-                        array(
-                            'key'     => 'wp_block_type',
-                            'compare' => 'NOT EXISTS',
-                        ),
-                    ),
-                )
-            );
-
-            $custom_patterns = array();
-
-            if ($custom_patterns_query->have_posts()) {
-                foreach ($custom_patterns_query->posts as $pattern_post) {
-                    $wp_block_type = get_post_meta($pattern_post->ID, 'wp_block_type', true);
-
-                    if ((int) $pattern_post->post_author === (int) $current_user_id || 'pattern' === $wp_block_type) {
-                        $custom_patterns[] = $pattern_post;
-                    }
-                }
-            }
-
-            wp_reset_postdata();
-
-            if (empty($custom_patterns)) {
-                echo '<p>' . esc_html__('Aucune composition personnalisée n\'a été trouvée.', 'theme-export-jlg') . '</p>';
-            } else {
-                $count = count($custom_patterns);
-                printf(
-                    '<p>%s</p>',
-                    esc_html(
-                        sprintf(
-                            _n('%d composition personnalisée trouvée :', '%d compositions personnalisées trouvées :', $count, 'theme-export-jlg'),
-                            $count
-                        )
-                    )
-                );
-                echo '<ul>';
-                foreach ($custom_patterns as $pattern_post) {
+            <?php if (empty($custom_patterns)) : ?>
+                <p><?php esc_html_e('Aucune composition personnalisée n\'a été trouvée.', 'theme-export-jlg'); ?></p>
+            <?php else : ?>
+                <p
+                    id="tejlg-custom-patterns-count"
+                    aria-live="polite"
+                    class="tejlg-custom-patterns-summary"
+                >
+                    <?php
                     printf(
-                        '<li><strong>%1$s</strong> (%2$s <code>%3$s</code>)</li>',
-                        esc_html(get_the_title($pattern_post)),
-                        esc_html__('Slug :', 'theme-export-jlg'),
-                        esc_html($pattern_post->post_name)
+                        esc_html(
+                            _n(
+                                '%d composition personnalisée trouvée :',
+                                '%d compositions personnalisées trouvées :',
+                                $custom_patterns_count,
+                                'theme-export-jlg'
+                            )
+                        ),
+                        (int) $custom_patterns_count
                     );
-                }
-                echo '</ul>';
-            }
-            ?>
+                    ?>
+                </p>
+                <ul class="tejlg-custom-patterns-list" role="list" aria-labelledby="tejlg-custom-patterns-count">
+                    <?php
+                    $date_format = trim(get_option('date_format', 'Y-m-d') . ' ' . get_option('time_format', 'H:i'));
+                    foreach ($custom_patterns as $pattern) :
+                        $title = isset($pattern['title']) ? (string) $pattern['title'] : '';
+                        $slug  = isset($pattern['slug']) ? (string) $pattern['slug'] : '';
+                        $is_global = !empty($pattern['is_global']);
+                        $is_owned  = !empty($pattern['is_owned']);
+                        $type_label = $is_global
+                            ? esc_html__('Global', 'theme-export-jlg')
+                            : ($is_owned ? esc_html__('Personnel', 'theme-export-jlg') : esc_html__('Partagé', 'theme-export-jlg'));
+
+                        $modified_timestamp = isset($pattern['modified_gmt']) ? (int) $pattern['modified_gmt'] : 0;
+                        $modified_label     = '';
+                        $modified_attr      = '';
+
+                        if ($modified_timestamp > 0) {
+                            if (function_exists('wp_date')) {
+                                $modified_label = wp_date($date_format, $modified_timestamp);
+                            } else {
+                                $modified_label = date_i18n($date_format, $modified_timestamp);
+                            }
+
+                            $modified_attr = gmdate('c', $modified_timestamp);
+                        }
+                    ?>
+                        <li class="tejlg-custom-patterns-list__item">
+                            <span class="tejlg-custom-patterns-list__title"><?php echo esc_html($title); ?></span>
+                            <?php if ('' !== $slug) : ?>
+                                <span class="tejlg-custom-patterns-list__slug">
+                                    <?php esc_html_e('Slug :', 'theme-export-jlg'); ?>
+                                    <code><?php echo esc_html($slug); ?></code>
+                                </span>
+                            <?php endif; ?>
+                            <span class="tejlg-custom-patterns-list__type"><?php echo esc_html($type_label); ?></span>
+                            <?php if ('' !== $modified_label) : ?>
+                                <span class="tejlg-custom-patterns-list__modified">
+                                    <?php esc_html_e('Modifié le :', 'theme-export-jlg'); ?>
+                                    <time datetime="<?php echo esc_attr($modified_attr); ?>">
+                                        <?php echo esc_html($modified_label); ?>
+                                    </time>
+                                </span>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
             </div>
         </div>
     </div>

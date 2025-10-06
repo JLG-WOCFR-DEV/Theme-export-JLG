@@ -917,3 +917,43 @@ textarea.has-pattern-error {
 .tejlg-theme-export-feedback [data-export-download] {
     margin-top: 4px;
 }
+
+.tejlg-custom-patterns-summary {
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.tejlg-custom-patterns-list {
+    margin: 0;
+    padding-left: 1.2em;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.tejlg-custom-patterns-list__item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    align-items: baseline;
+}
+
+.tejlg-custom-patterns-list__title {
+    font-weight: 600;
+}
+
+.tejlg-custom-patterns-list__slug code {
+    font-family: var(--font-code, SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace);
+}
+
+.tejlg-custom-patterns-list__type {
+    background-color: var(--tejlg-surface-muted-color, #f0f0f1);
+    border-radius: 3px;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.tejlg-custom-patterns-list__modified time {
+    font-style: italic;
+}

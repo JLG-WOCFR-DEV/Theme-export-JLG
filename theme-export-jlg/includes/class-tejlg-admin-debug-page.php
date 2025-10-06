@@ -10,6 +10,9 @@ class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
     const DOWNLOAD_NONCE_FIELD   = 'tejlg_debug_download_report_nonce';
     const DOWNLOAD_NONCE_ACTION  = 'tejlg_debug_download_report_action';
 
+    const PATTERN_SUMMARY_CACHE_GROUP = 'theme-export-jlg';
+    const PATTERN_SUMMARY_CACHE_TTL   = 60;
+
     private $page_slug;
 
     public function __construct($template_dir, $page_slug) {
@@ -242,6 +245,8 @@ class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
 
         $cron_status = $this->get_cron_status();
 
+        $patterns_summary = $this->get_custom_patterns_summary();
+
         $context = [
             'metrics_icon_size' => $this->get_metrics_icon_size(),
             'metrics_icon_min'  => self::METRICS_ICON_MIN,
@@ -249,6 +254,8 @@ class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
             'zip_status'        => $zip_status,
             'mbstring_status'   => $mbstring_status,
             'cron_status'       => $cron_status,
+            'custom_patterns'   => $patterns_summary,
+            'custom_patterns_count' => count($patterns_summary),
         ];
 
         settings_errors('tejlg_debug_messages');
@@ -351,14 +358,21 @@ class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
     private function get_custom_patterns_summary() {
         $current_user_id = get_current_user_id();
 
+        $cache_key = self::get_pattern_summary_cache_key($current_user_id);
+        $cached    = wp_cache_get($cache_key, self::PATTERN_SUMMARY_CACHE_GROUP);
+
+        if (false !== $cached) {
+            return is_array($cached) ? $cached : [];
+        }
+
         $query = new WP_Query(
             [
-                'post_type'      => 'wp_block',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-                'orderby'        => 'title',
-                'order'          => 'ASC',
-                'meta_query'     => [
+                'post_type'              => 'wp_block',
+                'post_status'            => 'publish',
+                'posts_per_page'         => -1,
+                'orderby'                => 'title',
+                'order'                  => 'ASC',
+                'meta_query'             => [
                     'relation' => 'OR',
                     [
                         'key'     => 'wp_block_type',
@@ -370,6 +384,11 @@ class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
                         'compare' => 'NOT EXISTS',
                     ],
                 ],
+                'no_found_rows'          => true,
+                'update_post_meta_cache' => false,
+                'update_post_term_cache' => false,
+                'lazy_load_term_meta'    => false,
+                'cache_results'          => false,
             ]
         );
 
@@ -377,26 +396,54 @@ class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
 
         if ($query->have_posts()) {
             foreach ($query->posts as $pattern_post) {
+                if (!($pattern_post instanceof WP_Post)) {
+                    continue;
+                }
+
                 $wp_block_type = get_post_meta($pattern_post->ID, 'wp_block_type', true);
 
                 if ((int) $pattern_post->post_author !== (int) $current_user_id && 'pattern' !== $wp_block_type) {
                     continue;
                 }
 
+                $modified_timestamp = 0;
+
+                if (!empty($pattern_post->post_modified_gmt)) {
+                    $modified_timestamp = (int) mysql2date('U', $pattern_post->post_modified_gmt, false);
+                }
+
                 $patterns[] = [
-                    'id'         => $pattern_post->ID,
-                    'title'      => get_the_title($pattern_post),
-                    'slug'       => $pattern_post->post_name,
-                    'author'     => $pattern_post->post_author,
-                    'is_global'  => 'pattern' === $wp_block_type,
-                    'modified_gmt' => $pattern_post->post_modified_gmt,
+                    'id'           => (int) $pattern_post->ID,
+                    'title'        => get_the_title($pattern_post),
+                    'slug'         => $pattern_post->post_name,
+                    'author'       => (int) $pattern_post->post_author,
+                    'is_global'    => 'pattern' === $wp_block_type,
+                    'is_owned'     => (int) $pattern_post->post_author === (int) $current_user_id,
+                    'modified_gmt' => $modified_timestamp,
                 ];
             }
         }
 
         wp_reset_postdata();
 
+        wp_cache_set($cache_key, $patterns, self::PATTERN_SUMMARY_CACHE_GROUP, self::PATTERN_SUMMARY_CACHE_TTL);
+
         return $patterns;
+    }
+
+    public static function invalidate_pattern_summary_cache($user_id = null) {
+        if (null === $user_id) {
+            $user_id = get_current_user_id();
+        }
+
+        $user_id = (int) $user_id;
+
+        $cache_key = self::get_pattern_summary_cache_key($user_id);
+        wp_cache_delete($cache_key, self::PATTERN_SUMMARY_CACHE_GROUP);
+    }
+
+    private static function get_pattern_summary_cache_key($user_id) {
+        return sprintf('debug_pattern_summary_%d', (int) $user_id);
     }
 
     private function add_debug_settings_error($code, $message, $type) {
