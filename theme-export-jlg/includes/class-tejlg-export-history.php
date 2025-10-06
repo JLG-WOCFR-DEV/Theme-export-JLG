@@ -111,6 +111,39 @@ class TEJLG_Export_History {
             }
         }
 
+        $start_times = [
+            isset($context['start_time']) ? (int) $context['start_time'] : 0,
+            isset($job['started_at']) ? (int) $job['started_at'] : 0,
+            isset($job['created_at']) ? (int) $job['created_at'] : 0,
+        ];
+
+        $start_time = 0;
+
+        foreach ($start_times as $candidate) {
+            if ($candidate > 0) {
+                $start_time = $candidate;
+                break;
+            }
+        }
+
+        $end_times = [
+            isset($context['completed_at']) ? (int) $context['completed_at'] : 0,
+            isset($job['completed_at']) ? (int) $job['completed_at'] : 0,
+            isset($job['updated_at']) ? (int) $job['updated_at'] : 0,
+            $timestamp,
+        ];
+
+        $duration = 0;
+
+        if ($start_time > 0) {
+            foreach ($end_times as $candidate) {
+                if ($candidate >= $start_time) {
+                    $duration = $candidate - $start_time;
+                    break;
+                }
+            }
+        }
+
         $user_id = 0;
 
         if (isset($context['user_id'])) {
@@ -188,6 +221,7 @@ class TEJLG_Export_History {
             'zip_file_size' => max(0, $zip_file_size),
             'exclusions'    => $exclusions,
             'origin'        => $origin,
+            'duration'      => max(0, (int) $duration),
         ];
 
         if (!empty($job['persistent_path']) && is_string($job['persistent_path'])) {
@@ -223,6 +257,7 @@ class TEJLG_Export_History {
         $entry['zip_file_name'] = isset($entry['zip_file_name']) ? sanitize_text_field((string) $entry['zip_file_name']) : '';
         $entry['zip_file_size'] = isset($entry['zip_file_size']) ? max(0, (int) $entry['zip_file_size']) : 0;
         $entry['origin'] = isset($entry['origin']) ? sanitize_key($entry['origin']) : '';
+        $entry['duration'] = isset($entry['duration']) ? max(0, (int) $entry['duration']) : 0;
 
         $exclusions = isset($entry['exclusions']) ? (array) $entry['exclusions'] : [];
         $entry['exclusions'] = array_values(

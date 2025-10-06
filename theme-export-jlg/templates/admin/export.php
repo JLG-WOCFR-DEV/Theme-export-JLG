@@ -494,6 +494,7 @@ $history_total_label = number_format_i18n((int) $history_total);
                         <th scope="col"><?php esc_html_e('Tâche', 'theme-export-jlg'); ?></th>
                         <th scope="col"><?php esc_html_e('Utilisateur', 'theme-export-jlg'); ?></th>
                         <th scope="col"><?php esc_html_e('Date', 'theme-export-jlg'); ?></th>
+                        <th scope="col"><?php esc_html_e('Durée', 'theme-export-jlg'); ?></th>
                         <th scope="col"><?php esc_html_e('Taille', 'theme-export-jlg'); ?></th>
                         <th scope="col"><?php esc_html_e('Exclusions', 'theme-export-jlg'); ?></th>
                         <th scope="col"><?php esc_html_e('Statut', 'theme-export-jlg'); ?></th>
@@ -524,6 +525,40 @@ $history_total_label = number_format_i18n((int) $history_total);
                             }
                         }
 
+                        $duration_seconds = isset($entry['duration']) ? (int) $entry['duration'] : 0;
+                        $duration_label   = __('Instantané', 'theme-export-jlg');
+
+                        if ($duration_seconds > 0) {
+                            $duration_parts = [];
+
+                            $hours = (int) floor($duration_seconds / HOUR_IN_SECONDS);
+                            if ($hours > 0) {
+                                $duration_parts[] = sprintf(
+                                    _n('%d heure', '%d heures', $hours, 'theme-export-jlg'),
+                                    $hours
+                                );
+                            }
+
+                            $remaining = $duration_seconds % HOUR_IN_SECONDS;
+                            $minutes   = (int) floor($remaining / MINUTE_IN_SECONDS);
+                            if ($minutes > 0) {
+                                $duration_parts[] = sprintf(
+                                    _n('%d minute', '%d minutes', $minutes, 'theme-export-jlg'),
+                                    $minutes
+                                );
+                            }
+
+                            $seconds = $remaining % MINUTE_IN_SECONDS;
+                            if ($seconds > 0 || empty($duration_parts)) {
+                                $duration_parts[] = sprintf(
+                                    _n('%d seconde', '%d secondes', $seconds, 'theme-export-jlg'),
+                                    $seconds
+                                );
+                            }
+
+                            $duration_label = implode(' ', $duration_parts);
+                        }
+
                         $size_bytes = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
                         $size_label = $size_bytes > 0 ? size_format($size_bytes, 2) : __('Inconnue', 'theme-export-jlg');
 
@@ -546,6 +581,7 @@ $history_total_label = number_format_i18n((int) $history_total);
                             </td>
                             <td><?php echo esc_html($user_name); ?></td>
                             <td><?php echo esc_html($formatted_date); ?></td>
+                            <td><?php echo esc_html($duration_label); ?></td>
                             <td><?php echo esc_html($size_label); ?></td>
                             <td><?php echo esc_html($exclusions_label); ?></td>
                             <td><?php echo esc_html($status_label); ?></td>
