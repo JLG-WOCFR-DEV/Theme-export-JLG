@@ -959,6 +959,10 @@ class TEJLG_Import {
             )
         );
 
+        if ($imported_count > 0 && class_exists('TEJLG_Admin_Debug_Page')) {
+            TEJLG_Admin_Debug_Page::invalidate_pattern_summary_cache();
+        }
+
         return [
             'imported_count' => $imported_count,
             'errors'         => $errors,
