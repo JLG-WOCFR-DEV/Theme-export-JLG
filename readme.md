@@ -67,6 +67,30 @@ Les fichiers analysés sont stockés temporairement dans un transient de 15 minu
 
 Pour toute autre question, consultez le **Guide de migration** intégré ou utilisez l’onglet **Débogage** pour réunir les informations nécessaires avant de contacter votre hébergeur ou votre agence WordPress.【F:theme-export-jlg/includes/class-tejlg-admin.php†L214-L352】
 
+## Comparaison avec des solutions professionnelles
+
+Les agences spécialisées s’appuient souvent sur des plateformes comme **ManageWP**, **BlogVault** ou **WP Migrate** pour orchestrer leurs exports, migrations et plans de secours WordPress. Ces outils misent sur une infrastructure SaaS qui centralise la gestion de dizaines de sites et automatise la maintenance (monitoring, sauvegardes incrémentales, restauration en un clic). Comparé à ces solutions, **Theme Export - JLG** se distingue par :
+
+- **Une intégration native dans l’administration** qui évite les connexions externes et permet de travailler sans dépendance à un service cloud, un atout pour les organisations qui privilégient la maîtrise des données ou les environnements sans accès sortant strict.【F:theme-export-jlg/includes/class-tejlg-admin.php†L10-L138】
+- **Des exports ciblés sur les thèmes blocs et les compositions** là où les plateformes professionnelles couvrent souvent un spectre plus large (base de données complète, médias, monitoring de disponibilité). Cette spécialisation offre un workflow adapté aux projets FSE tout en réduisant la surface d’outils à maîtriser.【F:theme-export-jlg/templates/admin/export.php†L29-L156】【F:theme-export-jlg/templates/admin/import.php†L15-L68】
+- **Une transparence sur l’état de l’environnement** (extensions PHP critiques, mémoire disponible, historique des compositions) quand les services SaaS se limitent parfois à un statut global. Le panneau Débogage permet d’anticiper les points de friction avant une migration.【F:theme-export-jlg/templates/admin/debug.php†L1-L40】
+
+En revanche, il reste des écarts avec les plateformes professionnelles :
+
+- **Orchestration multi‑sites** : la plupart des services premium pilotent plusieurs environnements depuis un tableau de bord unique, ce que le plugin ne couvre pas aujourd’hui (chaque site doit être géré indépendamment).
+- **Gestion fine des sauvegardes** : les outils SaaS proposent des exports incrémentaux, la rétention longue durée ou le stockage externalisé (S3, FTP, Google Drive) que le plugin ne gère pas encore.
+- **Alertes et reporting** : les solutions professionnelles envoient des rapports planifiés, des alertes de sécurité ou de performances. Theme Export - JLG s’appuie surtout sur la consultation manuelle des onglets Export et Débogage.
+
+## Pistes d’amélioration inspirées des apps pro
+
+Pour combler ces écarts tout en conservant l’esprit « in‑dashboard », plusieurs évolutions peuvent être envisagées :
+
+1. **Historique enrichi et notifications** : étendre la classe d’exports pour conserver des métadonnées (taille, durée, auteur) et déclencher un e‑mail de confirmation ou d’alerte en cas d’échec. On pourrait réutiliser la file d’attente existante et stocker le journal dans une table personnalisée.
+2. **Exports déportés** : ajouter un connecteur facultatif vers un stockage externe (S3, SFTP). La configuration resterait locale mais offrirait une redondance comparable aux offres cloud professionnelles.
+3. **Profils d’environnements** : proposer des préréglages (développement, préproduction, production) qui sélectionnent automatiquement les compositions, exclusions et scripts d’après un profil, à la manière des « blueprints » de BlogVault.
+4. **Automatisation multi‑sites légère** : permettre l’import/export d’un fichier de configuration du plugin (planning, exclusions, mapping des catégories) pour dupliquer rapidement la configuration sur plusieurs installations sans passer par un service externe.
+5. **Contrôles de cohérence supplémentaires** : intégrer des vérifications avant import (versions minimales de thème parent, compatibilité de schéma `theme.json`) et afficher des recommandations similaires à celles de WP Migrate.
+
 ## Tests
 
 Préparez l’environnement de test WordPress (par exemple avec [`wp-env`](https://developer.wordpress.org/block-editor/reference-guides/packages/packages-env/)) puis installez les dépendances JavaScript :
