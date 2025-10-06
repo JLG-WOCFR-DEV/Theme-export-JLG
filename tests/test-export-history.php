@@ -21,6 +21,10 @@ class Test_Export_History extends WP_UnitTestCase {
 
         file_put_contents($temp_file, 'demo');
 
+        $start_time     = time() - 120;
+        $update_time    = $start_time + 30;
+        $completed_time = $start_time + 45;
+
         $job = [
             'id'              => 'history-job-1',
             'status'          => 'completed',
@@ -28,9 +32,9 @@ class Test_Export_History extends WP_UnitTestCase {
             'zip_file_name'   => 'history-job-1.zip',
             'zip_file_size'   => filesize($temp_file),
             'exclusions'      => ['node_modules', '*.log'],
-            'created_at'      => time() - 10,
-            'updated_at'      => time() - 5,
-            'completed_at'    => time(),
+            'created_at'      => $start_time,
+            'updated_at'      => $update_time,
+            'completed_at'    => $completed_time,
             'created_by'      => 123,
             'created_by_name' => 'History Tester',
             'created_via'     => 'test',
@@ -50,6 +54,7 @@ class Test_Export_History extends WP_UnitTestCase {
         $this->assertSame('History Tester', $entry['user_name']);
         $this->assertSame(['node_modules', '*.log'], $entry['exclusions']);
         $this->assertSame(filesize($temp_file), $entry['zip_file_size']);
+        $this->assertSame(45, $entry['duration']);
 
         global $wpdb;
         $autoload = $wpdb->get_var(
@@ -75,6 +80,10 @@ class Test_Export_History extends WP_UnitTestCase {
 
         file_put_contents($temp_file, str_repeat('a', 1024));
 
+        $start_time     = time() - 300;
+        $updated_time   = $start_time + 60;
+        $completed_time = $start_time + 75;
+
         $job_id = 'history-job-2';
         $job = [
             'id'              => $job_id,
@@ -83,9 +92,9 @@ class Test_Export_History extends WP_UnitTestCase {
             'zip_file_name'   => 'history-job-2.zip',
             'zip_file_size'   => filesize($temp_file),
             'exclusions'      => ['vendor'],
-            'created_at'      => time() - 20,
-            'updated_at'      => time() - 10,
-            'completed_at'    => time() - 5,
+            'created_at'      => $start_time,
+            'updated_at'      => $updated_time,
+            'completed_at'    => $completed_time,
             'created_by'      => $user_id,
             'created_by_name' => 'History User',
             'created_via'     => 'admin',
@@ -118,6 +127,7 @@ class Test_Export_History extends WP_UnitTestCase {
         $this->assertStringContainsString('history-job-2.zip', $output);
         $this->assertStringContainsString('History User', $output);
         $this->assertStringContainsString('vendor', $output);
+        $this->assertStringContainsString('1 minute 15 secondes', $output);
 
         wp_set_current_user(0);
     }
