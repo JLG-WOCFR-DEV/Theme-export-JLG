@@ -358,11 +358,16 @@ class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
     private function get_custom_patterns_summary() {
         $current_user_id = get_current_user_id();
 
-        $cache_key = self::get_pattern_summary_cache_key($current_user_id);
-        $cached    = wp_cache_get($cache_key, self::PATTERN_SUMMARY_CACHE_GROUP);
+        $cache_key             = self::get_pattern_summary_cache_key($current_user_id);
+        $cached                = wp_cache_get($cache_key, self::PATTERN_SUMMARY_CACHE_GROUP);
+        $posts_last_changed    = (string) wp_cache_get_last_changed('posts');
+
+        if ($this->is_valid_pattern_summary_cache($cached, $posts_last_changed)) {
+            return is_array($cached['patterns']) ? $cached['patterns'] : [];
+        }
 
         if (false !== $cached) {
-            return is_array($cached) ? $cached : [];
+            wp_cache_delete($cache_key, self::PATTERN_SUMMARY_CACHE_GROUP);
         }
 
         $query = new WP_Query(
@@ -426,9 +431,41 @@ class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
 
         wp_reset_postdata();
 
-        wp_cache_set($cache_key, $patterns, self::PATTERN_SUMMARY_CACHE_GROUP, self::PATTERN_SUMMARY_CACHE_TTL);
+        $cache_payload = [
+            'patterns'     => $patterns,
+            'last_changed' => (string) wp_cache_get_last_changed('posts'),
+        ];
+
+        wp_cache_set(
+            $cache_key,
+            $cache_payload,
+            self::PATTERN_SUMMARY_CACHE_GROUP,
+            self::PATTERN_SUMMARY_CACHE_TTL
+        );
 
         return $patterns;
+    }
+
+    private function is_valid_pattern_summary_cache($cached, $expected_last_changed) {
+        if (!is_array($cached)) {
+            return false;
+        }
+
+        if (!isset($cached['patterns'], $cached['last_changed'])) {
+            return false;
+        }
+
+        if (!is_array($cached['patterns'])) {
+            return false;
+        }
+
+        $cached_last_changed = (string) $cached['last_changed'];
+
+        if ('' === $cached_last_changed) {
+            return false;
+        }
+
+        return $cached_last_changed === (string) $expected_last_changed;
     }
 
     public static function invalidate_pattern_summary_cache($user_id = null) {
