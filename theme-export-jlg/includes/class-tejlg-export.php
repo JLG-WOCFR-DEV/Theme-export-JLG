@@ -7,6 +7,102 @@ class TEJLG_Export {
     const SCHEDULE_SETTINGS_OPTION = 'tejlg_export_schedule_settings';
     const SCHEDULE_EVENT_HOOK      = 'tejlg_scheduled_theme_export';
     const CLEANUP_EVENT_HOOK       = 'tejlg_cleanup_theme_exports';
+    const MAX_EXCLUSION_PATTERNS   = 200;
+    const MAX_EXCLUSION_PATTERN_LENGTH = 255;
+
+    /**
+     * Normalise et sécurise une liste de motifs d'exclusion.
+     *
+     * @param string|array $raw_patterns Motifs provenant d'une saisie utilisateur.
+     * @param int|null     $max_patterns Nombre maximum de motifs acceptés.
+     *
+     * @return array<int, string> Liste nettoyée de motifs.
+     */
+    public static function sanitize_exclusion_patterns($raw_patterns, $max_patterns = null) {
+        $max_patterns = is_int($max_patterns) && $max_patterns > 0
+            ? $max_patterns
+            : self::MAX_EXCLUSION_PATTERNS;
+
+        if (is_string($raw_patterns)) {
+            $candidates = preg_split('/[,\r\n]+/', $raw_patterns);
+        } elseif (is_array($raw_patterns)) {
+            $candidates = $raw_patterns;
+        } else {
+            $candidates = [];
+        }
+
+        if (!is_array($candidates)) {
+            $candidates = [];
+        }
+
+        $sanitized = [];
+
+        foreach ($candidates as $candidate) {
+            if (is_array($candidate) || is_object($candidate)) {
+                continue;
+            }
+
+            $pattern = (string) $candidate;
+            $pattern = wp_check_invalid_utf8($pattern, true);
+            $pattern = wp_strip_all_tags($pattern);
+            $pattern = preg_replace('/[\x00-\x1F\x7F]/', '', $pattern);
+
+            if (!is_string($pattern)) {
+                continue;
+            }
+
+            $pattern = trim($pattern);
+            $pattern = preg_replace('#^[\\/]+#', '', $pattern);
+
+            if (!is_string($pattern)) {
+                continue;
+            }
+
+            if ('' === $pattern) {
+                continue;
+            }
+
+            if (function_exists('mb_substr')) {
+                $pattern = mb_substr($pattern, 0, self::MAX_EXCLUSION_PATTERN_LENGTH);
+            } else {
+                $pattern = substr($pattern, 0, self::MAX_EXCLUSION_PATTERN_LENGTH);
+            }
+
+            if ('' === $pattern) {
+                continue;
+            }
+
+            if (in_array($pattern, $sanitized, true)) {
+                continue;
+            }
+
+            $sanitized[] = $pattern;
+
+            if (count($sanitized) >= $max_patterns) {
+                break;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Renvoie la liste des motifs au format texte prêt à être stocké.
+     *
+     * @param string|array $raw_patterns Motifs provenant d'une saisie utilisateur.
+     * @param int|null     $max_patterns Nombre maximum de motifs acceptés.
+     *
+     * @return string Motifs normalisés, séparés par des retours à la ligne.
+     */
+    public static function sanitize_exclusion_patterns_string($raw_patterns, $max_patterns = null) {
+        $patterns = self::sanitize_exclusion_patterns($raw_patterns, $max_patterns);
+
+        if (empty($patterns)) {
+            return '';
+        }
+
+        return implode("\n", $patterns);
+    }
 
     public static function get_available_schedule_frequencies() {
         $frequencies = [
@@ -66,6 +162,7 @@ class TEJLG_Export {
 
         $exclusions = isset($settings['exclusions']) ? (string) $settings['exclusions'] : $defaults['exclusions'];
         $exclusions = (string) wp_unslash($exclusions);
+        $exclusions = self::sanitize_exclusion_patterns_string($exclusions);
 
         $retention = isset($settings['retention_days']) ? (int) $settings['retention_days'] : (int) $defaults['retention_days'];
 
@@ -751,33 +848,6 @@ class TEJLG_Export {
         }
 
         return $job_id;
-    }
-
-
-    private static function sanitize_exclusion_patterns($exclusions) {
-        return array_values(
-            array_filter(
-                array_map(
-                    static function ($pattern) {
-                        if (!is_scalar($pattern)) {
-                            return '';
-                        }
-
-                        $pattern = trim((string) $pattern);
-
-                        if ('' === $pattern) {
-                            return '';
-                        }
-
-                        return ltrim($pattern, "\/");
-                    },
-                    (array) $exclusions
-                ),
-                static function ($pattern) {
-                    return '' !== $pattern;
-                }
-            )
-        );
     }
 
     public static function preview_theme_export_files($raw_patterns) {
@@ -1634,30 +1704,11 @@ class TEJLG_Export {
 
         check_ajax_referer('tejlg_start_theme_export', 'nonce');
 
-        $raw_exclusions = isset($_POST['exclusions']) ? wp_unslash((string) $_POST['exclusions']) : '';
-        $exclusions     = [];
+        $raw_exclusions   = isset($_POST['exclusions']) ? wp_unslash((string) $_POST['exclusions']) : '';
+        $exclusions       = self::sanitize_exclusion_patterns($raw_exclusions);
+        $stored_exclusion = self::sanitize_exclusion_patterns_string($exclusions);
 
-        update_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION, $raw_exclusions);
-
-        if ('' !== $raw_exclusions) {
-            $split = preg_split('/[,\r\n]+/', $raw_exclusions);
-
-            if (false !== $split) {
-                $exclusions = array_values(
-                    array_filter(
-                        array_map(
-                            static function ($pattern) {
-                                return trim((string) $pattern);
-                            },
-                            $split
-                        ),
-                        static function ($pattern) {
-                            return '' !== $pattern;
-                        }
-                    )
-                );
-            }
-        }
+        update_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION, $stored_exclusion, false);
 
         $result = self::export_theme($exclusions);
 
