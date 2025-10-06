@@ -660,27 +660,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         $this->store_exclusion_patterns($raw_exclusions);
 
-        $exclusions = [];
-
-        if ('' !== $raw_exclusions) {
-            $split = preg_split('/[,\n]+/', $raw_exclusions);
-
-            if (false !== $split) {
-                $exclusions = array_values(
-                    array_filter(
-                        array_map(
-                            static function ($pattern) {
-                                return trim((string) $pattern);
-                            },
-                            $split
-                        ),
-                        static function ($pattern) {
-                            return '' !== $pattern;
-                        }
-                    )
-                );
-            }
-        }
+        $exclusions = TEJLG_Export::sanitize_exclusion_patterns($raw_exclusions);
 
         add_filter('tejlg_export_run_jobs_immediately', '__return_true');
 
@@ -804,17 +784,25 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
     }
 
     private function store_exclusion_patterns($patterns) {
-        if (!is_string($patterns)) {
-            $patterns = '';
-        }
+        $sanitized = TEJLG_Export::sanitize_exclusion_patterns_string($patterns);
 
-        update_option(self::EXCLUSION_PATTERNS_OPTION, $patterns);
+        update_option(self::EXCLUSION_PATTERNS_OPTION, $sanitized, false);
     }
 
     private function get_saved_exclusion_patterns() {
         $stored = get_option(self::EXCLUSION_PATTERNS_OPTION, '');
 
-        return is_string($stored) ? $stored : '';
+        if (!is_string($stored)) {
+            $stored = '';
+        }
+
+        $sanitized = TEJLG_Export::sanitize_exclusion_patterns_string($stored);
+
+        if ($sanitized !== $stored) {
+            update_option(self::EXCLUSION_PATTERNS_OPTION, $sanitized, false);
+        }
+
+        return $sanitized;
     }
 
     private function store_portable_mode_preference($is_portable) {
