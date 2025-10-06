@@ -18,6 +18,10 @@
     margin-top: 1em;
 }
 
+.tejlg-cards-container--actions {
+    margin-top: 1.5em;
+}
+
 @media (max-width: 782px) {
     .tejlg-cards-container {
         grid-template-columns: 1fr;
@@ -40,6 +44,10 @@
     background: var(--tejlg-surface-color);
     box-shadow: var(--wp-components-elevation-1, 0 1px 1px rgba(0, 0, 0, 0.04));
     border-radius: var(--wp-admin-border-radius, 4px);
+}
+
+.tejlg-card--primary {
+    grid-column: 1 / -1;
 }
 
 .tejlg-dropzone {
@@ -956,4 +964,186 @@ textarea.has-pattern-error {
 
 .tejlg-custom-patterns-list__modified time {
     font-style: italic;
+}
+
+.tejlg-dashboard {
+    margin-top: 1.5rem;
+}
+
+.tejlg-dashboard__header {
+    margin-bottom: 1rem;
+}
+
+.tejlg-dashboard__intro {
+    margin: 0.25rem 0 0;
+    color: var(--tejlg-text-muted-color);
+}
+
+.tejlg-dashboard__grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.tejlg-dashboard__card .components-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.tejlg-dashboard__label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--tejlg-text-muted-color);
+}
+
+.tejlg-dashboard__value {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--tejlg-text-color);
+}
+
+.tejlg-dashboard__meta {
+    color: var(--tejlg-text-subtle-color);
+    font-size: 0.92em;
+}
+
+.tejlg-stepper {
+    list-style: none;
+    margin: 1.5rem 0 1rem;
+    padding: 0;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.tejlg-stepper__step {
+    flex: 1;
+    min-width: 140px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--tejlg-border-color);
+    border-radius: var(--wp-admin-border-radius, 6px);
+    background: var(--tejlg-surface-alt-color);
+    position: relative;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.tejlg-stepper__step.is-active {
+    border-color: var(--tejlg-accent-color);
+    background: color-mix(in srgb, var(--tejlg-accent-color) 10%, var(--tejlg-surface-alt-color));
+}
+
+.tejlg-stepper__step.is-complete {
+    border-color: color-mix(in srgb, var(--tejlg-accent-color) 55%, var(--tejlg-border-color));
+    background: color-mix(in srgb, var(--tejlg-accent-color) 18%, var(--tejlg-surface-alt-color));
+}
+
+.tejlg-stepper__index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--tejlg-surface-color);
+    border: 1px solid var(--tejlg-border-color);
+    font-weight: 600;
+}
+
+.tejlg-stepper__step.is-active .tejlg-stepper__index,
+.tejlg-stepper__step.is-complete .tejlg-stepper__index {
+    border-color: var(--tejlg-accent-color);
+    color: var(--tejlg-accent-color);
+}
+
+.tejlg-stepper__label {
+    font-weight: 600;
+    color: var(--tejlg-text-color);
+}
+
+.tejlg-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.tejlg-step {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.tejlg-step[hidden] {
+    display: none;
+}
+
+.tejlg-step__title {
+    margin: 0;
+}
+
+.tejlg-step__details {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    margin: 0;
+}
+
+.tejlg-step__details dt {
+    font-weight: 600;
+    margin: 0;
+}
+
+.tejlg-step__details dd {
+    margin: 0;
+    color: var(--tejlg-text-subtle-color);
+}
+
+.tejlg-step__field-label {
+    font-weight: 600;
+}
+
+.tejlg-step__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tejlg-step__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tejlg-step-summary {
+    margin: 0 0 1rem;
+    padding-left: 1.25rem;
+}
+
+.tejlg-step-summary li {
+    margin-bottom: 0.35rem;
+}
+
+.tejlg-step-summary strong {
+    font-weight: 600;
+}
+
+@media (max-width: 782px) {
+    .tejlg-stepper__step {
+        flex-basis: 100%;
+    }
+
+    .tejlg-step__actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tejlg-step__cta {
+        justify-content: center;
+    }
 }
