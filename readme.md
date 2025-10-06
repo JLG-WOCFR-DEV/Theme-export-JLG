@@ -81,6 +81,50 @@ En revanche, il reste des écarts avec les plateformes professionnelles :
 - **Gestion fine des sauvegardes** : les outils SaaS proposent des exports incrémentaux, la rétention longue durée ou le stockage externalisé (S3, FTP, Google Drive) que le plugin ne gère pas encore.
 - **Alertes et reporting** : les solutions professionnelles envoient des rapports planifiés, des alertes de sécurité ou de performances. Theme Export - JLG s’appuie surtout sur la consultation manuelle des onglets Export et Débogage.
 
+### Analyse détaillée face à une application professionnelle
+
+#### Options et périmètre fonctionnel
+
+Theme Export - JLG couvre les exports de thèmes blocs, la sauvegarde sélective des compositions et une planification basique (fréquence, heure, motifs d’exclusion, durée de rétention).【F:theme-export-jlg/templates/admin/export.php†L37-L221】【F:theme-export-jlg/includes/class-tejlg-export.php†L11-L88】 À l’inverse, les suites professionnelles ajoutent généralement :
+
+- des **snapshots complets** (base de données, médias, fichiers) avec restauration granulaire ;
+- des **exports différentiels** et la conservation longue durée sur des stockages externes (S3, SFTP, Google Drive) ;
+- des **profils d’environnements** permettant d’appliquer des réglages pré‑définis (dev/préprod/prod) à plusieurs sites en un clic ;
+- une **gestion multi‑clients** (synchronisation de configurations, duplication des filtres d’exclusion, etc.).
+
+Pour se rapprocher de ces usages, le plugin pourrait intégrer un connecteur vers des stockages distants, exposer une API/CLI pour automatiser la duplication des réglages, proposer une option d’export étendu (fichiers médias, extraits de la base) et stocker des métadonnées détaillées (taille, durée, auteur) dans l’historique afin d’alimenter un reporting comparable à celui de BlogVault ou ManageWP.【F:theme-export-jlg/includes/class-tejlg-export.php†L328-L447】【F:theme-export-jlg/includes/class-tejlg-export-history.php†L6-L78】
+
+#### UX/UI et guidage
+
+Les vues administratives réutilisent les composants WordPress (`components-card`, boutons `wp-ui-*`) et des variables CSS communes pour garder la cohérence avec le tableau de bord.【F:theme-export-jlg/assets/css/admin-styles.css†L1-L41】【F:theme-export-jlg/templates/admin/export.php†L37-L156】 Les cartes présentent des explications contextualisées et la plupart des actions critiques sont accompagnées d’un retour d’état (`notice`, `aria-live`).【F:theme-export-jlg/templates/admin/export.php†L57-L132】【F:theme-export-jlg/templates/admin/import-preview.php†L30-L220】 Pour rivaliser avec un outil pro, plusieurs améliorations UX peuvent être envisagées :
+
+- ajouter un **assistant pas-à-pas** pour les tâches longues (planification, export complet + import) avec résumé final et liens directs vers la documentation ;
+- intégrer des **infobulles et états vides illustrés** pour mieux guider les utilisateurs novices sur chaque carte ;
+- proposer un **mode compact** ou des regroupements de sections pour éviter le défilement sur les écrans denses, en particulier lorsque l’historique contient de nombreuses entrées.
+
+#### Navigation mobile et petits écrans
+
+Le CSS adapte déjà les grilles de cartes et la barre d’onglets en dessous de 782 px (colonne unique, onglets défilables horizontalement).【F:theme-export-jlg/assets/css/admin-styles.css†L15-L33】 Cependant, l’expérience mobile reste en retrait face aux tableaux de bord responsive des solutions SaaS. Les pistes suivantes réduiraient l’écart :
+
+- transformer les onglets secondaires en **navigation verticale ou accordéons** sur mobile afin d’éviter la friction du scroll horizontal ;
+- ajouter un **récapitulatif flottant** (bouton d’action principal ou carte « Actions rapides ») toujours visible pendant les listes longues ;
+- optimiser les tableaux (`form-table`, historique) pour qu’ils basculent en cartes empilées ou listes à colonnes réduites lorsque l’espace horizontal manque.
+
+#### Accessibilité
+
+Les formulaires s’appuient sur des libellés `<label>` explicites, des zones `aria-live` pour annoncer la progression et des contrôles clavier pour les dropzones (input masqué, gestion des états `focus-visible`).【F:theme-export-jlg/templates/admin/export.php†L49-L132】【F:theme-export-jlg/assets/css/admin-styles.css†L37-L83】 Pour se rapprocher des standards AA/AAA ciblés par les produits pro, il reste à :
+
+- enrichir les **messages d’erreur** avec des suggestions d’actions et des liens d’ancrage pour repositionner le focus en cas d’échec ;
+- ajouter des **tests automatiques de contraste** et des classes `has-high-contrast` pour les utilisateurs qui désactivent les styles natifs ;
+- proposer des **raccourcis clavier** (ex. : `Shift+S` pour sélectionner toutes les compositions) et des résumés vocalisables des opérations, utiles aux opérateurs qui traitent de gros volumes.
+
+#### Apparence dans WordPress et éditeur visuel
+
+Le thème administratif du plugin puise dans les variables WP (`--wp-admin-theme-color`, `--wp-components-color-*`) pour rester aligné sur les schémas clair/sombre du back-office et du site editor.【F:theme-export-jlg/assets/css/admin-styles.css†L1-L41】 Pour offrir un rendu digne d’un outil pro, deux axes sont à considérer :
+
+- garantir la **parité visuelle dans l’éditeur de site** (`/wp-admin/site-editor.php`) en isolant les styles du plugin via des namespaces (`.edit-site-page .tejlg-card`), afin d’éviter les collisions avec les styles du thème actif ;
+- préparer des **variantes de présentation** (compacte, haute densité, mode distraction‑free) activables via un toggle, ce que les solutions professionnelles exploitent pour travailler confortablement depuis Gutenberg ou un constructeur tiers.
+
 ## Pistes d’amélioration inspirées des apps pro
 
 Pour combler ces écarts tout en conservant l’esprit « in‑dashboard », plusieurs évolutions peuvent être envisagées :
