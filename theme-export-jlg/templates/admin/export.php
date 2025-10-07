@@ -8,10 +8,14 @@
 /** @var int|false $schedule_next_run */
 /** @var array  $history_entries */
 /** @var int    $history_total */
+/** @var int    $history_total_all */
 /** @var array  $history_pagination_links */
 /** @var int    $history_current_page */
 /** @var int    $history_total_pages */
 /** @var int    $history_per_page */
+/** @var array  $history_filter_values */
+/** @var array  $history_selected_filters */
+/** @var array  $history_base_args */
 
 $export_tab_url = add_query_arg([
     'page' => $page_slug,
@@ -49,6 +53,51 @@ $datetime_format = trim($date_format . ' ' . $time_format);
 
 $current_theme = wp_get_theme();
 
+$history_filter_values = is_array($history_filter_values) ? $history_filter_values : ['origins' => [], 'results' => []];
+$history_selected_filters = is_array($history_selected_filters)
+    ? wp_parse_args($history_selected_filters, [
+        'result'  => '',
+        'origin'  => '',
+        'orderby' => 'timestamp',
+        'order'   => 'desc',
+    ])
+    : [
+        'result'  => '',
+        'origin'  => '',
+        'orderby' => 'timestamp',
+        'order'   => 'desc',
+    ];
+$history_base_args = is_array($history_base_args) ? $history_base_args : [
+    'page' => $page_slug,
+    'tab'  => 'export',
+];
+
+$history_result_labels = [
+    'success' => __('Succès', 'theme-export-jlg'),
+    'warning' => __('Avertissement', 'theme-export-jlg'),
+    'error'   => __('Échec', 'theme-export-jlg'),
+    'info'    => __('Information', 'theme-export-jlg'),
+];
+
+$history_origin_labels = [
+    'web'      => __('Interface', 'theme-export-jlg'),
+    'cli'      => __('WP-CLI', 'theme-export-jlg'),
+    'schedule' => __('Planification', 'theme-export-jlg'),
+];
+
+$available_history_results = isset($history_filter_values['results']) && is_array($history_filter_values['results'])
+    ? $history_filter_values['results']
+    : [];
+$available_history_origins = isset($history_filter_values['origins']) && is_array($history_filter_values['origins'])
+    ? $history_filter_values['origins']
+    : [];
+
+$available_history_results = array_values(array_unique(array_merge(array_keys($history_result_labels), $available_history_results)));
+sort($available_history_results);
+
+$available_history_origins = array_values(array_unique(array_merge(array_keys($history_origin_labels), $available_history_origins)));
+sort($available_history_origins);
+
 $latest_export = !empty($history_entries) ? $history_entries[0] : null;
 
 $latest_export_status = __('Aucun export enregistré', 'theme-export-jlg');
@@ -58,9 +107,12 @@ $latest_export_exclusions = __('Aucun motif', 'theme-export-jlg');
 $current_exclusion_summary = __('Aucun motif', 'theme-export-jlg');
 
 if (is_array($latest_export)) {
-    $latest_status_label = isset($latest_export['status']) && '' !== $latest_export['status']
-        ? (string) $latest_export['status']
-        : __('Inconnu', 'theme-export-jlg');
+    $latest_status_key = isset($latest_export['result']) ? (string) $latest_export['result'] : '';
+    $latest_status_label = isset($history_result_labels[$latest_status_key])
+        ? $history_result_labels[$latest_status_key]
+        : (isset($latest_export['status']) && '' !== $latest_export['status']
+            ? (string) $latest_export['status']
+            : __('Inconnu', 'theme-export-jlg'));
 
     $latest_export_status = sprintf(
         /* translators: %s: export status label */
@@ -125,7 +177,9 @@ $schedule_retention_label = $schedule_retention_value > 0
     )
     : __('Conservation illimitée', 'theme-export-jlg');
 
-$history_total_label = number_format_i18n((int) $history_total);
+$history_total_all = isset($history_total_all) ? (int) $history_total_all : (int) $history_total;
+$history_total_all_label = number_format_i18n($history_total_all);
+$history_total_filtered_label = number_format_i18n((int) $history_total);
 ?>
 <section class="tejlg-dashboard" aria-labelledby="tejlg-dashboard-title">
     <div class="tejlg-dashboard__header">
@@ -178,7 +232,7 @@ $history_total_label = number_format_i18n((int) $history_total);
         <div class="tejlg-dashboard__card components-card is-elevated">
             <div class="components-card__body">
                 <span class="tejlg-dashboard__label"><?php esc_html_e('Archives suivies', 'theme-export-jlg'); ?></span>
-                <strong class="tejlg-dashboard__value"><?php echo esc_html($history_total_label); ?></strong>
+                <strong class="tejlg-dashboard__value"><?php echo esc_html($history_total_all_label); ?></strong>
                 <span class="tejlg-dashboard__meta"><?php esc_html_e('Nombre total d’exports enregistrés', 'theme-export-jlg'); ?></span>
                 <span class="tejlg-dashboard__meta">
                     <?php
@@ -487,6 +541,69 @@ $history_total_label = number_format_i18n((int) $history_total);
 <h2><?php esc_html_e('Historique des exports', 'theme-export-jlg'); ?></h2>
 <div class="tejlg-card components-card is-elevated">
     <div class="components-card__body">
+        <form method="get" class="tejlg-history-filters" aria-label="<?php esc_attr_e('Filtres de l\'historique d\'export', 'theme-export-jlg'); ?>">
+            <input type="hidden" name="page" value="<?php echo esc_attr($history_base_args['page']); ?>">
+            <input type="hidden" name="tab" value="<?php echo esc_attr($history_base_args['tab']); ?>">
+            <div class="tejlg-history-filters__group">
+                <label for="tejlg-history-result"><?php esc_html_e('Statut', 'theme-export-jlg'); ?></label>
+                <select name="history_result" id="tejlg-history-result">
+                    <option value=""><?php esc_html_e('Tous les statuts', 'theme-export-jlg'); ?></option>
+                    <?php foreach ($available_history_results as $result_key) :
+                        $result_label = isset($history_result_labels[$result_key])
+                            ? $history_result_labels[$result_key]
+                            : ucfirst($result_key);
+                    ?>
+                        <option value="<?php echo esc_attr($result_key); ?>" <?php selected($history_selected_filters['result'], $result_key); ?>>
+                            <?php echo esc_html($result_label); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="tejlg-history-filters__group">
+                <label for="tejlg-history-origin"><?php esc_html_e('Origine', 'theme-export-jlg'); ?></label>
+                <select name="history_origin" id="tejlg-history-origin">
+                    <option value=""><?php esc_html_e('Toutes les origines', 'theme-export-jlg'); ?></option>
+                    <?php foreach ($available_history_origins as $origin_key) :
+                        $origin_label = isset($history_origin_labels[$origin_key])
+                            ? $history_origin_labels[$origin_key]
+                            : ucfirst($origin_key);
+                    ?>
+                        <option value="<?php echo esc_attr($origin_key); ?>" <?php selected($history_selected_filters['origin'], $origin_key); ?>>
+                            <?php echo esc_html($origin_label); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="tejlg-history-filters__group">
+                <label for="tejlg-history-orderby"><?php esc_html_e('Trier par', 'theme-export-jlg'); ?></label>
+                <select name="history_orderby" id="tejlg-history-orderby">
+                    <option value="timestamp" <?php selected($history_selected_filters['orderby'], 'timestamp'); ?>><?php esc_html_e('Date', 'theme-export-jlg'); ?></option>
+                    <option value="duration" <?php selected($history_selected_filters['orderby'], 'duration'); ?>><?php esc_html_e('Durée', 'theme-export-jlg'); ?></option>
+                    <option value="zip_file_size" <?php selected($history_selected_filters['orderby'], 'zip_file_size'); ?>><?php esc_html_e('Taille', 'theme-export-jlg'); ?></option>
+                </select>
+            </div>
+            <div class="tejlg-history-filters__group">
+                <label for="tejlg-history-order"><?php esc_html_e('Ordre', 'theme-export-jlg'); ?></label>
+                <select name="history_order" id="tejlg-history-order">
+                    <option value="desc" <?php selected($history_selected_filters['order'], 'desc'); ?>><?php esc_html_e('Décroissant', 'theme-export-jlg'); ?></option>
+                    <option value="asc" <?php selected($history_selected_filters['order'], 'asc'); ?>><?php esc_html_e('Croissant', 'theme-export-jlg'); ?></option>
+                </select>
+            </div>
+            <div class="tejlg-history-filters__actions">
+                <button type="submit" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Filtrer', 'theme-export-jlg'); ?></button>
+                <a class="button button-link" href="<?php echo esc_url(add_query_arg($history_base_args, admin_url('admin.php'))); ?>"><?php esc_html_e('Réinitialiser', 'theme-export-jlg'); ?></a>
+            </div>
+        </form>
+        <p class="tejlg-history-summary">
+            <?php
+            printf(
+                /* translators: 1: number of displayed exports, 2: total number of exports recorded */
+                esc_html__('Affichage de %1$s export(s) sur %2$s.', 'theme-export-jlg'),
+                esc_html($history_total_filtered_label),
+                esc_html($history_total_all_label)
+            );
+            ?>
+        </p>
         <?php if (!empty($history_entries)) : ?>
             <table class="wp-list-table widefat striped">
                 <thead>
@@ -497,6 +614,7 @@ $history_total_label = number_format_i18n((int) $history_total);
                         <th scope="col"><?php esc_html_e('Durée', 'theme-export-jlg'); ?></th>
                         <th scope="col"><?php esc_html_e('Taille', 'theme-export-jlg'); ?></th>
                         <th scope="col"><?php esc_html_e('Exclusions', 'theme-export-jlg'); ?></th>
+                        <th scope="col"><?php esc_html_e('Origine', 'theme-export-jlg'); ?></th>
                         <th scope="col"><?php esc_html_e('Statut', 'theme-export-jlg'); ?></th>
                         <th scope="col"><?php esc_html_e('Téléchargement', 'theme-export-jlg'); ?></th>
                     </tr>
@@ -568,11 +686,27 @@ $history_total_label = number_format_i18n((int) $history_total);
                             ? implode(', ', $exclusions_clean)
                             : __('Aucune', 'theme-export-jlg');
 
-                        $status_label = isset($entry['status']) && '' !== $entry['status']
-                            ? (string) $entry['status']
-                            : __('Inconnu', 'theme-export-jlg');
-
                         $download_url = isset($entry['persistent_url']) ? esc_url($entry['persistent_url']) : '';
+
+                        $origin_key = isset($entry['origin']) ? (string) $entry['origin'] : '';
+                        $origin_label = isset($history_origin_labels[$origin_key])
+                            ? $history_origin_labels[$origin_key]
+                            : ($origin_key ? ucfirst($origin_key) : __('Non défini', 'theme-export-jlg'));
+
+                        $context_label = isset($entry['context']) ? (string) $entry['context'] : '';
+
+                        $status_key = isset($entry['result']) ? (string) $entry['result'] : '';
+                        $status_label = isset($history_result_labels[$status_key])
+                            ? $history_result_labels[$status_key]
+                            : (isset($entry['status']) && '' !== $entry['status']
+                                ? (string) $entry['status']
+                                : __('Inconnu', 'theme-export-jlg'));
+
+                        $status_message = isset($entry['status_message']) ? (string) $entry['status_message'] : '';
+                        $status_css = '' !== $status_key
+                            ? 'tejlg-history-status--' . sanitize_html_class($status_key)
+                            : 'tejlg-history-status--neutral';
+
                     ?>
                         <tr>
                             <td>
@@ -584,7 +718,18 @@ $history_total_label = number_format_i18n((int) $history_total);
                             <td><?php echo esc_html($duration_label); ?></td>
                             <td><?php echo esc_html($size_label); ?></td>
                             <td><?php echo esc_html($exclusions_label); ?></td>
-                            <td><?php echo esc_html($status_label); ?></td>
+                            <td>
+                                <span class="tejlg-history-origin"><?php echo esc_html($origin_label); ?></span>
+                                <?php if ('' !== $context_label && $context_label !== $origin_label) : ?>
+                                    <span class="tejlg-history-origin__context"><?php echo esc_html($context_label); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <span class="tejlg-history-status <?php echo esc_attr($status_css); ?>"><?php echo esc_html($status_label); ?></span>
+                                <?php if ('' !== $status_message) : ?>
+                                    <span class="tejlg-history-status__message"><?php echo esc_html($status_message); ?></span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <?php if ('' !== $download_url) : ?>
                                     <a href="<?php echo esc_url($download_url); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Télécharger', 'theme-export-jlg'); ?></a>
