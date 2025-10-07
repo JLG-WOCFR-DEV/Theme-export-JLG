@@ -9,6 +9,7 @@ class TEJLG_Export {
     const CLEANUP_EVENT_HOOK       = 'tejlg_cleanup_theme_exports';
     const MAX_EXCLUSION_PATTERNS   = 200;
     const MAX_EXCLUSION_PATTERN_LENGTH = 255;
+    const PARENT_THEME_EXPORT_DIRECTORY = 'parent-theme';
 
     /**
      * Normalise et sécurise une liste de motifs d'exclusion.
@@ -694,14 +695,18 @@ class TEJLG_Export {
     public static function export_theme($exclusions = []) {
         $exclusions = self::sanitize_exclusion_patterns($exclusions);
 
-        $theme = wp_get_theme();
-        $theme_dir_path = $theme->get_stylesheet_directory();
+        $theme    = wp_get_theme();
+        $targets  = self::get_theme_export_targets($theme);
 
-        if (!is_dir($theme_dir_path) || !is_readable($theme_dir_path)) {
-            return new WP_Error('tejlg_theme_directory_unreadable', esc_html__("Impossible d'accéder au dossier du thème actif.", 'theme-export-jlg'));
+        if (is_wp_error($targets)) {
+            return $targets;
         }
 
-        $theme_slug    = $theme->get_stylesheet();
+        $primary_target = reset($targets);
+        $theme_slug     = isset($primary_target['slug']) && is_string($primary_target['slug'])
+            ? (string) $primary_target['slug']
+            : $theme->get_stylesheet();
+
         $zip_file_name = $theme_slug . '.zip';
         $zip_file_path = wp_tempnam($zip_file_name);
 
@@ -724,33 +729,36 @@ class TEJLG_Export {
             );
         }
 
-        $zip_root_directory = rtrim($theme_slug, '/') . '/';
+        $directories_added = [];
 
-        if (true !== $zip_writer->add_directory($zip_root_directory)) {
-            $zip_writer->close();
-            self::delete_temp_file($zip_file_path);
+        foreach ($targets as $target) {
+            $zip_root_directory = isset($target['zip_root']) ? (string) $target['zip_root'] : '';
 
-            return new WP_Error(
-                'tejlg_zip_root_dir_failed',
-                sprintf(
-                    /* translators: %s: slug of the theme used as the root directory of the ZIP archive. */
-                    esc_html__("Impossible d'ajouter le dossier racine « %s » à l'archive ZIP.", 'theme-export-jlg'),
-                    esc_html($zip_root_directory)
-                )
-            );
+            if ('' === $zip_root_directory) {
+                continue;
+            }
+
+            if (true !== $zip_writer->add_directory($zip_root_directory)) {
+                $zip_writer->close();
+                self::delete_temp_file($zip_file_path);
+
+                return new WP_Error(
+                    'tejlg_zip_root_dir_failed',
+                    sprintf(
+                        /* translators: %s: slug of the theme used as the root directory of the ZIP archive. */
+                        esc_html__("Impossible d'ajouter le dossier racine « %s » à l'archive ZIP.", 'theme-export-jlg'),
+                        esc_html($zip_root_directory)
+                    )
+                );
+            }
+
+            $directories_added[$zip_root_directory] = true;
         }
 
         $zip_writer->close();
 
-        $normalized_theme_dir = self::normalize_path($theme_dir_path);
-
         try {
-            $queue = self::collect_theme_export_items(
-                $theme_dir_path,
-                $normalized_theme_dir,
-                $zip_root_directory,
-                $exclusions
-            );
+            $queue = self::build_theme_export_queue_from_targets($targets, $exclusions);
         } catch (RuntimeException $exception) {
             self::delete_temp_file($zip_file_path);
 
@@ -790,9 +798,7 @@ class TEJLG_Export {
             'total_items'       => count($queue_items),
             'zip_path'          => $zip_file_path,
             'zip_file_name'     => $zip_file_name,
-            'directories_added' => [
-                $zip_root_directory => true,
-            ],
+            'directories_added' => $directories_added,
             'exclusions'        => $exclusions,
             'created_at'        => time(),
             'updated_at'        => time(),
@@ -937,27 +943,15 @@ class TEJLG_Export {
             );
         }
 
-        $theme = wp_get_theme();
-        $theme_dir_path = $theme->get_stylesheet_directory();
+        $theme   = wp_get_theme();
+        $targets = self::get_theme_export_targets($theme);
 
-        if (!is_dir($theme_dir_path) || !is_readable($theme_dir_path)) {
-            return new WP_Error(
-                'tejlg_theme_directory_unreadable',
-                esc_html__("Impossible d'accéder au dossier du thème actif.", 'theme-export-jlg')
-            );
+        if (is_wp_error($targets)) {
+            return $targets;
         }
 
-        $theme_slug = $theme->get_stylesheet();
-        $zip_root_directory = rtrim($theme_slug, '/') . '/';
-        $normalized_theme_dir = self::normalize_path($theme_dir_path);
-
         try {
-            $queue = self::collect_theme_export_items(
-                $theme_dir_path,
-                $normalized_theme_dir,
-                $zip_root_directory,
-                $sanitized_patterns
-            );
+            $queue = self::build_theme_export_queue_from_targets($targets, $sanitized_patterns);
         } catch (RuntimeException $exception) {
             return new WP_Error(
                 'tejlg_theme_export_queue_failed',
@@ -985,11 +979,7 @@ class TEJLG_Export {
                     continue;
                 }
 
-                if ('' !== $zip_root_directory && 0 === strpos($relative_in_zip, $zip_root_directory)) {
-                    $relative_in_zip = substr($relative_in_zip, strlen($zip_root_directory));
-                }
-
-                $relative = ltrim($relative_in_zip, '/');
+                $relative = self::format_relative_path_for_display($relative_in_zip, $targets);
 
                 if ('' === $relative) {
                     continue;
@@ -1002,7 +992,31 @@ class TEJLG_Export {
         $included = array_values(array_unique(array_map('strval', $included)));
         sort($included, SORT_NATURAL | SORT_FLAG_CASE);
 
-        $all_files = self::list_theme_files($theme_dir_path, $normalized_theme_dir);
+        $all_files = [];
+
+        foreach ($targets as $target) {
+            $directory         = isset($target['directory']) ? (string) $target['directory'] : '';
+            $normalized_dir    = isset($target['normalized_directory']) ? (string) $target['normalized_directory'] : '';
+
+            if ('' === $directory || '' === $normalized_dir) {
+                continue;
+            }
+
+            $files = self::list_theme_files($directory, $normalized_dir);
+
+            foreach ($files as $file) {
+                $formatted = self::format_listed_file_for_target($file, $target);
+
+                if ('' === $formatted) {
+                    continue;
+                }
+
+                $all_files[] = $formatted;
+            }
+        }
+
+        $all_files = array_values(array_unique(array_map('strval', $all_files)));
+        sort($all_files, SORT_NATURAL | SORT_FLAG_CASE);
 
         $excluded = array_values(array_diff($all_files, $included));
 
@@ -1114,6 +1128,154 @@ class TEJLG_Export {
             'items'       => $items,
             'files_count' => $files_count,
         ];
+    }
+
+    private static function build_theme_export_queue_from_targets($targets, $exclusions) {
+        $items       = [];
+        $files_count = 0;
+
+        foreach ((array) $targets as $target) {
+            if (!is_array($target)) {
+                continue;
+            }
+
+            $directory        = isset($target['directory']) ? (string) $target['directory'] : '';
+            $normalized_dir   = isset($target['normalized_directory']) ? (string) $target['normalized_directory'] : '';
+            $zip_root         = isset($target['zip_root']) ? (string) $target['zip_root'] : '';
+
+            if ('' === $directory || '' === $normalized_dir || '' === $zip_root) {
+                continue;
+            }
+
+            $result = self::collect_theme_export_items(
+                $directory,
+                $normalized_dir,
+                $zip_root,
+                $exclusions
+            );
+
+            if (isset($result['items']) && is_array($result['items'])) {
+                $items = array_merge($items, $result['items']);
+            }
+
+            if (isset($result['files_count'])) {
+                $files_count += (int) $result['files_count'];
+            }
+        }
+
+        return [
+            'items'       => $items,
+            'files_count' => $files_count,
+        ];
+    }
+
+    private static function get_theme_export_targets(WP_Theme $theme) {
+        $targets = [];
+
+        $theme_dir_path = $theme->get_stylesheet_directory();
+
+        if (!is_dir($theme_dir_path) || !is_readable($theme_dir_path)) {
+            return new WP_Error(
+                'tejlg_theme_directory_unreadable',
+                esc_html__("Impossible d'accéder au dossier du thème actif.", 'theme-export-jlg')
+            );
+        }
+
+        $theme_slug = $theme->get_stylesheet();
+
+        $targets[] = [
+            'slug'                 => $theme_slug,
+            'directory'            => $theme_dir_path,
+            'normalized_directory' => self::normalize_path($theme_dir_path),
+            'zip_root'             => rtrim($theme_slug, '/') . '/',
+            'type'                 => 'child',
+        ];
+
+        $parent_theme = $theme->parent();
+
+        if ($parent_theme instanceof WP_Theme) {
+            $parent_dir_path = $parent_theme->get_stylesheet_directory();
+
+            if (!is_dir($parent_dir_path) || !is_readable($parent_dir_path)) {
+                return new WP_Error(
+                    'tejlg_parent_theme_directory_unreadable',
+                    esc_html__("Impossible d'accéder au dossier du thème parent.", 'theme-export-jlg')
+                );
+            }
+
+            $parent_slug = $parent_theme->get_stylesheet();
+            $parent_root = self::PARENT_THEME_EXPORT_DIRECTORY . '/' . rtrim($parent_slug, '/') . '/';
+
+            $targets[] = [
+                'slug'                 => $parent_slug,
+                'directory'            => $parent_dir_path,
+                'normalized_directory' => self::normalize_path($parent_dir_path),
+                'zip_root'             => $parent_root,
+                'type'                 => 'parent',
+            ];
+        }
+
+        return $targets;
+    }
+
+    private static function format_relative_path_for_display($relative_path_in_zip, array $targets) {
+        $relative_path_in_zip = (string) $relative_path_in_zip;
+
+        if ('' === $relative_path_in_zip) {
+            return '';
+        }
+
+        foreach ($targets as $target) {
+            if (!is_array($target)) {
+                continue;
+            }
+
+            $zip_root = isset($target['zip_root']) ? (string) $target['zip_root'] : '';
+
+            if ('' === $zip_root) {
+                continue;
+            }
+
+            if (0 === strpos($relative_path_in_zip, $zip_root)) {
+                if (isset($target['type']) && 'parent' === $target['type']) {
+                    return ltrim($relative_path_in_zip, '/');
+                }
+
+                $stripped = substr($relative_path_in_zip, strlen($zip_root));
+
+                return ltrim($stripped, '/');
+            }
+        }
+
+        return ltrim($relative_path_in_zip, '/');
+    }
+
+    private static function format_listed_file_for_target($relative_path, array $target) {
+        $relative_path = ltrim((string) $relative_path, '/');
+
+        if ('' === $relative_path) {
+            return '';
+        }
+
+        $type = isset($target['type']) ? (string) $target['type'] : 'child';
+
+        if ('parent' === $type) {
+            $zip_root = isset($target['zip_root']) ? (string) $target['zip_root'] : '';
+
+            if ('' === $zip_root) {
+                return $relative_path;
+            }
+
+            $zip_root = rtrim($zip_root, '/');
+
+            if ('' === $zip_root) {
+                return $relative_path;
+            }
+
+            return ltrim($zip_root . '/' . $relative_path, '/');
+        }
+
+        return $relative_path;
     }
 
     private static function generate_job_id() {

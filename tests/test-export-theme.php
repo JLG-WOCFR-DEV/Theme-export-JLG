@@ -261,4 +261,118 @@ class Test_Export_Theme extends WP_UnitTestCase {
         update_option('admin_email', $original_admin_email);
         TEJLG_Export_History::clear_history();
     }
+
+    public function test_export_theme_includes_parent_theme_files() {
+        $theme_root     = trailingslashit(get_theme_root());
+        $parent_slug    = sanitize_title('tejlg-parent-' . wp_generate_password(6, false));
+        $child_slug     = sanitize_title('tejlg-child-' . wp_generate_password(6, false));
+        $parent_dir     = $theme_root . $parent_slug;
+        $child_dir      = $theme_root . $child_slug;
+        $job_id         = null;
+        $previous_theme = get_stylesheet();
+
+        wp_mkdir_p($parent_dir);
+        file_put_contents(
+            $parent_dir . '/style.css',
+            "/*\nTheme Name: Temporary Parent\nVersion: 1.0\n*/"
+        );
+        file_put_contents($parent_dir . '/index.php', "<?php\n// Parent index\n");
+        file_put_contents($parent_dir . '/parent-extra.php', "<?php\n// Parent extra\n");
+
+        wp_mkdir_p($child_dir);
+        file_put_contents(
+            $child_dir . '/style.css',
+            "/*\nTheme Name: Temporary Child\nTemplate: {$parent_slug}\nVersion: 1.0\n*/"
+        );
+        file_put_contents($child_dir . '/functions.php', "<?php\n// Child functions\n");
+        file_put_contents($child_dir . '/child-extra.php', "<?php\n// Child extra\n");
+
+        wp_clean_themes_cache();
+
+        try {
+            switch_theme($child_slug);
+
+            $job_id = TEJLG_Export::export_theme();
+
+            $this->assertNotWPError($job_id, 'Exporting the child theme should succeed.');
+
+            TEJLG_Export::run_pending_export_jobs();
+
+            $job = TEJLG_Export::get_export_job_status($job_id);
+
+            $this->assertIsArray($job, 'Export job payload should be stored.');
+
+            $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
+
+            $this->assertNotEmpty($zip_path, 'Export should provide a ZIP path.');
+            $this->assertFileExists($zip_path, 'Generated ZIP file should exist.');
+
+            $entries = [];
+
+            if (class_exists('ZipArchive')) {
+                $zip = new ZipArchive();
+                $this->assertSame(true, $zip->open($zip_path), 'ZIP archive should open successfully.');
+
+                for ($i = 0; $i < $zip->numFiles; $i++) {
+                    $entries[] = $zip->getNameIndex($i);
+                }
+
+                $zip->close();
+            } else {
+                if (!class_exists('PclZip')) {
+                    require_once ABSPATH . 'wp-admin/includes/class-pclzip.php';
+                }
+
+                $pclzip = new PclZip($zip_path);
+                $list   = $pclzip->listContent();
+
+                foreach ((array) $list as $entry) {
+                    if (isset($entry['stored_filename'])) {
+                        $entries[] = (string) $entry['stored_filename'];
+                    } elseif (isset($entry['filename'])) {
+                        $entries[] = (string) $entry['filename'];
+                    }
+                }
+            }
+
+            $this->assertContains($child_slug . '/child-extra.php', $entries, 'Child-specific files should be present.');
+            $this->assertContains(
+                'parent-theme/' . $parent_slug . '/parent-extra.php',
+                $entries,
+                'Parent theme files should be included in the archive.'
+            );
+        } finally {
+            if (null !== $job_id) {
+                TEJLG_Export::delete_job($job_id);
+            }
+
+            switch_theme($previous_theme);
+            wp_clean_themes_cache();
+
+            $this->remove_theme_directory($child_dir);
+            $this->remove_theme_directory($parent_dir);
+            wp_clean_themes_cache();
+        }
+    }
+
+    private function remove_theme_directory($directory) {
+        if (!is_dir($directory)) {
+            return;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            if ($item->isDir()) {
+                rmdir($item->getPathname());
+            } else {
+                unlink($item->getPathname());
+            }
+        }
+
+        rmdir($directory);
+    }
 }
