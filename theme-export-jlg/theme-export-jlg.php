@@ -32,6 +32,7 @@ require_once TEJLG_PATH . 'includes/class-tejlg-zip-writer.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export-process.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-import.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-settings.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-theme-tools.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-site-health.php';
 
