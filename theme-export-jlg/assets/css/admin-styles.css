@@ -22,8 +22,52 @@
     --tejlg-radius-xl: 20px;
 }
 
+@supports not (color: color-mix(in srgb, #000 50%, #fff 50%)) {
+    body.toplevel_page_theme-export-jlg {
+        background: #f6f5ff;
+    }
+
+    body.toplevel_page_theme-export-jlg .wrap {
+        background: #ffffff;
+        border: 1px solid var(--tejlg-border-color);
+        box-shadow: var(--tejlg-shadow-lg);
+    }
+
+    body.toplevel_page_theme-export-jlg .nav-tab-wrapper {
+        background: #f3f0ff;
+        border: 1px solid var(--tejlg-border-color);
+    }
+
+    body.toplevel_page_theme-export-jlg .components-card,
+    .tejlg-card {
+        background: #ffffff;
+        border: 1px solid var(--tejlg-border-color);
+    }
+
+    .tejlg-dropzone {
+        background: #f4f1ff;
+        border-color: var(--tejlg-border-color);
+    }
+
+    .tejlg-dropzone:hover,
+    .tejlg-dropzone:focus-visible {
+        background: #ede6ff;
+        border-color: var(--tejlg-accent-color);
+    }
+
+    .tejlg-card:hover,
+    .tejlg-card:focus-within {
+        border-color: var(--tejlg-accent-color);
+    }
+}
+
 body.toplevel_page_theme-export-jlg {
-    background: var(--tejlg-page-background);
+    background-color: #f6f5ff;
+    background-image: radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--tejlg-accent-color) 10%, #ffffff) 0%, transparent 58%),
+        radial-gradient(circle at 82% -6%, color-mix(in srgb, var(--tejlg-accent-color) 12%, #ffffff) 0%, transparent 60%);
+    background-blend-mode: normal;
+    background-repeat: no-repeat;
+    background-size: cover;
     font-family: var(--wp-components-font-family, "Inter", "Inter var", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
     color: var(--tejlg-text-color);
 }
