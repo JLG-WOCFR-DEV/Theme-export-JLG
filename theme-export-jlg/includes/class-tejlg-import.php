@@ -20,6 +20,12 @@ class TEJLG_Import {
                 'json' => 'application/json',
             ],
         ],
+        'settings' => [
+            'extensions' => ['json'],
+            'mime_types' => [
+                'json' => 'application/json',
+            ],
+        ],
     ];
 
     public static function get_import_file_types() {

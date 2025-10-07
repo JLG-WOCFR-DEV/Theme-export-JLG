@@ -34,12 +34,17 @@ Theme Export - JLG est un plugin WordPress pour administrateurs de sites blocs q
 
 ## Utilisation en ligne de commande (WP-CLI)
 
-Le plugin enregistre la commande `wp theme-export-jlg` dès que WP-CLI est disponible.【F:theme-export-jlg/includes/class-tejlg-cli.php†L7-L168】 Elle propose deux sous-commandes :
+Le plugin enregistre la commande `wp theme-export-jlg` dès que WP-CLI est disponible.【F:theme-export-jlg/includes/class-tejlg-cli.php†L7-L205】 Elle propose plusieurs sous-commandes complémentaires :
 
-- `wp theme-export-jlg theme [--exclusions=<motifs>] [--output=<chemin>]` exporte le thème actif au format ZIP. Utilisez l’option `--exclusions` pour ignorer des fichiers ou dossiers (séparateur virgule ou retour à la ligne) et `--output` pour définir le chemin du fichier généré (par défaut dans le dossier courant, avec le slug du thème).【F:theme-export-jlg/includes/class-tejlg-cli.php†L17-L98】
-- `wp theme-export-jlg patterns [--portable] [--output=<chemin>]` crée un export JSON des compositions (`wp_block`). L’option `--portable` active le nettoyage portable déjà proposé dans l’interface graphique et `--output` contrôle l’emplacement du fichier généré.【F:theme-export-jlg/includes/class-tejlg-cli.php†L100-L160】
+- `wp theme-export-jlg theme [--exclusions=<motifs>] [--output=<chemin>]` exporte le thème actif au format ZIP. Utilisez l’option `--exclusions` pour ignorer des fichiers ou dossiers (séparateur virgule ou retour à la ligne) et `--output` pour définir le chemin du fichier généré (par défaut dans le dossier courant, avec le slug du thème).【F:theme-export-jlg/includes/class-tejlg-cli.php†L17-L101】
+- `wp theme-export-jlg patterns [--portable] [--output=<chemin>]` crée un export JSON des compositions (`wp_block`). L’option `--portable` active le nettoyage portable déjà proposé dans l’interface graphique et `--output` contrôle l’emplacement du fichier généré.【F:theme-export-jlg/includes/class-tejlg-cli.php†L103-L223】
+- `wp theme-export-jlg import theme <chemin_zip> [--overwrite]` et `wp theme-export-jlg import patterns <chemin_json>` réalisent les imports côté CLI, avec les mêmes validations MIME/tailles que l’interface graphique.【F:theme-export-jlg/includes/class-tejlg-cli.php†L135-L340】
+- `wp theme-export-jlg settings export [--output=<chemin>]` génère un profil JSON signé contenant la planification, les exclusions et les préférences d’interface. Le message de succès affiche l’empreinte SHA-256 pour vérifier rapidement l’intégrité du fichier.【F:theme-export-jlg/includes/class-tejlg-cli.php†L207-L276】
+- `wp theme-export-jlg settings import <chemin_json>` recharge un profil existant. Si la signature ne correspond plus au contenu, la commande l’indique explicitement tout en appliquant les réglages (utile lorsqu’un fichier a été modifié manuellement).【F:theme-export-jlg/includes/class-tejlg-cli.php†L278-L336】
 
-Chaque commande renvoie un message de réussite structuré ou un message d’erreur explicite en cas de problème (dossier non accessible, erreur `wp_die`, etc.), pour s’intégrer facilement dans des scripts d’automatisation.【F:theme-export-jlg/includes/class-tejlg-cli.php†L40-L160】
+Les exports de réglages s’appuient sur `TEJLG_Settings` qui sérialise un instantané normalisé et génère automatiquement une signature horodatée.【F:theme-export-jlg/includes/class-tejlg-settings.php†L7-L229】 Des filtres (`tejlg_settings_export_snapshot`, `tejlg_settings_export_package`, `tejlg_settings_import_snapshot`) permettent d’étendre le schéma ou d’injecter des métadonnées propres à votre environnement CI/CD.【F:theme-export-jlg/includes/class-tejlg-settings.php†L27-L224】 Un crochet dédié contrôle également la taille maximale autorisée lors des imports (`tejlg_settings_import_max_filesize`).【F:theme-export-jlg/includes/class-tejlg-cli.php†L320-L333】
+
+Chaque commande renvoie un message de réussite structuré ou un message d’erreur explicite en cas de problème (dossier non accessible, erreur `wp_die`, signature altérée…), ce qui facilite l’intégration dans les scripts d’automatisation.【F:theme-export-jlg/includes/class-tejlg-cli.php†L40-L334】
 
 ## Support & ressources
 

@@ -57,6 +57,7 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
         WP_CLI::$success_message = '';
         WP_CLI::$error_message = '';
         WP_CLI::$last_log       = '';
+        WP_CLI::$last_warning   = '';
 
         TEJLG_Export_History::clear_history();
     }
@@ -130,6 +131,101 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
         if (file_exists($temp_file)) {
             @unlink($temp_file);
         }
+    }
+
+    public function test_settings_command_exports_signed_package() {
+        $target = trailingslashit($this->export_dir) . 'settings-export.json';
+
+        TEJLG_Export::update_schedule_settings([
+            'frequency'      => 'daily',
+            'exclusions'     => "vendor\nnode_modules",
+            'retention_days' => 14,
+            'run_time'       => '06:45',
+        ]);
+
+        update_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION, "vendor\nnode_modules");
+        update_option(TEJLG_Admin_Export_Page::PORTABLE_MODE_OPTION, '1');
+        update_option(TEJLG_Admin_Debug_Page::METRICS_ICON_OPTION, 48);
+
+        $cli = new TEJLG_CLI();
+        $cli->settings(['export'], ['output' => $target]);
+
+        $this->assertFileExists($target);
+
+        $contents = file_get_contents($target);
+        $this->assertNotFalse($contents);
+
+        $decoded = json_decode($contents, true);
+        $this->assertIsArray($decoded);
+        $this->assertSame(TEJLG_Settings::EXPORT_SCHEMA, $decoded['schema']);
+
+        $signature = TEJLG_Settings::verify_signature($decoded);
+        $this->assertTrue($signature['valid']);
+
+        $this->assertStringContainsString('Réglages exportés', WP_CLI::$success_message);
+    }
+
+    public function test_settings_command_imports_snapshot_and_warns_on_signature_mismatch() {
+        $target = trailingslashit($this->export_dir) . 'settings-import.json';
+
+        TEJLG_Export::update_schedule_settings([
+            'frequency'      => 'disabled',
+            'exclusions'     => '',
+            'retention_days' => 30,
+            'run_time'       => '00:00',
+        ]);
+
+        update_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION, '');
+        update_option(TEJLG_Admin_Export_Page::PORTABLE_MODE_OPTION, '0');
+        update_option(TEJLG_Admin_Debug_Page::METRICS_ICON_OPTION, TEJLG_Admin_Debug_Page::METRICS_ICON_DEFAULT);
+
+        $snapshot = [
+            'schedule' => [
+                'frequency'      => 'hourly',
+                'exclusions'     => "foo\nbar",
+                'retention_days' => 5,
+                'run_time'       => '02:10',
+            ],
+            'export_preferences' => [
+                'exclusion_patterns' => "foo\nbar",
+                'portable_mode'      => true,
+            ],
+            'debug_preferences' => [
+                'metrics_icon_size' => 72,
+            ],
+        ];
+
+        $package = TEJLG_Settings::build_export_package($snapshot);
+        $json    = TEJLG_Settings::encode_export_package($package);
+        $this->assertNotWPError($json);
+
+        file_put_contents($target, $json);
+
+        $cli = new TEJLG_CLI();
+
+        WP_CLI::$last_warning = '';
+        $cli->settings(['import', $target], []);
+
+        $settings = TEJLG_Export::get_schedule_settings();
+        $this->assertSame('hourly', $settings['frequency']);
+        $this->assertSame("foo\nbar", get_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION));
+        $this->assertSame('1', get_option(TEJLG_Admin_Export_Page::PORTABLE_MODE_OPTION));
+        $this->assertSame(72, (int) get_option(TEJLG_Admin_Debug_Page::METRICS_ICON_OPTION));
+        $this->assertSame('', WP_CLI::$last_warning);
+
+        $tampered = json_decode($json, true);
+        $this->assertIsArray($tampered);
+        $tampered['settings']['schedule']['frequency'] = 'weekly';
+        $tampered_json = wp_json_encode($tampered, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $this->assertNotFalse($tampered_json);
+        file_put_contents($target, $tampered_json);
+
+        WP_CLI::$last_warning = '';
+        $cli->settings(['import', $target], []);
+
+        $this->assertStringContainsString('signature ne correspond pas', WP_CLI::$last_warning);
+        $settings = TEJLG_Export::get_schedule_settings();
+        $this->assertSame('weekly', $settings['frequency']);
     }
 
     private function remove_directory($directory) {
