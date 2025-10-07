@@ -99,6 +99,18 @@ En revanche, il reste des écarts avec les plateformes professionnelles :
 3. **Expérience guidée**  : créer un assistant multi-écrans pour l’export complet (choix du périmètre, exclusions, confirmation) et pour l’import (validation, prévisualisation, application). Chaque étape afficherait des conseils contextualisés et un résumé final téléchargeable en PDF/CSV afin d’aligner la solution sur les checklists proposées par les outils pro.【F:theme-export-jlg/templates/admin/export.php†L37-L221】【F:theme-export-jlg/templates/admin/import-preview.php†L30-L220】
 4. **Mode compact et accessibilité renforcée**  : offrir une bascule « Vue compacte » qui réduit les marges, regroupe les cartes et ajoute des ancres de navigation clavier. Compléter les notices d’erreur avec des liens d’action et intégrer un test automatique de contraste pour les combinaisons de couleurs personnalisées.【F:theme-export-jlg/assets/css/admin-styles.css†L37-L83】
 5. **Optimisation mobile**  : convertir les onglets secondaires en accordéons verticaux sous 600 px, ajouter un bouton flottant « Actions rapides » (export immédiat, téléchargement du dernier ZIP) et transformer l’historique en listes empilées pour limiter le défilement horizontal sur tablette/smartphone.【F:theme-export-jlg/assets/css/admin-styles.css†L15-L33】【F:theme-export-jlg/templates/admin/export.php†L141-L199】
+
+
+#### Plan d’implémentation priorisé
+
+Les axes précédents peuvent être regroupés en lots successifs pour sécuriser l’exécution et faciliter le suivi des dépendances. Le détail du backlog est consigné dans `docs/roadmap.md`.
+
+| Priorité | Lot | Objectif | Actions clés |
+| --- | --- | --- | --- |
+| 1 | Journal d’export enrichi | Étendre la persistance des exports pour stocker durée, taille, auteur et surface des exclusions afin d’alimenter des notifications et des tableaux de bord détaillés.【F:theme-export-jlg/includes/class-tejlg-export-history.php†L6-L195】【F:theme-export-jlg/includes/class-tejlg-export.php†L300-L378】 | Ajouter des colonnes calculées lors de `record_job`, exposer ces métadonnées dans l’écran d’historique et préparer un hook de notification (e-mail/webhook). |
+| 2 | Orchestration & profils | Offrir une duplication rapide de la configuration via WP-CLI et préparer la synchronisation multi-sites légère.【F:theme-export-jlg/includes/class-tejlg-cli.php†L16-L195】 | Implémenter `wp theme-export-jlg settings` (export/import JSON signé), documenter les options et exposer des filtres pour enrichir le schéma. |
+| 3 | Assistants guidés | Transformer les formulaires Export/Import en parcours multi-étapes avec aides contextuelles pour aligner l’expérience sur les outils professionnels.【F:theme-export-jlg/templates/admin/export.php†L130-L220】【F:theme-export-jlg/templates/admin/import-preview.php†L30-L200】 | Décomposer les étapes dans des composants réutilisables, injecter des conseils dynamiques et générer un résumé téléchargeable (PDF/JSON) en fin de processus. |
+| 4 | Vue compacte & mobile | Optimiser la grille responsive et introduire une bascule compacte pour accélérer les workflows sur petits écrans.【F:theme-export-jlg/assets/css/admin-styles.css†L1-L160】 | Ajouter un `ToggleControl` mémorisé par utilisateur, convertir les onglets en accordéons <600 px et préparer le bouton d’actions flottant partagé entre les onglets. |
 ## Pistes d’amélioration inspirées des apps pro
 
 Pour combler ces écarts tout en conservant l’esprit « in‑dashboard », plusieurs évolutions peuvent être envisagées :
