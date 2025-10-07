@@ -6,6 +6,7 @@ require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin.ph
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-import.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin-debug-page.php';
+require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export-notifications.php';
 
 /**
  * @group admin

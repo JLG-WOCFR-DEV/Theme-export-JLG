@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
 require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export-history.php';
+require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export-notifications.php';
 
 if (!defined('WP_CLI')) {
     define('WP_CLI', true);
@@ -146,6 +147,10 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
         update_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION, "vendor\nnode_modules");
         update_option(TEJLG_Admin_Export_Page::PORTABLE_MODE_OPTION, '1');
         update_option(TEJLG_Admin_Debug_Page::METRICS_ICON_OPTION, 48);
+        TEJLG_Export_Notifications::update_settings([
+            'recipients'      => "ops@example.com\nsupport@example.com",
+            'enabled_results' => ['error', 'warning', 'success'],
+        ]);
 
         $cli = new TEJLG_CLI();
         $cli->settings(['export'], ['output' => $target]);
@@ -193,6 +198,10 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
             'debug_preferences' => [
                 'metrics_icon_size' => 72,
             ],
+            'notifications' => [
+                'recipients'      => "ops@example.com\nsupport@example.com",
+                'enabled_results' => ['error', 'success'],
+            ],
         ];
 
         $package = TEJLG_Settings::build_export_package($snapshot);
@@ -211,6 +220,9 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
         $this->assertSame("foo\nbar", get_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION));
         $this->assertSame('1', get_option(TEJLG_Admin_Export_Page::PORTABLE_MODE_OPTION));
         $this->assertSame(72, (int) get_option(TEJLG_Admin_Debug_Page::METRICS_ICON_OPTION));
+        $notifications = TEJLG_Export_Notifications::get_settings();
+        $this->assertSame("ops@example.com\nsupport@example.com", $notifications['recipients']);
+        $this->assertSame(['error', 'success'], $notifications['enabled_results']);
         $this->assertSame('', WP_CLI::$last_warning);
 
         $tampered = json_decode($json, true);

@@ -504,4 +504,66 @@ class TEJLG_Export_History {
             'results' => array_keys($results),
         ];
     }
+
+    public static function get_recent_stats($days = 7) {
+        $days = is_numeric($days) ? (int) $days : 7;
+        $days = $days > 0 ? $days : 7;
+
+        $cutoff = time() - ($days * DAY_IN_SECONDS);
+
+        $entries = self::get_raw_entries();
+
+        $counts = [
+            self::RESULT_SUCCESS => 0,
+            self::RESULT_WARNING => 0,
+            self::RESULT_ERROR   => 0,
+            self::RESULT_INFO    => 0,
+        ];
+
+        $recent_entries = [];
+
+        foreach ($entries as $entry) {
+            $result = isset($entry['result']) ? (string) $entry['result'] : '';
+
+            if (!isset($counts[$result])) {
+                $result = self::RESULT_INFO;
+            }
+
+            $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+
+            if ($timestamp >= $cutoff) {
+                $counts[$result]++;
+                $recent_entries[] = $entry;
+            }
+        }
+
+        $total_recent = 0;
+
+        foreach ($counts as $result => $count) {
+            $counts[$result] = (int) $count;
+            $total_recent   += (int) $count;
+        }
+
+        $uptime_rate = null;
+
+        if ($total_recent > 0) {
+            $successes  = isset($counts[self::RESULT_SUCCESS]) ? (int) $counts[self::RESULT_SUCCESS] : 0;
+            $uptime_rate = round(($successes / $total_recent) * 100, 1);
+        }
+
+        $latest_entry = null;
+
+        if (!empty($entries)) {
+            $latest_entry = $entries[0];
+        }
+
+        return [
+            'window_days'   => $days,
+            'counts'        => $counts,
+            'total_recent'  => $total_recent,
+            'uptime_rate'   => $uptime_rate,
+            'latest_entry'  => $latest_entry,
+            'recent_entries'=> $recent_entries,
+        ];
+    }
 }
