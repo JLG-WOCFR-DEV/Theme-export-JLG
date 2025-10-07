@@ -149,7 +149,7 @@ body.toplevel_page_theme-export-jlg .components-card__body {
         margin-inline: 10px;
     }
 
-    .nav-tab-wrapper {
+    body.toplevel_page_theme-export-jlg .nav-tab-wrapper {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
