@@ -16,6 +16,8 @@
 /** @var array  $history_filter_values */
 /** @var array  $history_selected_filters */
 /** @var array  $history_base_args */
+/** @var array  $history_stats */
+/** @var array  $notification_settings */
 
 $export_tab_url = add_query_arg([
     'page' => $page_slug,
@@ -72,6 +74,9 @@ $history_base_args = is_array($history_base_args) ? $history_base_args : [
     'tab'  => 'export',
 ];
 
+$history_stats = is_array($history_stats) ? $history_stats : [];
+$notification_settings = is_array($notification_settings) ? $notification_settings : [];
+
 $history_result_labels = [
     'success' => __('Succès', 'theme-export-jlg'),
     'warning' => __('Avertissement', 'theme-export-jlg'),
@@ -99,6 +104,16 @@ $available_history_origins = array_values(array_unique(array_merge(array_keys($h
 sort($available_history_origins);
 
 $latest_export = !empty($history_entries) ? $history_entries[0] : null;
+
+$notification_recipients_value = isset($notification_settings['recipients']) ? (string) $notification_settings['recipients'] : '';
+$notification_enabled_results = isset($notification_settings['enabled_results']) && is_array($notification_settings['enabled_results'])
+    ? array_map('sanitize_key', $notification_settings['enabled_results'])
+    : [];
+$notification_enabled_lookup = [];
+
+foreach ($notification_enabled_results as $enabled_result) {
+    $notification_enabled_lookup[$enabled_result] = true;
+}
 
 $latest_export_status = __('Aucun export enregistré', 'theme-export-jlg');
 $latest_export_date = __('Lancez un premier export pour voir son statut ici.', 'theme-export-jlg');
@@ -140,6 +155,115 @@ if (is_array($latest_export)) {
     $latest_export_exclusions = !empty($latest_exclusions_clean)
         ? implode(', ', $latest_exclusions_clean)
         : __('Aucun motif', 'theme-export-jlg');
+}
+
+$monitoring_counts = [
+    'success' => 0,
+    'warning' => 0,
+    'error'   => 0,
+    'info'    => 0,
+];
+
+if (isset($history_stats['counts']) && is_array($history_stats['counts'])) {
+    foreach ($monitoring_counts as $key => $value) {
+        if (isset($history_stats['counts'][$key])) {
+            $monitoring_counts[$key] = (int) $history_stats['counts'][$key];
+        }
+    }
+}
+
+$monitoring_total_recent = isset($history_stats['total_recent']) ? (int) $history_stats['total_recent'] : ($monitoring_counts['success'] + $monitoring_counts['warning'] + $monitoring_counts['error'] + $monitoring_counts['info']);
+$monitoring_window_days  = isset($history_stats['window_days']) ? (int) $history_stats['window_days'] : 7;
+$monitoring_uptime_rate  = isset($history_stats['uptime_rate']) ? $history_stats['uptime_rate'] : null;
+
+if (null !== $monitoring_uptime_rate) {
+    $monitoring_uptime_rate = (float) $monitoring_uptime_rate;
+}
+
+$monitoring_value = ($monitoring_total_recent > 0 && null !== $monitoring_uptime_rate)
+    ? sprintf(
+        /* translators: %s: success rate percentage. */
+        __('%s %% de succès', 'theme-export-jlg'),
+        number_format_i18n($monitoring_uptime_rate, 1)
+    )
+    : __('Aucune donnée récente', 'theme-export-jlg');
+
+if ($monitoring_total_recent <= 0) {
+    $monitoring_breakdown_label = __('Surveillance inactive : aucune exécution récente.', 'theme-export-jlg');
+} else {
+    $monitoring_breakdown_label = sprintf(
+        /* translators: 1: export count, 2: success count, 3: warning count, 4: error count. */
+        __('Sur %1$d export(s) : %2$d succès · %3$d avertissements · %4$d erreurs', 'theme-export-jlg'),
+        $monitoring_total_recent,
+        $monitoring_counts['success'],
+        $monitoring_counts['warning'],
+        $monitoring_counts['error']
+    );
+}
+
+$monitoring_window_label = sprintf(
+    _n('Période analysée : %d jour', 'Période analysée : %d jours', max(1, $monitoring_window_days), 'theme-export-jlg'),
+    max(1, $monitoring_window_days)
+);
+
+$monitoring_last_entry_label = __('Dernier événement : aucun export enregistré.', 'theme-export-jlg');
+$monitoring_last_details     = '';
+$monitoring_latest_entry     = isset($history_stats['latest_entry']) && is_array($history_stats['latest_entry'])
+    ? $history_stats['latest_entry']
+    : null;
+
+if (is_array($monitoring_latest_entry) && !empty($monitoring_latest_entry)) {
+    $last_result_key = isset($monitoring_latest_entry['result']) ? (string) $monitoring_latest_entry['result'] : '';
+    $last_result_label = isset($history_result_labels[$last_result_key])
+        ? $history_result_labels[$last_result_key]
+        : __('Statut inconnu', 'theme-export-jlg');
+
+    $last_timestamp = isset($monitoring_latest_entry['timestamp']) ? (int) $monitoring_latest_entry['timestamp'] : 0;
+
+    if ($last_timestamp > 0) {
+        if (function_exists('wp_date')) {
+            $last_date_label = wp_date($datetime_format, $last_timestamp);
+        } else {
+            $last_date_label = date_i18n($datetime_format, $last_timestamp);
+        }
+    } else {
+        $last_date_label = __('Date inconnue', 'theme-export-jlg');
+    }
+
+    $monitoring_last_entry_label = sprintf(
+        /* translators: 1: result label, 2: formatted date. */
+        __('Dernier événement : %1$s – %2$s', 'theme-export-jlg'),
+        $last_result_label,
+        $last_date_label
+    );
+
+    $last_details_parts = [];
+
+    if (!empty($monitoring_latest_entry['duration']) && function_exists('human_readable_duration')) {
+        $last_details_parts[] = human_readable_duration((int) $monitoring_latest_entry['duration']);
+    }
+
+    if (!empty($monitoring_latest_entry['zip_file_size'])) {
+        $last_details_parts[] = size_format((int) $monitoring_latest_entry['zip_file_size'], 2);
+    }
+
+    if (!empty($monitoring_latest_entry['origin'])) {
+        $origin_key = (string) $monitoring_latest_entry['origin'];
+        $origin_label = isset($history_origin_labels[$origin_key]) ? $history_origin_labels[$origin_key] : $origin_key;
+        $last_details_parts[] = sprintf(
+            /* translators: %s: export origin label. */
+            __('Origine : %s', 'theme-export-jlg'),
+            $origin_label
+        );
+    }
+
+    if (!empty($monitoring_latest_entry['status_message'])) {
+        $last_details_parts[] = wp_strip_all_tags((string) $monitoring_latest_entry['status_message']);
+    }
+
+    if (!empty($last_details_parts)) {
+        $monitoring_last_details = implode(' · ', array_map('sanitize_text_field', $last_details_parts));
+    }
 }
 
 $exclusion_summary_patterns = preg_split('/[\r\n,]+/', (string) $exclusion_patterns_value);
@@ -243,6 +367,18 @@ $history_total_filtered_label = number_format_i18n((int) $history_total);
                     );
                     ?>
                 </span>
+            </div>
+        </div>
+        <div class="tejlg-dashboard__card components-card is-elevated">
+            <div class="components-card__body">
+                <span class="tejlg-dashboard__label"><?php esc_html_e('Surveillance & alertes', 'theme-export-jlg'); ?></span>
+                <strong class="tejlg-dashboard__value"><?php echo esc_html($monitoring_value); ?></strong>
+                <span class="tejlg-dashboard__meta"><?php echo esc_html($monitoring_breakdown_label); ?></span>
+                <span class="tejlg-dashboard__meta"><?php echo esc_html($monitoring_window_label); ?></span>
+                <span class="tejlg-dashboard__meta"><?php echo esc_html($monitoring_last_entry_label); ?></span>
+                <?php if ('' !== $monitoring_last_details) : ?>
+                    <span class="tejlg-dashboard__meta"><?php echo esc_html($monitoring_last_details); ?></span>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -490,6 +626,49 @@ $history_total_filtered_label = number_format_i18n((int) $history_total);
                                     value="<?php echo esc_attr($schedule_retention_value); ?>"
                                 >
                                 <p class="description"><?php esc_html_e('Durée de conservation des archives stockées dans la médiathèque. Indiquez 0 pour désactiver le nettoyage automatique.', 'theme-export-jlg'); ?></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">
+                                <label for="tejlg_notifications_emails"><?php esc_html_e('Destinataires des alertes', 'theme-export-jlg'); ?></label>
+                            </th>
+                            <td>
+                                <textarea
+                                    name="tejlg_notifications_emails"
+                                    id="tejlg_notifications_emails"
+                                    class="large-text code"
+                                    rows="3"
+                                    placeholder="<?php echo esc_attr__('admin@example.com', 'theme-export-jlg'); ?>"
+                                ><?php echo esc_textarea($notification_recipients_value); ?></textarea>
+                                <p class="description"><?php esc_html_e('Une adresse par ligne (ou séparée par des virgules). L’e-mail administrateur du site est utilisé par défaut si cette liste est vide.', 'theme-export-jlg'); ?></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><?php esc_html_e('Évènements surveillés', 'theme-export-jlg'); ?></th>
+                            <td>
+                                <fieldset>
+                                    <legend class="screen-reader-text"><span><?php esc_html_e('Choisissez les statuts qui déclenchent un e-mail', 'theme-export-jlg'); ?></span></legend>
+                                    <label>
+                                        <input type="checkbox" name="tejlg_notifications_events[]" value="error" <?php checked(!empty($notification_enabled_lookup['error'])); ?>>
+                                        <?php esc_html_e('Échecs', 'theme-export-jlg'); ?>
+                                    </label>
+                                    <br>
+                                    <label>
+                                        <input type="checkbox" name="tejlg_notifications_events[]" value="warning" <?php checked(!empty($notification_enabled_lookup['warning'])); ?>>
+                                        <?php esc_html_e('Annulations / avertissements', 'theme-export-jlg'); ?>
+                                    </label>
+                                    <br>
+                                    <label>
+                                        <input type="checkbox" name="tejlg_notifications_events[]" value="success" <?php checked(!empty($notification_enabled_lookup['success'])); ?>>
+                                        <?php esc_html_e('Succès', 'theme-export-jlg'); ?>
+                                    </label>
+                                    <br>
+                                    <label>
+                                        <input type="checkbox" name="tejlg_notifications_events[]" value="info" <?php checked(!empty($notification_enabled_lookup['info'])); ?>>
+                                        <?php esc_html_e('Informations', 'theme-export-jlg'); ?>
+                                    </label>
+                                </fieldset>
+                                <p class="description"><?php esc_html_e('Les notifications s’appliquent aux exports manuels et WP-CLI. Utilisez les filtres PHP pour inclure les exports planifiés si nécessaire.', 'theme-export-jlg'); ?></p>
                             </td>
                         </tr>
                     </tbody>

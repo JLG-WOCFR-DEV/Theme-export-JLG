@@ -66,6 +66,12 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $raw_exclusions = isset($_POST['tejlg_schedule_exclusions']) ? wp_unslash((string) $_POST['tejlg_schedule_exclusions']) : '';
         $raw_retention  = isset($_POST['tejlg_schedule_retention']) ? wp_unslash((string) $_POST['tejlg_schedule_retention']) : '';
         $raw_run_time   = isset($_POST['tejlg_schedule_run_time']) ? wp_unslash((string) $_POST['tejlg_schedule_run_time']) : '';
+        $raw_notifications_emails = isset($_POST['tejlg_notifications_emails'])
+            ? wp_unslash((string) $_POST['tejlg_notifications_emails'])
+            : '';
+        $raw_notifications_results = isset($_POST['tejlg_notifications_events']) && is_array($_POST['tejlg_notifications_events'])
+            ? array_map('sanitize_key', (array) $_POST['tejlg_notifications_events'])
+            : [];
 
         $retention = is_numeric($raw_retention) ? (int) $raw_retention : 0;
         $retention = $retention < 0 ? 0 : $retention;
@@ -92,6 +98,11 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         TEJLG_Export::reschedule_theme_export_event();
         TEJLG_Export::ensure_cleanup_event_scheduled();
         TEJLG_Export::cleanup_persisted_archives($normalized['retention_days']);
+
+        TEJLG_Export_Notifications::update_settings([
+            'recipients'      => $raw_notifications_emails,
+            'enabled_results' => $raw_notifications_results,
+        ]);
 
         add_settings_error(
             'tejlg_admin_messages',
@@ -175,6 +186,8 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         ]);
 
         $history_filters = TEJLG_Export_History::get_available_filters();
+        $history_stats   = TEJLG_Export_History::get_recent_stats();
+        $notification_settings = TEJLG_Export_Notifications::get_settings();
 
         $history_total_pages = isset($history['total_pages']) ? (int) $history['total_pages'] : 1;
         $history_total_pages = $history_total_pages > 0 ? $history_total_pages : 1;
@@ -219,6 +232,8 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
                 'page' => $this->page_slug,
                 'tab'  => 'export',
             ],
+            'history_stats'             => $history_stats,
+            'notification_settings'     => $notification_settings,
         ]);
     }
 

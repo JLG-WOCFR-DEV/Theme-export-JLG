@@ -22,6 +22,7 @@ class TEJLG_Settings {
             'schedule'          => self::get_schedule_settings(),
             'export_preferences'=> self::get_export_preferences(),
             'debug_preferences' => self::get_debug_preferences(),
+            'notifications'     => TEJLG_Export_Notifications::get_settings(),
         ];
 
         /**
@@ -147,9 +148,10 @@ class TEJLG_Settings {
     public static function apply_snapshot($snapshot, $context = []) {
         if (!is_array($snapshot)) {
             return [
-                'schedule_updated' => false,
+                'schedule_updated'           => false,
                 'export_preferences_updated' => false,
                 'debug_preferences_updated'  => false,
+                'notifications_updated'      => false,
             ];
         }
 
@@ -169,6 +171,7 @@ class TEJLG_Settings {
             'schedule_updated'           => false,
             'export_preferences_updated' => false,
             'debug_preferences_updated'  => false,
+            'notifications_updated'      => false,
         ];
 
         if (isset($snapshot['schedule']) && is_array($snapshot['schedule'])) {
@@ -184,6 +187,12 @@ class TEJLG_Settings {
 
         if (isset($snapshot['debug_preferences']) && is_array($snapshot['debug_preferences'])) {
             $results['debug_preferences_updated'] = self::apply_debug_preferences($snapshot['debug_preferences']);
+        }
+
+        if (isset($snapshot['notifications']) && is_array($snapshot['notifications'])) {
+            $before = TEJLG_Export_Notifications::get_settings();
+            $after  = TEJLG_Export_Notifications::update_settings($snapshot['notifications']);
+            $results['notifications_updated'] = ($before !== $after);
         }
 
         return $results;
@@ -213,6 +222,12 @@ class TEJLG_Settings {
             $snapshot['debug_preferences'] = self::get_debug_preferences();
         } else {
             $snapshot['debug_preferences'] = self::normalize_debug_preferences($snapshot['debug_preferences']);
+        }
+
+        if (!isset($snapshot['notifications']) || !is_array($snapshot['notifications'])) {
+            $snapshot['notifications'] = TEJLG_Export_Notifications::get_settings();
+        } else {
+            $snapshot['notifications'] = TEJLG_Export_Notifications::normalize_settings($snapshot['notifications']);
         }
 
         return $snapshot;
