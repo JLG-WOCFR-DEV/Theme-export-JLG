@@ -20,6 +20,18 @@ class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
         $this->page_slug = $page_slug;
     }
 
+    /**
+     * Fournit un instantané des informations de débogage du plugin pour des usages externes (Site Health, exports, etc.).
+     *
+     * @return array<string,mixed>
+     */
+    public static function get_debug_report_snapshot() {
+        $template_dir = defined('TEJLG_PATH') ? TEJLG_PATH . 'templates/admin/' : plugin_dir_path(__FILE__) . '../templates/admin/';
+        $instance     = new self($template_dir, 'theme-export-jlg');
+
+        return $instance->collect_debug_report_data();
+    }
+
     public function handle_request() {
         if ('POST' !== $this->get_request_method()) {
             return;
@@ -123,7 +135,7 @@ class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
     }
 
     private function handle_debug_report_download() {
-        if (!current_user_can('manage_options')) {
+        if (!TEJLG_Capabilities::current_user_can('reports')) {
             return;
         }
 

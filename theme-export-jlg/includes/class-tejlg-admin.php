@@ -37,7 +37,7 @@ class TEJLG_Admin {
         $this->menu_hook_suffix = add_menu_page(
             __('Theme Export - JLG', 'theme-export-jlg'),
             __('Theme Export', 'theme-export-jlg'),
-            'manage_options',
+            TEJLG_Capabilities::get_capability('menu'),
             $this->page_slug,
             [ $this, 'render_admin_page' ],
             'dashicons-download',
@@ -167,44 +167,101 @@ class TEJLG_Admin {
     }
 
     public function handle_form_requests() {
-        if (!current_user_can('manage_options')) {
-            return;
+        if (TEJLG_Capabilities::current_user_can('debug')) {
+            $this->debug_page->handle_request();
         }
 
-        $this->debug_page->handle_request();
-        $this->export_page->handle_request();
-        $this->import_page->handle_request();
+        if (TEJLG_Capabilities::current_user_can('exports')) {
+            $this->export_page->handle_request();
+        }
+
+        if (TEJLG_Capabilities::current_user_can('imports')) {
+            $this->import_page->handle_request();
+        }
     }
 
     public function render_admin_page() {
-        $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'export';
+        $tabs = $this->get_accessible_tabs();
+
+        if (empty($tabs)) {
+            wp_die(
+                esc_html__("Vous n'avez pas les autorisations nécessaires pour accéder à Theme Export - JLG.", 'theme-export-jlg'),
+                esc_html__('Accès refusé', 'theme-export-jlg'),
+                [
+                    'response' => 403,
+                ]
+            );
+        }
+
+        $requested_tab = isset($_GET['tab']) ? sanitize_key((string) $_GET['tab']) : '';
+        $active_tab    = isset($tabs[$requested_tab]) ? $requested_tab : key($tabs);
+
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
             <h2 class="nav-tab-wrapper">
-                <a href="<?php echo esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'export'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab === 'export' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Exporter & Outils', 'theme-export-jlg'); ?></a>
-                <a href="<?php echo esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'import'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab === 'import' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Importer', 'theme-export-jlg'); ?></a>
-                <a href="<?php echo esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'migration_guide'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab === 'migration_guide' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Guide de Migration', 'theme-export-jlg'); ?></a>
-                <a href="<?php echo esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'debug'], admin_url('admin.php'))); ?>" class="nav-tab <?php echo $active_tab === 'debug' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e('Débogage', 'theme-export-jlg'); ?></a>
+                <?php foreach ($tabs as $tab_slug => $tab_config) :
+                    $url = add_query_arg([
+                        'page' => $this->page_slug,
+                        'tab'  => $tab_slug,
+                    ], admin_url('admin.php'));
+                ?>
+                    <a href="<?php echo esc_url($url); ?>" class="nav-tab <?php echo $active_tab === $tab_slug ? 'nav-tab-active' : ''; ?>"><?php echo esc_html($tab_config['label']); ?></a>
+                <?php endforeach; ?>
             </h2>
             <?php
-            switch ($active_tab) {
-                case 'import':
-                    $this->import_page->render();
-                    break;
-                case 'migration_guide':
-                    $this->render_migration_guide_tab();
-                    break;
-                case 'debug':
-                    $this->debug_page->render();
-                    break;
-                default:
-                    $this->export_page->render();
-                    break;
+            $active_tab_config = $tabs[$active_tab];
+
+            if (is_callable($active_tab_config['callback'])) {
+                call_user_func($active_tab_config['callback']);
             }
             ?>
         </div>
         <?php
+    }
+
+    private function get_accessible_tabs() {
+        $tabs = [
+            'export' => [
+                'label'    => __('Exporter & Outils', 'theme-export-jlg'),
+                'cap'      => 'exports',
+                'callback' => [ $this->export_page, 'render' ],
+            ],
+            'import' => [
+                'label'    => __('Importer', 'theme-export-jlg'),
+                'cap'      => 'imports',
+                'callback' => [ $this->import_page, 'render' ],
+            ],
+            'migration_guide' => [
+                'label'    => __('Guide de Migration', 'theme-export-jlg'),
+                'cap'      => 'menu',
+                'callback' => [ $this, 'render_migration_guide_tab' ],
+            ],
+            'debug' => [
+                'label'    => __('Débogage', 'theme-export-jlg'),
+                'cap'      => 'debug',
+                'callback' => [ $this->debug_page, 'render' ],
+            ],
+        ];
+
+        /**
+         * Permet de modifier la liste des onglets disponibles dans l'interface d'administration.
+         *
+         * @param array<string,array<string,mixed>> $tabs
+         */
+        $tabs = apply_filters('tejlg_admin_tabs', $tabs);
+
+        $accessible = [];
+
+        foreach ($tabs as $slug => $config) {
+            $cap_context = isset($config['cap']) ? (string) $config['cap'] : 'menu';
+
+            if (TEJLG_Capabilities::current_user_can($cap_context)) {
+                $accessible[$slug] = $config;
+            }
+        }
+
+        return $accessible;
     }
 
     private function render_migration_guide_tab() {

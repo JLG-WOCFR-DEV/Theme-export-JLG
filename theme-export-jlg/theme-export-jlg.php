@@ -24,6 +24,7 @@ define( 'TEJLG_PATH', plugin_dir_path( __FILE__ ) );
 define( 'TEJLG_URL', plugin_dir_url( __FILE__ ) );
 
 // Charger les classes nécessaires
+require_once TEJLG_PATH . 'includes/class-tejlg-capabilities.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export-history.php';
 require_once TEJLG_PATH . 'includes/class-wp-background-process.php';
@@ -32,6 +33,7 @@ require_once TEJLG_PATH . 'includes/class-tejlg-export-process.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-import.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-theme-tools.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-site-health.php';
 
 if (defined('WP_CLI') && WP_CLI) {
     require_once TEJLG_PATH . 'includes/class-tejlg-cli.php';
@@ -41,6 +43,8 @@ if (defined('WP_CLI') && WP_CLI) {
  * Fonction principale pour initialiser le plugin.
  */
 function tejlg_run_plugin() {
+    TEJLG_Capabilities::init();
+    TEJLG_Site_Health::init();
     new TEJLG_Admin();
 }
 

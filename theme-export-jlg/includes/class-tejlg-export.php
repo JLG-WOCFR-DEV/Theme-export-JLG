@@ -1698,7 +1698,7 @@ class TEJLG_Export {
     }
 
     public static function ajax_start_theme_export() {
-        if (!current_user_can('manage_options')) {
+        if (!TEJLG_Capabilities::current_user_can('ajax')) {
             wp_send_json_error(['message' => esc_html__('Accès refusé.', 'theme-export-jlg')], 403);
         }
 
@@ -1727,7 +1727,7 @@ class TEJLG_Export {
     }
 
     public static function ajax_get_theme_export_status() {
-        if (!current_user_can('manage_options')) {
+        if (!TEJLG_Capabilities::current_user_can('ajax')) {
             wp_send_json_error(['message' => esc_html__('Accès refusé.', 'theme-export-jlg')], 403);
         }
 
@@ -1774,7 +1774,7 @@ class TEJLG_Export {
     }
 
     public static function ajax_cancel_theme_export() {
-        if (!current_user_can('manage_options')) {
+        if (!TEJLG_Capabilities::current_user_can('ajax')) {
             wp_send_json_error(['message' => esc_html__('Accès refusé.', 'theme-export-jlg')], 403);
         }
 
@@ -1808,7 +1808,7 @@ class TEJLG_Export {
     }
 
     public static function ajax_download_theme_export() {
-        if (!current_user_can('manage_options')) {
+        if (!TEJLG_Capabilities::current_user_can('ajax')) {
             wp_die(esc_html__('Accès refusé.', 'theme-export-jlg')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         }
 
