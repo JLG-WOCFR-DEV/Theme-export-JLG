@@ -6,6 +6,11 @@ if (!defined('ABSPATH')) {
 class TEJLG_Export_History {
     const OPTION_NAME = 'tejlg_export_history_entries';
 
+    const RESULT_SUCCESS = 'success';
+    const RESULT_WARNING = 'warning';
+    const RESULT_ERROR   = 'error';
+    const RESULT_INFO    = 'info';
+
     public static function record_job($job, array $context = []) {
         if (!is_array($job) || empty($job['id'])) {
             return;
@@ -42,12 +47,18 @@ class TEJLG_Export_History {
         }
 
         self::save_entries($entries);
+
+        self::dispatch_recorded_hooks($entry, $job, $context);
     }
 
     public static function get_entries($args = []) {
         $defaults = [
             'per_page' => 10,
             'paged'    => 1,
+            'result'   => '',
+            'origin'   => '',
+            'orderby'  => 'timestamp',
+            'order'    => 'desc',
         ];
 
         $args = wp_parse_args($args, $defaults);
@@ -58,8 +69,70 @@ class TEJLG_Export_History {
         $current_page = isset($args['paged']) ? (int) $args['paged'] : 1;
         $current_page = $current_page > 0 ? $current_page : 1;
 
+        $result_filter = isset($args['result']) ? sanitize_key((string) $args['result']) : '';
+        $origin_filter = isset($args['origin']) ? sanitize_key((string) $args['origin']) : '';
+
+        $orderby = isset($args['orderby']) ? sanitize_key((string) $args['orderby']) : 'timestamp';
+        $allowed_orderby = ['timestamp', 'duration', 'zip_file_size'];
+        if (!in_array($orderby, $allowed_orderby, true)) {
+            $orderby = 'timestamp';
+        }
+
+        $order = isset($args['order']) ? strtolower((string) $args['order']) : 'desc';
+        $order = 'asc' === $order ? 'asc' : 'desc';
+
         $entries = self::get_raw_entries();
-        $total   = count($entries);
+
+        if ('' !== $result_filter) {
+            $entries = array_values(
+                array_filter(
+                    $entries,
+                    static function ($entry) use ($result_filter) {
+                        return is_array($entry)
+                            && isset($entry['result'])
+                            && (string) $entry['result'] === $result_filter;
+                    }
+                )
+            );
+        }
+
+        if ('' !== $origin_filter) {
+            $entries = array_values(
+                array_filter(
+                    $entries,
+                    static function ($entry) use ($origin_filter) {
+                        return is_array($entry)
+                            && isset($entry['origin'])
+                            && (string) $entry['origin'] === $origin_filter;
+                    }
+                )
+            );
+        }
+
+        $total = count($entries);
+
+        if ($total > 1) {
+            usort(
+                $entries,
+                static function ($left, $right) use ($orderby, $order) {
+                    $left_value  = isset($left[$orderby]) ? (int) $left[$orderby] : 0;
+                    $right_value = isset($right[$orderby]) ? (int) $right[$orderby] : 0;
+
+                    if ($left_value === $right_value) {
+                        $left_timestamp  = isset($left['timestamp']) ? (int) $left['timestamp'] : 0;
+                        $right_timestamp = isset($right['timestamp']) ? (int) $right['timestamp'] : 0;
+
+                        if ($left_timestamp === $right_timestamp) {
+                            return 0;
+                        }
+
+                        return ('asc' === $order) ? ($left_timestamp <=> $right_timestamp) : ($right_timestamp <=> $left_timestamp);
+                    }
+
+                    return ('asc' === $order) ? ($left_value <=> $right_value) : ($right_value <=> $left_value);
+                }
+            );
+        }
 
         $offset = ($current_page - 1) * $per_page;
         $offset = $offset < 0 ? 0 : $offset;
@@ -94,6 +167,14 @@ class TEJLG_Export_History {
         }
 
         $status = isset($job['status']) ? (string) $job['status'] : '';
+
+        $status_message = '';
+
+        if (isset($context['status_message']) && is_string($context['status_message'])) {
+            $status_message = $context['status_message'];
+        } elseif (!empty($job['message']) && is_string($job['message'])) {
+            $status_message = $job['message'];
+        }
 
         $timestamps = [
             isset($job['completed_at']) ? (int) $job['completed_at'] : 0,
@@ -211,6 +292,20 @@ class TEJLG_Export_History {
             $origin = 'web';
         }
 
+        $context_label = '';
+
+        if (isset($context['context']) && is_string($context['context'])) {
+            $context_label = $context['context'];
+        } elseif (isset($job['context']) && is_string($job['context'])) {
+            $context_label = $job['context'];
+        } elseif (isset($context['trigger']) && is_string($context['trigger'])) {
+            $context_label = $context['trigger'];
+        } elseif (isset($job['trigger']) && is_string($job['trigger'])) {
+            $context_label = $job['trigger'];
+        } elseif ('' !== $origin) {
+            $context_label = $origin;
+        }
+
         $entry = [
             'job_id'        => $job_id,
             'status'        => $status,
@@ -222,6 +317,9 @@ class TEJLG_Export_History {
             'exclusions'    => $exclusions,
             'origin'        => $origin,
             'duration'      => max(0, (int) $duration),
+            'result'        => self::determine_result_from_status($status),
+            'status_message'=> $status_message,
+            'context'       => $context_label,
         ];
 
         if (!empty($job['persistent_path']) && is_string($job['persistent_path'])) {
@@ -258,6 +356,18 @@ class TEJLG_Export_History {
         $entry['zip_file_size'] = isset($entry['zip_file_size']) ? max(0, (int) $entry['zip_file_size']) : 0;
         $entry['origin'] = isset($entry['origin']) ? sanitize_key($entry['origin']) : '';
         $entry['duration'] = isset($entry['duration']) ? max(0, (int) $entry['duration']) : 0;
+        $entry['result'] = isset($entry['result']) ? sanitize_key($entry['result']) : '';
+
+        $allowed_results = [
+            self::RESULT_SUCCESS,
+            self::RESULT_WARNING,
+            self::RESULT_ERROR,
+            self::RESULT_INFO,
+        ];
+
+        if (!in_array($entry['result'], $allowed_results, true)) {
+            $entry['result'] = '';
+        }
 
         $exclusions = isset($entry['exclusions']) ? (array) $entry['exclusions'] : [];
         $entry['exclusions'] = array_values(
@@ -280,6 +390,18 @@ class TEJLG_Export_History {
 
         if (isset($entry['persistent_url']) && is_string($entry['persistent_url'])) {
             $entry['persistent_url'] = esc_url_raw($entry['persistent_url']);
+        }
+
+        if (isset($entry['status_message']) && is_string($entry['status_message'])) {
+            $entry['status_message'] = sanitize_textarea_field($entry['status_message']);
+        } else {
+            $entry['status_message'] = '';
+        }
+
+        if (isset($entry['context']) && is_string($entry['context'])) {
+            $entry['context'] = sanitize_text_field($entry['context']);
+        } else {
+            $entry['context'] = '';
         }
 
         return $entry;
@@ -309,5 +431,77 @@ class TEJLG_Export_History {
         $entries = array_values($entries);
 
         update_option(self::OPTION_NAME, $entries, false);
+    }
+
+    private static function dispatch_recorded_hooks(array $entry, array $job, array $context) {
+        /**
+         * Fires when a new export history entry has been recorded.
+         *
+         * @param array $entry   Normalized history entry data.
+         * @param array $job     Raw job payload prior to normalization.
+         * @param array $context Additional context supplied to the recorder.
+         */
+        do_action('tejlg_export_history_recorded', $entry, $job, $context);
+
+        if (empty($entry['result'])) {
+            return;
+        }
+
+        $result_action = sprintf('tejlg_export_history_recorded_%s', $entry['result']);
+
+        /**
+         * Fires when a history entry of a specific result type has been recorded.
+         *
+         * The dynamic portion of the hook name corresponds to the result key
+         * (success, warning, error, info).
+         *
+         * @param array $entry   Normalized history entry data.
+         * @param array $job     Raw job payload prior to normalization.
+         * @param array $context Additional context supplied to the recorder.
+         */
+        do_action($result_action, $entry, $job, $context);
+    }
+
+    private static function determine_result_from_status($status) {
+        $status = (string) $status;
+
+        if ('' === $status) {
+            return self::RESULT_INFO;
+        }
+
+        switch ($status) {
+            case 'completed':
+                return self::RESULT_SUCCESS;
+            case 'failed':
+                return self::RESULT_ERROR;
+            case 'cancelled':
+                return self::RESULT_WARNING;
+            default:
+                return self::RESULT_INFO;
+        }
+    }
+
+    public static function get_available_filters() {
+        $entries = self::get_raw_entries();
+        $origins = [];
+        $results = [];
+
+        foreach ($entries as $entry) {
+            if (isset($entry['origin']) && '' !== $entry['origin']) {
+                $origins[$entry['origin']] = true;
+            }
+
+            if (isset($entry['result']) && '' !== $entry['result']) {
+                $results[$entry['result']] = true;
+            }
+        }
+
+        ksort($origins);
+        ksort($results);
+
+        return [
+            'origins' => array_keys($origins),
+            'results' => array_keys($results),
+        ];
     }
 }

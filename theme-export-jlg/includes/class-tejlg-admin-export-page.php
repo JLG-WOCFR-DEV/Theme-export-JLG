@@ -155,10 +155,26 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $history_page = isset($_GET['history_page']) ? absint($_GET['history_page']) : 0;
         $history_page = $history_page > 0 ? $history_page : 1;
 
+        $history_result = isset($_GET['history_result']) ? sanitize_key((string) $_GET['history_result']) : '';
+        $history_origin = isset($_GET['history_origin']) ? sanitize_key((string) $_GET['history_origin']) : '';
+        $history_orderby = isset($_GET['history_orderby']) ? sanitize_key((string) $_GET['history_orderby']) : 'timestamp';
+        $allowed_history_orderby = ['timestamp', 'duration', 'zip_file_size'];
+        if (!in_array($history_orderby, $allowed_history_orderby, true)) {
+            $history_orderby = 'timestamp';
+        }
+        $history_order = isset($_GET['history_order']) ? strtolower((string) $_GET['history_order']) : 'desc';
+        $history_order = 'asc' === $history_order ? 'asc' : 'desc';
+
         $history = TEJLG_Export_History::get_entries([
             'per_page' => $history_per_page,
             'paged'    => $history_page,
+            'result'   => $history_result,
+            'origin'   => $history_origin,
+            'orderby'  => $history_orderby,
+            'order'    => $history_order,
         ]);
+
+        $history_filters = TEJLG_Export_History::get_available_filters();
 
         $history_total_pages = isset($history['total_pages']) ? (int) $history['total_pages'] : 1;
         $history_total_pages = $history_total_pages > 0 ? $history_total_pages : 1;
@@ -187,10 +203,22 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'schedule_next_run'         => $schedule_next_run,
             'history_entries'           => isset($history['entries']) ? (array) $history['entries'] : [],
             'history_total'             => isset($history['total']) ? (int) $history['total'] : 0,
+            'history_total_all'         => TEJLG_Export_History::count_entries(),
             'history_pagination_links'  => is_array($history_pagination_links) ? $history_pagination_links : [],
             'history_current_page'      => isset($history['current_page']) ? (int) $history['current_page'] : 1,
             'history_total_pages'       => $history_total_pages,
             'history_per_page'          => $history_per_page,
+            'history_filter_values'     => $history_filters,
+            'history_selected_filters'  => [
+                'result'  => $history_result,
+                'origin'  => $history_origin,
+                'orderby' => $history_orderby,
+                'order'   => $history_order,
+            ],
+            'history_base_args'         => [
+                'page' => $this->page_slug,
+                'tab'  => 'export',
+            ],
         ]);
     }
 
