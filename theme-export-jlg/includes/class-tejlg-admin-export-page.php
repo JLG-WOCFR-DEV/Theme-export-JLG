@@ -51,7 +51,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             return;
         }
 
-        if (!current_user_can('manage_options')) {
+        if (!TEJLG_Capabilities::current_user_can('settings')) {
             add_settings_error(
                 'tejlg_admin_messages',
                 'schedule_settings_permissions',
@@ -871,7 +871,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
     }
 
     public static function ajax_preview_exclusion_patterns() {
-        if (!current_user_can('manage_options')) {
+        if (!TEJLG_Capabilities::current_user_can('exports')) {
             wp_send_json_error([
                 'message' => esc_html__("Erreur : vous n'avez pas l'autorisation d'effectuer cette action.", 'theme-export-jlg'),
             ], 403);
