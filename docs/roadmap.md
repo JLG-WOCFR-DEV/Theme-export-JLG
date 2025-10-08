@@ -3,30 +3,30 @@
 Cette feuille de route décline les axes identifiés dans le `readme.md` en lots actionnables. Chaque lot précise les objectifs, les jalons techniques et les métriques de réussite pour faciliter le pilotage continu.
 
 ## Lot 1 – Journal d’export enrichi
-- **Objectif produit** : transformer l’historique actuel en source de vérité pour les exports afin de supporter les futures notifications et tableaux de bord.【F:theme-export-jlg/includes/class-tejlg-export-history.php†L6-L195】【F:theme-export-jlg/includes/class-tejlg-export.php†L300-L378】
-- **Actions techniques** :
-  - Étendre `TEJLG_Export_History::record_job()` pour calculer la durée réelle, la taille finale de l’archive et l’identité de l’auteur à chaque exécution.【F:theme-export-jlg/includes/class-tejlg-export-history.php†L9-L195】
-  - Persister un statut détaillé (succès, avertissement, échec) en s’appuyant sur les statuts retournés par `TEJLG_Export::get_export_job_status()` et prévoir un champ `context` pour tracer l’origine (UI, WP-CLI, CRON).【F:theme-export-jlg/includes/class-tejlg-export.php†L300-L378】
-  - Ajouter des hooks (`do_action`) permettant de brancher des notifications e-mail/webhook lorsque de nouvelles entrées sont enregistrées.
+- **Statut (nov. 2024)** : ✅ livré côté persistance et UI. Les entrées conservent désormais durée, taille, origine, initiateur et URL persistante, avec filtres CLI/UI. Le rapport agrégé (`wp theme-export-jlg history report`) expose les statistiques clés et le nouveau hook `tejlg_export_history_report_ready` fournit un payload normalisé pour alimenter webhooks et alertes personnalisées.【F:theme-export-jlg/includes/class-tejlg-export-history.php†L6-L340】【F:theme-export-jlg/includes/class-tejlg-cli.php†L44-L285】【F:theme-export-jlg/includes/class-tejlg-export-notifications.php†L7-L205】 Reste à partager des recettes clé-en-main (Slack, e-mail enrichi) bâties sur ces extensions.
+- **Objectif produit** : transformer l’historique en source de vérité pour préparer les futures notifications et tableaux de bord.
+- **Actions techniques à poursuivre** :
+  - Publier des exemples d’intégration (Slack, e-mail enrichi, webhook générique) exploitant `tejlg_export_history_report_ready`.
+  - Documenter un modèle de rapport hebdomadaire (JSON + CSV) à partir des données retournées par `generate_report()`.
 - **Livrables** :
-  - Colonnes supplémentaires visibles dans le tableau d’historique (durée, taille, auteur, origine) avec tri et filtres basiques.【F:theme-export-jlg/templates/admin/export.php†L130-L220】
-  - Documentation interne décrivant le format des entrées et les points d’extension.
+  - Guide de personnalisation des notifications (filtres, formats d’e-mail, webhooks) illustré par des snippets concrets.
+  - Exemple de rapport hebdomadaire généré à partir des métadonnées existantes.
 - **Indicateurs de succès** :
-  - 100 % des exports enregistrent une durée et une taille non nulles.
-  - Couverture de tests automatisés sur la persistance portée à >80 %.
+  - Les intégrateurs peuvent brancher un webhook en moins de 10 minutes grâce à la documentation.
+  - Les exports en erreur déclenchent systématiquement une notification contextualisée.
 
 ## Lot 2 – Orchestration & profils
-- **Objectif produit** : permettre aux équipes d’initialiser plusieurs sites avec la même configuration d’exports/imports sans passer par un service tiers.【F:theme-export-jlg/includes/class-tejlg-cli.php†L16-L195】
-- **Actions techniques** :
-  - Introduire `wp theme-export-jlg settings export|import` pour sérialiser les réglages (exclusions, planification, préférences UI) et les réinjecter via WP-CLI.【F:theme-export-jlg/includes/class-tejlg-cli.php†L16-L195】
-  - Signer les fichiers générés (hash + timestamp) afin de détecter les modifications manuelles et avertir l’utilisateur en ligne de commande.
-  - Ajouter des filtres PHP (`apply_filters`) permettant aux développeurs d’étendre le schéma de configuration avant export/import.
+- **Statut (nov. 2024)** : ✅ commandes WP-CLI disponibles (`settings export`/`import`), fichiers signés SHA-256 et filtres (`tejlg_settings_export_snapshot`…) opérationnels.【F:theme-export-jlg/includes/class-tejlg-cli.php†L207-L336】【F:theme-export-jlg/includes/class-tejlg-settings.php†L7-L224】 Prochaines étapes : proposer des presets d’environnements et une interface graphique minimale pour lancer l’import.
+- **Objectif produit** : permettre aux équipes d’initialiser plusieurs sites avec la même configuration d’exports/imports sans passer par un service tiers.
+- **Actions techniques à poursuivre** :
+  - Définir un format de presets (`development`, `staging`, `production`) basé sur les commandes existantes.
+  - Ajouter des tests de non-régression couvrant l’import/export avec signature modifiée.
 - **Livrables** :
-  - Commandes WP-CLI documentées dans `readme.md` et exemples d’utilisation (export puis import sur un second site).
-  - Tests automatisés simulant un aller-retour de configuration dans `tests/`.
+  - Tutoriel multi-sites (CLI → second site) illustrant la duplication de configuration.
+  - Proposition d’écran minimal côté admin pour importer/exporter un profil sans passer par WP-CLI.
 - **Indicateurs de succès** :
-  - Exports/imports de configuration utilisables en CI/CD sans intervention manuelle.
-  - Zéro régression sur les commandes existantes (`theme`, `patterns`, `history`).
+  - Déploiement de presets sur au moins deux environnements en moins de 5 minutes.
+  - Import graphique disponible sans dépendre de la ligne de commande.
 
 ## Lot 3 – Assistants guidés
 - **Objectif produit** : fluidifier les parcours d’export et d’import grâce à des assistants multi-étapes et des conseils contextuels, inspirés des solutions professionnelles.【F:theme-export-jlg/templates/admin/export.php†L130-L220】【F:theme-export-jlg/templates/admin/import-preview.php†L30-L200】

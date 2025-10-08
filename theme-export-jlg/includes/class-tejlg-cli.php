@@ -21,6 +21,7 @@ class TEJLG_CLI {
         WP_CLI::log('  wp theme-export-jlg import theme <chemin_zip> [--overwrite]');
         WP_CLI::log('  wp theme-export-jlg import patterns <chemin_json>');
         WP_CLI::log('  wp theme-export-jlg history [--per-page=<nombre>] [--page=<nombre>] [--result=<statut>] [--origin=<origine>]');
+        WP_CLI::log('  wp theme-export-jlg history report [--window=<jours>] [--result=<statut>] [--origin=<origine>] [--format=<table|json>] [--limit=<nombre>]');
         WP_CLI::log('  wp theme-export-jlg settings export [--output=<chemin>]');
         WP_CLI::log('  wp theme-export-jlg settings import <chemin_json>');
     }
@@ -108,6 +109,19 @@ class TEJLG_CLI {
     }
 
     public function history($args, $assoc_args) {
+        if (!empty($args)) {
+            $subcommand = array_shift($args);
+            $subcommand = is_string($subcommand) ? strtolower($subcommand) : '';
+
+            if ('report' === $subcommand) {
+                $this->run_history_report($assoc_args);
+
+                return;
+            }
+
+            WP_CLI::error(__('Sous-commande inconnue. Utilisez "report" ou aucun argument.', 'theme-export-jlg'));
+        }
+
         $per_page = isset($assoc_args['per-page']) ? (int) $assoc_args['per-page'] : 10;
         $per_page = $per_page > 0 ? $per_page : 10;
 
@@ -203,6 +217,160 @@ class TEJLG_CLI {
             }
 
             WP_CLI::log($line);
+        }
+    }
+
+    private function run_history_report($assoc_args) {
+        $window_days = isset($assoc_args['window']) ? (int) $assoc_args['window'] : 7;
+        $window_days = $window_days >= 0 ? $window_days : 7;
+
+        $result_filter = isset($assoc_args['result']) ? sanitize_key((string) $assoc_args['result']) : '';
+        $origin_filter = isset($assoc_args['origin']) ? sanitize_key((string) $assoc_args['origin']) : '';
+
+        $format = isset($assoc_args['format']) ? strtolower((string) $assoc_args['format']) : 'table';
+        $limit  = isset($assoc_args['limit']) ? (int) $assoc_args['limit'] : 10;
+        $limit  = $limit >= 0 ? $limit : 10;
+
+        $report = TEJLG_Export_History::generate_report([
+            'window_days'     => $window_days,
+            'result'          => $result_filter,
+            'origin'          => $origin_filter,
+            'limit'           => $limit,
+            'include_entries' => true,
+        ]);
+
+        if ('json' === $format) {
+            WP_CLI::print_value($report, [
+                'format' => 'json',
+            ]);
+
+            return;
+        }
+
+        $date_format = get_option('date_format', 'Y-m-d');
+        $time_format = get_option('time_format', 'H:i');
+        $datetime    = trim($date_format . ' ' . $time_format);
+        $generated   = isset($report['generated_at']) ? (int) $report['generated_at'] : time();
+
+        if (function_exists('wp_date')) {
+            $generated_label = wp_date($datetime, $generated);
+        } else {
+            $generated_label = date_i18n($datetime, $generated);
+        }
+
+        $total_entries = isset($report['totals']['entries']) ? (int) $report['totals']['entries'] : 0;
+        $total_duration = isset($report['totals']['duration_seconds']) ? (int) $report['totals']['duration_seconds'] : 0;
+        $total_size     = isset($report['totals']['archive_size_bytes']) ? (int) $report['totals']['archive_size_bytes'] : 0;
+        $counts         = isset($report['counts']['results']) && is_array($report['counts']['results'])
+            ? $report['counts']['results']
+            : [];
+        $uptime_rate = isset($report['uptime_rate']) ? $report['uptime_rate'] : null;
+
+        WP_CLI::log(sprintf(
+            /* translators: %s: report generation datetime. */
+            __('Rapport d’export généré le %s', 'theme-export-jlg'),
+            $generated_label
+        ));
+
+        WP_CLI::log(sprintf(
+            /* translators: %d: analysis window in days. */
+            __('Fenêtre analysée : %d jours', 'theme-export-jlg'),
+            isset($report['filters']['window_days']) ? (int) $report['filters']['window_days'] : $window_days
+        ));
+
+        WP_CLI::log(sprintf(
+            /* translators: %d: total number of exports. */
+            __('Exports analysés : %d', 'theme-export-jlg'),
+            $total_entries
+        ));
+
+        WP_CLI::log(sprintf(
+            /* translators: 1: success count, 2: warning count, 3: error count, 4: info count. */
+            __('Répartition – Succès : %1$d | Avertissements : %2$d | Erreurs : %3$d | Informations : %4$d', 'theme-export-jlg'),
+            isset($counts[TEJLG_Export_History::RESULT_SUCCESS]) ? (int) $counts[TEJLG_Export_History::RESULT_SUCCESS] : 0,
+            isset($counts[TEJLG_Export_History::RESULT_WARNING]) ? (int) $counts[TEJLG_Export_History::RESULT_WARNING] : 0,
+            isset($counts[TEJLG_Export_History::RESULT_ERROR]) ? (int) $counts[TEJLG_Export_History::RESULT_ERROR] : 0,
+            isset($counts[TEJLG_Export_History::RESULT_INFO]) ? (int) $counts[TEJLG_Export_History::RESULT_INFO] : 0
+        ));
+
+        if (null !== $uptime_rate) {
+            WP_CLI::log(sprintf(
+                /* translators: %s: uptime rate percentage. */
+                __('Taux de réussite sur la période : %s%%', 'theme-export-jlg'),
+                function_exists('number_format_i18n')
+                    ? number_format_i18n($uptime_rate, 1)
+                    : number_format($uptime_rate, 1)
+            ));
+        }
+
+        if ($total_duration > 0) {
+            WP_CLI::log(sprintf(
+                /* translators: %s: total duration. */
+                __('Durée cumulée : %s', 'theme-export-jlg'),
+                human_readable_duration($total_duration)
+            ));
+        }
+
+        if ($total_size > 0) {
+            WP_CLI::log(sprintf(
+                /* translators: %s: total archive size. */
+                __('Poids total des archives : %s', 'theme-export-jlg'),
+                size_format($total_size)
+            ));
+        }
+
+        $entries = isset($report['entries']) && is_array($report['entries']) ? $report['entries'] : [];
+
+        if (empty($entries)) {
+            WP_CLI::log(__('Aucun export récent ne correspond aux critères.', 'theme-export-jlg'));
+
+            return;
+        }
+
+        WP_CLI::log(__('Exports récents :', 'theme-export-jlg'));
+
+        foreach ($entries as $entry) {
+            $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+
+            if ($timestamp > 0) {
+                if (function_exists('wp_date')) {
+                    $date_label = wp_date($datetime, $timestamp);
+                } else {
+                    $date_label = date_i18n($datetime, $timestamp);
+                }
+            } else {
+                $date_label = __('Date inconnue', 'theme-export-jlg');
+            }
+
+            $job_id = isset($entry['job_id']) ? (string) $entry['job_id'] : '';
+            $result = isset($entry['result']) ? (string) $entry['result'] : TEJLG_Export_History::RESULT_INFO;
+            $result_label = $this->get_history_result_label($result);
+            $size   = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
+            $size_label = $size > 0 ? size_format($size, 2) : __('Inconnue', 'theme-export-jlg');
+            $duration = isset($entry['duration']) ? (int) $entry['duration'] : 0;
+            $duration_label = $duration > 0 ? human_readable_duration($duration) : __('Non renseignée', 'theme-export-jlg');
+
+            WP_CLI::log(sprintf(
+                '[%1$s] %2$s | %3$s | %4$s | %5$s',
+                $job_id,
+                $date_label,
+                $result_label,
+                $size_label,
+                $duration_label
+            ));
+        }
+    }
+
+    private function get_history_result_label($result) {
+        switch ($result) {
+            case TEJLG_Export_History::RESULT_SUCCESS:
+                return __('Succès', 'theme-export-jlg');
+            case TEJLG_Export_History::RESULT_WARNING:
+                return __('Avertissement', 'theme-export-jlg');
+            case TEJLG_Export_History::RESULT_ERROR:
+                return __('Erreur', 'theme-export-jlg');
+            default:
+                return __('Information', 'theme-export-jlg');
         }
     }
 

@@ -131,4 +131,97 @@ class Test_Export_History extends WP_UnitTestCase {
 
         wp_set_current_user(0);
     }
+
+    public function test_generate_report_aggregates_totals_and_respects_filters() {
+        $now = time();
+
+        TEJLG_Export_History::record_job([
+            'id'              => 'report-success',
+            'status'          => 'completed',
+            'zip_file_name'   => 'report-success.zip',
+            'zip_file_size'   => 2048,
+            'exclusions'      => ['node_modules'],
+            'created_at'      => $now - 300,
+            'updated_at'      => $now - 200,
+            'completed_at'    => $now - 180,
+            'created_by_name' => 'Reporter',
+            'created_via'     => 'web',
+            'duration'        => 60,
+        ], [
+            'origin'    => 'web',
+            'timestamp' => $now - 180,
+        ]);
+
+        TEJLG_Export_History::record_job([
+            'id'            => 'report-error',
+            'status'        => 'failed',
+            'zip_file_name' => 'report-error.zip',
+            'zip_file_size' => 1024,
+            'created_at'    => $now - 120,
+            'updated_at'    => $now - 60,
+            'completed_at'  => $now - 30,
+            'created_via'   => 'cli',
+            'duration'      => 90,
+        ], [
+            'origin'    => 'cli',
+            'timestamp' => $now - 30,
+        ]);
+
+        $report = TEJLG_Export_History::generate_report([
+            'window_days'     => 1,
+            'include_entries' => true,
+            'limit'           => 1,
+        ]);
+
+        $this->assertSame(2, $report['totals']['entries']);
+        $this->assertSame(150, $report['totals']['duration_seconds']);
+        $this->assertSame(3072, $report['totals']['archive_size_bytes']);
+        $this->assertSame(75, $report['averages']['duration_seconds']);
+        $this->assertSame(1536, $report['averages']['archive_size_bytes']);
+        $this->assertSame(1, $report['counts']['results'][TEJLG_Export_History::RESULT_SUCCESS]);
+        $this->assertSame(1, $report['counts']['results'][TEJLG_Export_History::RESULT_ERROR]);
+        $this->assertArrayHasKey('cli', $report['counts']['origins']);
+        $this->assertArrayHasKey('web', $report['counts']['origins']);
+        $this->assertCount(1, $report['entries']);
+        $this->assertSame('report-error', $report['entries'][0]['job_id'], 'Entries should be limited to the configured amount.');
+    }
+
+    public function test_report_ready_action_receives_payload() {
+        $captured = null;
+
+        $callback = function ($report, $entry, $job, $context, $args) use (&$captured) {
+            $captured = [
+                'report'  => $report,
+                'entry'   => $entry,
+                'job'     => $job,
+                'context' => $context,
+                'args'    => $args,
+            ];
+        };
+
+        add_action('tejlg_export_history_report_ready', $callback, 10, 5);
+
+        $now = time();
+
+        TEJLG_Export_History::record_job([
+            'id'            => 'report-hook',
+            'status'        => 'completed',
+            'zip_file_name' => 'report-hook.zip',
+            'zip_file_size' => 4096,
+            'created_at'    => $now - 100,
+            'updated_at'    => $now - 50,
+            'completed_at'  => $now - 25,
+        ], [
+            'origin' => 'web',
+        ]);
+
+        remove_action('tejlg_export_history_report_ready', $callback, 10);
+
+        $this->assertNotNull($captured, 'Report hook should receive a payload when a job is recorded.');
+        $this->assertSame('report-hook', $captured['entry']['job_id']);
+        $this->assertArrayHasKey('totals', $captured['report']);
+        $this->assertArrayHasKey('entries', $captured['report']);
+        $this->assertEmpty($captured['report']['entries'], 'Default report generation should omit entry details.');
+        $this->assertSame(10, $captured['args']['limit']);
+    }
 }

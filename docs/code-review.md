@@ -9,7 +9,7 @@ Le cœur du plugin repose principalement sur deux classes statiques volumineuses
 `TEJLG_Export` dépasse 1 700 lignes et mélange des préoccupations très différentes : sanitisation d’entrées utilisateur, calculs de planification, gestion de file d’attente, persistance des jobs et manipulation d’archives ZIP.【F:theme-export-jlg/includes/class-tejlg-export.php†L22-L423】【F:theme-export-jlg/includes/class-tejlg-export.php†L1104-L1184】【F:theme-export-jlg/includes/class-tejlg-export.php†L1408-L1760】
 
 **Pistes concrètes :**
-- Extraire une classe `ExclusionPatternsSanitizer` (ou équivalent) pour regrouper la logique des méthodes `sanitize_exclusion_patterns` / `sanitize_exclusion_patterns_string` et éviter les vérifications redondantes (ex. multiples `is_string` après un cast en chaîne).【F:theme-export-jlg/includes/class-tejlg-export.php†L22-L106】
+- La sanitisation est désormais prise en charge par `TEJLG_Exclusion_Patterns_Sanitizer`; il reste à faire remonter les appels historiques (`get_schedule_exclusion_list`, CLI) vers cette classe pour éviter les duplications restantes.【F:theme-export-jlg/includes/class-tejlg-exclusion-patterns-sanitizer.php†L1-L140】
 - Isoler la logique de planification (`maybe_schedule_theme_export_event`, `calculate_next_schedule_timestamp`, etc.) dans un service `ExportScheduler`, facilitant les tests unitaires de calcul d’horodatage.【F:theme-export-jlg/includes/class-tejlg-export.php†L200-L383】
 - Déplacer la persistance des jobs (méthodes `persist_job`, `get_job`, `delete_job`, `cleanup_stale_jobs`, etc.) dans un repository dédié. Cela clarifierait la responsabilité du service principal et permettrait de tester séparément le nettoyage des options WordPress.【F:theme-export-jlg/includes/class-tejlg-export.php†L1408-L1760】
 - Conserver dans `TEJLG_Export` uniquement l’orchestration haut niveau (démarrage d’un export, déclenchement du process de fond), ce qui réduira la surface d’une classe « dieu » difficile à faire évoluer.
@@ -40,7 +40,7 @@ La méthode `import_theme` retourne parfois un `WP_Error` (ou `null`) alors que 
 
 1. **Refactorer `TEJLG_Export` en modules ciblés** pour réduire la dette technique et simplifier les tests.
 2. **Réduire la taille et la responsabilité de `TEJLG_Admin_Export_Page`**, en introduisant des services ou contrôleurs dédiés pour les différentes actions (export, historique, patterns).
-3. **Corriger la documentation/retours de `TEJLG_Import`** et factoriser la sanitisation des motifs afin d’éviter des erreurs de compréhension et du code dupliqué.
+3. **Clarifier l’API de `TEJLG_Import` et aligner les PHPDoc** (retours `WP_Error`, valeurs nulles) tout en s’appuyant sur les utilitaires de sanitisation existants pour éviter toute divergence.
 4. **Mettre en place un autoload Composer** pour supprimer les inclusions manuelles et fiabiliser le chargement des classes.
 
 Ces chantiers apporteront un gain de clarté immédiat, faciliteront la contribution future et prépareront le terrain pour des tests automatisés plus fins.

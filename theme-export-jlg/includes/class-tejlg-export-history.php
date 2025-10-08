@@ -433,6 +433,165 @@ class TEJLG_Export_History {
         update_option(self::OPTION_NAME, $entries, false);
     }
 
+    /**
+     * Generates an aggregated report from the export history.
+     *
+     * @param array<string,mixed> $args
+     *
+     * @return array<string,mixed>
+     */
+    public static function generate_report($args = []) {
+        $defaults = [
+            'window_days'     => 7,
+            'result'          => '',
+            'origin'          => '',
+            'limit'           => 20,
+            'include_entries' => true,
+        ];
+
+        $args = wp_parse_args($args, $defaults);
+
+        $window_days = isset($args['window_days']) ? (int) $args['window_days'] : 7;
+        $window_days = $window_days >= 0 ? $window_days : 7;
+
+        $result_filter = isset($args['result']) ? sanitize_key((string) $args['result']) : '';
+        $origin_filter = isset($args['origin']) ? sanitize_key((string) $args['origin']) : '';
+
+        $limit = isset($args['limit']) ? (int) $args['limit'] : 20;
+        $limit = $limit >= 0 ? $limit : 20;
+
+        $include_entries = !empty($args['include_entries']);
+
+        $cutoff = 0;
+
+        if ($window_days > 0) {
+            $cutoff = time() - ($window_days * DAY_IN_SECONDS);
+        }
+
+        $entries = self::get_raw_entries();
+
+        $filtered_entries = [];
+        $result_counts = [
+            self::RESULT_SUCCESS => 0,
+            self::RESULT_WARNING => 0,
+            self::RESULT_ERROR   => 0,
+            self::RESULT_INFO    => 0,
+        ];
+        $origin_counts = [];
+        $total_duration = 0;
+        $total_size     = 0;
+        $period_start   = null;
+        $period_end     = null;
+
+        foreach ($entries as $entry) {
+            $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+
+            if ($cutoff > 0 && $timestamp < $cutoff) {
+                continue;
+            }
+
+            $entry_result = isset($entry['result']) ? (string) $entry['result'] : '';
+
+            if ('' !== $result_filter && $entry_result !== $result_filter) {
+                continue;
+            }
+
+            $entry_origin = isset($entry['origin']) ? (string) $entry['origin'] : '';
+
+            if ('' !== $origin_filter && $entry_origin !== $origin_filter) {
+                continue;
+            }
+
+            $filtered_entries[] = $entry;
+
+            if (!isset($result_counts[$entry_result])) {
+                $result_counts[$entry_result] = 0;
+            }
+
+            $result_counts[$entry_result]++;
+
+            $origin_key = '' !== $entry_origin ? $entry_origin : 'unknown';
+
+            if (!isset($origin_counts[$origin_key])) {
+                $origin_counts[$origin_key] = 0;
+            }
+
+            $origin_counts[$origin_key]++;
+
+            $duration = isset($entry['duration']) ? (int) $entry['duration'] : 0;
+            $size     = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
+
+            $total_duration += $duration > 0 ? $duration : 0;
+            $total_size     += $size > 0 ? $size : 0;
+
+            if (null === $period_start || $timestamp < $period_start) {
+                $period_start = $timestamp;
+            }
+
+            if (null === $period_end || $timestamp > $period_end) {
+                $period_end = $timestamp;
+            }
+        }
+
+        ksort($origin_counts);
+
+        foreach ($result_counts as $key => $value) {
+            $result_counts[$key] = (int) $value;
+        }
+
+        $total_entries = count($filtered_entries);
+
+        $uptime_rate = null;
+
+        if ($total_entries > 0) {
+            $successes  = isset($result_counts[self::RESULT_SUCCESS]) ? (int) $result_counts[self::RESULT_SUCCESS] : 0;
+            $uptime_rate = round(($successes / $total_entries) * 100, 1);
+        }
+
+        $average_duration = $total_entries > 0 ? (int) round($total_duration / $total_entries) : 0;
+        $average_size     = $total_entries > 0 ? (int) round($total_size / $total_entries) : 0;
+
+        $report = [
+            'generated_at' => time(),
+            'filters'      => [
+                'window_days' => $window_days,
+                'result'      => $result_filter,
+                'origin'      => $origin_filter,
+                'limit'       => $limit,
+            ],
+            'totals'       => [
+                'entries'             => $total_entries,
+                'duration_seconds'    => (int) $total_duration,
+                'archive_size_bytes'  => (int) $total_size,
+            ],
+            'averages'     => [
+                'duration_seconds'   => $average_duration,
+                'archive_size_bytes' => $average_size,
+            ],
+            'counts'       => [
+                'results' => $result_counts,
+                'origins' => $origin_counts,
+            ],
+            'uptime_rate'  => $uptime_rate,
+            'period_start' => $period_start,
+            'period_end'   => $period_end,
+            'latest_entry' => !empty($filtered_entries) ? $filtered_entries[0] : null,
+            'entries'      => $include_entries
+                ? array_slice($filtered_entries, 0, $limit > 0 ? $limit : null)
+                : [],
+        ];
+
+        /**
+         * Filters the generated export history report before it is returned.
+         *
+         * @param array<string,mixed> $report Report payload.
+         * @param array<string,mixed> $args   Report arguments.
+         */
+        $report = apply_filters('tejlg_export_history_report', $report, $args);
+
+        return $report;
+    }
+
     private static function dispatch_recorded_hooks(array $entry, array $job, array $context) {
         /**
          * Fires when a new export history entry has been recorded.
@@ -460,6 +619,35 @@ class TEJLG_Export_History {
          * @param array $context Additional context supplied to the recorder.
          */
         do_action($result_action, $entry, $job, $context);
+
+        $report_args = apply_filters(
+            'tejlg_export_history_report_args',
+            [
+                'window_days'     => 7,
+                'limit'           => 10,
+                'include_entries' => false,
+            ],
+            $entry,
+            $job,
+            $context
+        );
+
+        if (!is_array($report_args)) {
+            return;
+        }
+
+        $report = self::generate_report($report_args);
+
+        /**
+         * Fires after an export history report has been generated for observers.
+         *
+         * @param array<string,mixed> $report  Aggregated report payload.
+         * @param array<string,mixed> $entry   History entry that triggered the generation.
+         * @param array<string,mixed> $job     Raw job payload.
+         * @param array<string,mixed> $context Additional context supplied to the recorder.
+         * @param array<string,mixed> $args    Arguments used to build the report.
+         */
+        do_action('tejlg_export_history_report_ready', $report, $entry, $job, $context, $report_args);
     }
 
     private static function determine_result_from_status($status) {
