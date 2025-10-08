@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test:php": "phpunit",
+    "test:php": "composer install --no-interaction --no-progress && vendor/bin/phpunit",
     "test:e2e": "playwright test",
     "test": "npm run test:php && npm run test:e2e"
   },

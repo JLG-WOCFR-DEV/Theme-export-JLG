@@ -108,17 +108,28 @@ class TEJLG_Export_Process extends WP_Background_Process {
                 return false;
             }
 
-            $directory_to_ensure = trailingslashit(dirname($relative_path_in_zip));
+            $directory_base = dirname($relative_path_in_zip);
+            $directory_base = is_string($directory_base) ? trim($directory_base) : '';
 
-            if ('' !== $directory_to_ensure && '.' !== $directory_to_ensure) {
-                $segments = explode('/', trim($directory_to_ensure, '/'));
-                $current  = '';
+            if ('' !== $directory_base && '.' !== $directory_base && '/' !== $directory_base && '\\' !== $directory_base) {
+                $directory_to_ensure = trailingslashit($directory_base);
+                $segments = array_filter(
+                    explode('/', trim($directory_to_ensure, '/')),
+                    static function ($segment) {
+                        return '' !== $segment && '.' !== $segment;
+                    }
+                );
 
-                foreach ($segments as $segment) {
-                    $current .= $segment . '/';
-                    if (!isset($directories_added[$current])) {
-                        $zip->add_directory($current);
-                        $directories_added[$current] = true;
+                if (!empty($segments)) {
+                    $current = '';
+
+                    foreach ($segments as $segment) {
+                        $current .= $segment . '/';
+
+                        if (!isset($directories_added[$current])) {
+                            $zip->add_directory($current);
+                            $directories_added[$current] = true;
+                        }
                     }
                 }
             }

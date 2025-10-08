@@ -1,0 +1,16 @@
+{
+    "name": "jlg/theme-export",
+    "type": "project",
+    "require-dev": {
+        "phpunit/phpunit": "^9.6"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "autoload": {
+        "classmap": [],
+        "psr-4": {},
+        "files": []
+    }
+}
