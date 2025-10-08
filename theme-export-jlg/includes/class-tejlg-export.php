@@ -59,6 +59,12 @@ class TEJLG_Export {
                 continue;
             }
 
+            $normalized_for_segments = str_replace('\\', '/', $pattern);
+
+            if (preg_match('#(?:^|/)\.\.(?:/|$)#', $normalized_for_segments)) {
+                continue;
+            }
+
             if ('' === $pattern) {
                 continue;
             }
