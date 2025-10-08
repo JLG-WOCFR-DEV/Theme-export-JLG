@@ -16,6 +16,7 @@ if (!class_exists('WP_CLI')) {
         public static $last_log = '';
         public static $last_warning = '';
         public static $logs = [];
+        public static $printed_value = null;
 
         public static function add_command($name, $callable) {
             self::$commands[$name] = $callable;
@@ -42,6 +43,10 @@ if (!class_exists('WP_CLI')) {
         public static function warning($message) {
             self::$last_warning = (string) $message;
         }
+
+        public static function print_value($value, $args = []) {
+            self::$printed_value = $value;
+        }
     }
 }
 
@@ -62,6 +67,7 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
         WP_CLI::$last_log       = '';
         WP_CLI::$last_warning   = '';
         WP_CLI::$logs           = [];
+        WP_CLI::$printed_value  = null;
 
         TEJLG_Export_History::clear_history();
     }
@@ -196,6 +202,77 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
         if (file_exists($second_file)) {
             @unlink($second_file);
         }
+    }
+
+    public function test_history_report_command_outputs_summary() {
+        $now = time();
+
+        TEJLG_Export_History::record_job([
+            'id'            => 'cli-report-success',
+            'status'        => 'completed',
+            'zip_file_name' => 'cli-report-success.zip',
+            'zip_file_size' => 5120,
+            'created_at'    => $now - 120,
+            'updated_at'    => $now - 60,
+            'completed_at'  => $now - 30,
+        ], [
+            'origin' => 'web',
+        ]);
+
+        TEJLG_Export_History::record_job([
+            'id'            => 'cli-report-error',
+            'status'        => 'failed',
+            'zip_file_name' => 'cli-report-error.zip',
+            'zip_file_size' => 1024,
+            'created_at'    => $now - 90,
+            'updated_at'    => $now - 45,
+            'completed_at'  => $now - 10,
+        ], [
+            'origin' => 'cli',
+        ]);
+
+        $cli = new TEJLG_CLI();
+
+        WP_CLI::$logs = [];
+
+        $cli->history(['report'], ['window' => 1, 'limit' => 2]);
+
+        $this->assertNotEmpty(WP_CLI::$logs, 'Report command should output summary lines.');
+        $this->assertStringContainsString('Rapport d’export généré', WP_CLI::$logs[0]);
+
+        $found_entry = false;
+
+        foreach (WP_CLI::$logs as $log_line) {
+            if (false !== strpos($log_line, 'cli-report-error')) {
+                $found_entry = true;
+                break;
+            }
+        }
+
+        $this->assertTrue($found_entry, 'Report should include recent entries in the output.');
+    }
+
+    public function test_history_report_supports_json_format() {
+        $now = time();
+
+        TEJLG_Export_History::record_job([
+            'id'            => 'cli-report-json',
+            'status'        => 'completed',
+            'zip_file_name' => 'cli-report-json.zip',
+            'zip_file_size' => 2048,
+            'created_at'    => $now - 60,
+            'updated_at'    => $now - 30,
+            'completed_at'  => $now - 10,
+        ], [
+            'origin' => 'web',
+        ]);
+
+        $cli = new TEJLG_CLI();
+
+        $cli->history(['report'], ['format' => 'json']);
+
+        $this->assertIsArray(WP_CLI::$printed_value, 'JSON format should capture a structured report.');
+        $this->assertSame(1, WP_CLI::$printed_value['totals']['entries']);
     }
 
     public function test_settings_command_exports_signed_package() {

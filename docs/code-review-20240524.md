@@ -18,14 +18,14 @@
    Les appels AJAX de la file d’export gèrent bien les messages (`failed`, `unknownError`). En revanche, aucune stratégie de retry progressif n’est prévue et un simple `fetch` échoué stoppe le processus.  
    → Recommandation : introduire un backoff exponentiel (2–3 tentatives) et enregistrer l’échec côté PHP afin de nourrir l’historique (`TEJLG_Export_History`).
 
-4. **Journalisation enrichie**  
-   `TEJLG_Export_History::record_job()` stocke déjà les métadonnées basiques. Il serait pertinent d’y ajouter la taille finale de l’archive, la durée d’exécution et l’utilisateur initiateur pour alimenter des rapports ou notifications futures.  
-   → Ceci faciliterait la mise en place de notifications (e-mail/webhook) évoquées dans `docs/roadmap.md`.
+4. **Journalisation enrichie**
+   `TEJLG_Export_History::record_job()` enregistre désormais la durée, la taille, l’origine et l’initiateur d’un export ; ces données alimentent l’interface et la CLI.
+   → Prochaine étape : documenter et exposer un hook dédié pour diffuser ces informations vers un système externe (Slack, webhook maison) et prévoir un rapport agrégé.
 
-5. **Tests automatisés**  
-   Le dépôt expose des scripts `npm run test:php` et `npm run test:e2e`, mais aucun bootstrap PHPUnit ou configuration Playwright n’est fourni.  
-   → Clarifier dans la documentation comment installer l’environnement de test (WordPress de démo, configuration Playwright, etc.) ou fournir des mocks pour lancer les suites en CI.
+5. **Tests automatisés**
+   Le dépôt expose des scripts `npm run test:php` et `npm run test:e2e`, et une première suite PHPUnit (`tests/test-export-sanitization.php`) couvre la sanitisation des motifs.
+   → Clarifier dans la documentation comment préparer l’environnement de test (WordPress de démo, configuration Playwright) et ajouter un exemple Playwright pour valider les parcours multi-étapes.
 
 ## Suivi
 - Prioriser la factorisation de `admin-scripts.js` lors d’une future évolution majeure.
-- Documenter les navigateurs officiellement supportés dans le readme (section « Prérequis ») afin de cadrer les attentes côté clients.
+- Documenter la préparation de l’environnement de test (base WordPress, Playwright) pour fiabiliser la CI.
