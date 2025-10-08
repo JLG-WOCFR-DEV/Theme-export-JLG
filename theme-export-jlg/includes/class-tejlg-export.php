@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/class-tejlg-exclusion-patterns-sanitizer.php';
 require_once __DIR__ . '/class-tejlg-export-history.php';
 require_once __DIR__ . '/class-tejlg-zip-writer.php';
 
@@ -24,73 +25,11 @@ class TEJLG_Export {
             ? $max_patterns
             : self::MAX_EXCLUSION_PATTERNS;
 
-        if (is_string($raw_patterns)) {
-            $candidates = preg_split('/[,\r\n]+/', $raw_patterns);
-        } elseif (is_array($raw_patterns)) {
-            $candidates = $raw_patterns;
-        } else {
-            $candidates = [];
-        }
-
-        if (!is_array($candidates)) {
-            $candidates = [];
-        }
-
-        $sanitized = [];
-
-        foreach ($candidates as $candidate) {
-            if (is_array($candidate) || is_object($candidate)) {
-                continue;
-            }
-
-            $pattern = (string) $candidate;
-            $pattern = wp_check_invalid_utf8($pattern, true);
-            $pattern = wp_strip_all_tags($pattern);
-            $pattern = preg_replace('/[\x00-\x1F\x7F]/', '', $pattern);
-
-            if (!is_string($pattern)) {
-                continue;
-            }
-
-            $pattern = trim($pattern);
-            $pattern = preg_replace('#^[\\/]+#', '', $pattern);
-
-            if (!is_string($pattern)) {
-                continue;
-            }
-
-            $normalized_for_segments = str_replace('\\', '/', $pattern);
-
-            if (preg_match('#(?:^|/)\.\.(?:/|$)#', $normalized_for_segments)) {
-                continue;
-            }
-
-            if ('' === $pattern) {
-                continue;
-            }
-
-            if (function_exists('mb_substr')) {
-                $pattern = mb_substr($pattern, 0, self::MAX_EXCLUSION_PATTERN_LENGTH);
-            } else {
-                $pattern = substr($pattern, 0, self::MAX_EXCLUSION_PATTERN_LENGTH);
-            }
-
-            if ('' === $pattern) {
-                continue;
-            }
-
-            if (in_array($pattern, $sanitized, true)) {
-                continue;
-            }
-
-            $sanitized[] = $pattern;
-
-            if (count($sanitized) >= $max_patterns) {
-                break;
-            }
-        }
-
-        return $sanitized;
+        return TEJLG_Exclusion_Patterns_Sanitizer::sanitize_list(
+            $raw_patterns,
+            $max_patterns,
+            self::MAX_EXCLUSION_PATTERN_LENGTH
+        );
     }
 
     /**
@@ -102,13 +41,11 @@ class TEJLG_Export {
      * @return string Motifs normalisés, séparés par des retours à la ligne.
      */
     public static function sanitize_exclusion_patterns_string($raw_patterns, $max_patterns = null) {
-        $patterns = self::sanitize_exclusion_patterns($raw_patterns, $max_patterns);
-
-        if (empty($patterns)) {
-            return '';
-        }
-
-        return implode("\n", $patterns);
+        return TEJLG_Exclusion_Patterns_Sanitizer::sanitize_string(
+            $raw_patterns,
+            $max_patterns,
+            self::MAX_EXCLUSION_PATTERN_LENGTH
+        );
     }
 
     public static function get_available_schedule_frequencies() {
@@ -400,33 +337,11 @@ class TEJLG_Export {
     private static function get_schedule_exclusion_list($settings) {
         $raw = isset($settings['exclusions']) ? (string) $settings['exclusions'] : '';
 
-        if ('' === trim($raw)) {
-            return [];
-        }
-
-        $split = preg_split('/[,\n]+/', $raw);
-
-        if (false === $split) {
-            return [];
-        }
-
-        $patterns = array_values(array_filter(
-            array_map(
-                static function ($pattern) {
-                    if (!is_scalar($pattern)) {
-                        return '';
-                    }
-
-                    return trim((string) $pattern);
-                },
-                $split
-            ),
-            static function ($pattern) {
-                return '' !== $pattern;
-            }
-        ));
-
-        return self::sanitize_exclusion_patterns($patterns);
+        return TEJLG_Exclusion_Patterns_Sanitizer::sanitize_list(
+            $raw,
+            self::MAX_EXCLUSION_PATTERNS,
+            self::MAX_EXCLUSION_PATTERN_LENGTH
+        );
     }
 
     public static function run_scheduled_theme_export() {

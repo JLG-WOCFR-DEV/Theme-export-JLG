@@ -3,6 +3,7 @@
     <testsuites>
         <testsuite name="Theme Export JLG">
             <file>tests/test-export-process.php</file>
+            <file>tests/test-export-sanitization.php</file>
         </testsuite>
     </testsuites>
 </phpunit>
