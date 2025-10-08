@@ -15,6 +15,7 @@ if (!class_exists('WP_CLI')) {
         public static $error_message = '';
         public static $last_log = '';
         public static $last_warning = '';
+        public static $logs = [];
 
         public static function add_command($name, $callable) {
             self::$commands[$name] = $callable;
@@ -35,6 +36,7 @@ if (!class_exists('WP_CLI')) {
 
         public static function log($message) {
             self::$last_log = (string) $message;
+            self::$logs[]   = self::$last_log;
         }
 
         public static function warning($message) {
@@ -59,6 +61,7 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
         WP_CLI::$error_message = '';
         WP_CLI::$last_log       = '';
         WP_CLI::$last_warning   = '';
+        WP_CLI::$logs           = [];
 
         TEJLG_Export_History::clear_history();
     }
@@ -131,6 +134,67 @@ class Test_TEJLG_CLI_Command extends WP_UnitTestCase {
 
         if (file_exists($temp_file)) {
             @unlink($temp_file);
+        }
+    }
+
+    public function test_history_command_supports_result_and_origin_filters() {
+        $first_file = wp_tempnam('cli-history-success.zip');
+        $second_file = wp_tempnam('cli-history-error.zip');
+
+        $this->assertNotFalse($first_file);
+        $this->assertNotFalse($second_file);
+
+        file_put_contents($first_file, 'success');
+        file_put_contents($second_file, 'error');
+
+        TEJLG_Export_History::record_job([
+            'id'            => 'cli-history-success',
+            'status'        => 'completed',
+            'zip_path'      => $first_file,
+            'zip_file_name' => 'cli-history-success.zip',
+            'zip_file_size' => filesize($first_file),
+            'created_at'    => time(),
+            'updated_at'    => time(),
+            'completed_at'  => time(),
+        ], [
+            'origin' => 'schedule',
+        ]);
+
+        TEJLG_Export_History::record_job([
+            'id'            => 'cli-history-error',
+            'status'        => 'failed',
+            'zip_path'      => $second_file,
+            'zip_file_name' => 'cli-history-error.zip',
+            'zip_file_size' => filesize($second_file),
+            'created_at'    => time(),
+            'updated_at'    => time(),
+            'completed_at'  => time(),
+        ], [
+            'origin' => 'cli',
+        ]);
+
+        $cli = new TEJLG_CLI();
+
+        WP_CLI::$logs = [];
+
+        $cli->history([], ['result' => 'success', 'origin' => 'schedule']);
+
+        $this->assertNotEmpty(WP_CLI::$logs, 'History command should output logs.');
+        $last_log = end(WP_CLI::$logs);
+
+        $this->assertIsString($last_log);
+        $this->assertStringContainsString('cli-history-success', $last_log, 'Filtered history should include the matching job.');
+
+        foreach (WP_CLI::$logs as $log_line) {
+            $this->assertStringNotContainsString('cli-history-error', $log_line, 'Filtered history should not include non-matching jobs.');
+        }
+
+        if (file_exists($first_file)) {
+            @unlink($first_file);
+        }
+
+        if (file_exists($second_file)) {
+            @unlink($second_file);
         }
     }
 
