@@ -3,7 +3,7 @@
 use PHPUnit\Framework\TestCase;
 
 if (!function_exists('wp_check_invalid_utf8')) {
-    function wp_check_invalid_utf8($string) {
+    function wp_check_invalid_utf8($string, $strip = false) {
         return (string) $string;
     }
 }
