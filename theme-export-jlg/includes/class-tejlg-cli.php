@@ -20,7 +20,7 @@ class TEJLG_CLI {
         WP_CLI::log('  wp theme-export-jlg patterns [--portable] [--output=<chemin>]');
         WP_CLI::log('  wp theme-export-jlg import theme <chemin_zip> [--overwrite]');
         WP_CLI::log('  wp theme-export-jlg import patterns <chemin_json>');
-        WP_CLI::log('  wp theme-export-jlg history [--per-page=<nombre>] [--page=<nombre>]');
+        WP_CLI::log('  wp theme-export-jlg history [--per-page=<nombre>] [--page=<nombre>] [--result=<statut>] [--origin=<origine>]');
         WP_CLI::log('  wp theme-export-jlg settings export [--output=<chemin>]');
         WP_CLI::log('  wp theme-export-jlg settings import <chemin_json>');
     }
@@ -114,9 +114,14 @@ class TEJLG_CLI {
         $page = isset($assoc_args['page']) ? (int) $assoc_args['page'] : 1;
         $page = $page > 0 ? $page : 1;
 
+        $result_filter = isset($assoc_args['result']) ? sanitize_key((string) $assoc_args['result']) : '';
+        $origin_filter = isset($assoc_args['origin']) ? sanitize_key((string) $assoc_args['origin']) : '';
+
         $history = TEJLG_Export_History::get_entries([
             'per_page' => $per_page,
             'paged'    => $page,
+            'result'   => $result_filter,
+            'origin'   => $origin_filter,
         ]);
 
         $entries = isset($history['entries']) ? (array) $history['entries'] : [];
@@ -125,7 +130,11 @@ class TEJLG_CLI {
         $total_pages = $total_pages > 0 ? $total_pages : 1;
 
         if (empty($entries)) {
-            WP_CLI::log(__('Aucun export n\'a encore été enregistré.', 'theme-export-jlg'));
+            if ('' !== $result_filter || '' !== $origin_filter) {
+                WP_CLI::log(__('Aucun export ne correspond aux filtres fournis.', 'theme-export-jlg'));
+            } else {
+                WP_CLI::log(__('Aucun export n\'a encore été enregistré.', 'theme-export-jlg'));
+            }
             return;
         }
 
