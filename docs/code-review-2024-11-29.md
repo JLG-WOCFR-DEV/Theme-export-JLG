@@ -6,6 +6,7 @@
 
 ## Améliorations intégrées
 - Le CLI dispose désormais de filtres `--result` et `--origin` pour cibler rapidement un sous-ensemble d'exports, ce qui facilite l'exploitation des environnements de production et le diagnostic d'incidents.
+- La persistance des archives déclenche un hook `tejlg_export_persist_archive_failed` (et un log filtrable) en cas d'échec, ce qui facilite le suivi des erreurs silencieuses observées lors de la revue initiale.【F:theme-export-jlg/includes/class-tejlg-export.php†L1996-L2060】
 
 ## Opportunités supplémentaires
 - `TEJLG_Export::persist_export_archive()` retourne silencieusement un tableau vide en cas d'échec de création de dossier ou de copie. Journaliser ces erreurs (via `error_log()` ou une action dédiée) simplifierait le diagnostic en production.
