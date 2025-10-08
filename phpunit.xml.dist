@@ -4,6 +4,7 @@
         <testsuite name="Theme Export JLG">
             <file>tests/test-export-process.php</file>
             <file>tests/test-export-sanitization.php</file>
+            <file>tests/test-export-persist-archive.php</file>
         </testsuite>
     </testsuites>
 </phpunit>

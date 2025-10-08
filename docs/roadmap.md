@@ -9,7 +9,7 @@ Cette feuille de route décline les axes identifiés dans le `readme.md` en lots
   - Publier des exemples d’intégration (Slack, e-mail enrichi, webhook générique) exploitant `tejlg_export_history_report_ready`.
   - Documenter un modèle de rapport hebdomadaire (JSON + CSV) à partir des données retournées par `generate_report()`.
 - **Livrables** :
-  - Guide de personnalisation des notifications (filtres, formats d’e-mail, webhooks) illustré par des snippets concrets.
+  - ✅ Guide de personnalisation des notifications (filtres, formats d’e-mail, webhooks) illustré par des snippets concrets — voir [`docs/notifications-guide.md`](./notifications-guide.md).
   - Exemple de rapport hebdomadaire généré à partir des métadonnées existantes.
 - **Indicateurs de succès** :
   - Les intégrateurs peuvent brancher un webhook en moins de 10 minutes grâce à la documentation.

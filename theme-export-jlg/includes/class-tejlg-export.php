@@ -1995,6 +1995,14 @@ class TEJLG_Export {
         }
 
         if ('' === $zip_path || !file_exists($zip_path)) {
+            self::report_persist_archive_failure(
+                'source_missing',
+                $job,
+                [
+                    'zip_path' => $zip_path,
+                ]
+            );
+
             return [
                 'path' => '',
                 'url'  => '',
@@ -2008,6 +2016,16 @@ class TEJLG_Export {
         $uploads = wp_upload_dir();
 
         if (!is_array($uploads) || !empty($uploads['error'])) {
+            self::report_persist_archive_failure(
+                'wp_upload_dir_error',
+                $job,
+                [
+                    'zip_path' => $zip_path,
+                    'job_id'   => $job_id,
+                    'error'    => isset($uploads['error']) ? (string) $uploads['error'] : '',
+                ]
+            );
+
             return [
                 'path' => '',
                 'url'  => '',
@@ -2018,6 +2036,19 @@ class TEJLG_Export {
         $base_url = isset($uploads['baseurl']) ? (string) $uploads['baseurl'] : '';
 
         if ('' === $base_dir || '' === $base_url) {
+            self::report_persist_archive_failure(
+                'uploads_path_unusable',
+                $job,
+                [
+                    'zip_path' => $zip_path,
+                    'job_id'   => $job_id,
+                    'uploads'  => [
+                        'basedir' => $base_dir,
+                        'baseurl' => $base_url,
+                    ],
+                ]
+            );
+
             return [
                 'path' => '',
                 'url'  => '',
@@ -2027,6 +2058,16 @@ class TEJLG_Export {
         $target_directory = trailingslashit($base_dir) . 'theme-export-jlg/';
 
         if (!wp_mkdir_p($target_directory)) {
+            self::report_persist_archive_failure(
+                'mkdir_failed',
+                $job,
+                [
+                    'target_directory' => $target_directory,
+                    'zip_path'         => $zip_path,
+                    'job_id'           => $job_id,
+                ]
+            );
+
             return [
                 'path' => '',
                 'url'  => '',
@@ -2052,6 +2093,16 @@ class TEJLG_Export {
         }
 
         if (!copy($zip_path, $destination)) {
+            self::report_persist_archive_failure(
+                'copy_failed',
+                $job,
+                [
+                    'source'      => $zip_path,
+                    'destination' => $destination,
+                    'job_id'      => $job_id,
+                ]
+            );
+
             return [
                 'path' => '',
                 'url'  => '',
@@ -2070,6 +2121,44 @@ class TEJLG_Export {
             'path' => $destination,
             'url'  => $url,
         ];
+    }
+
+    /**
+     * Report a failure that prevented an export archive from being persisted.
+     *
+     * @since 3.1.0
+     *
+     * @param array|string $job     The job payload or source path.
+     * @param string       $reason  Machine readable reason describing the failure.
+     * @param array        $context Additional debugging context.
+     *
+     * @return void
+     */
+    private static function report_persist_archive_failure($reason, $job, array $context = []) {
+        $payload = $context;
+        $payload['reason'] = (string) $reason;
+
+        if (is_array($job) && isset($job['id'])) {
+            $payload['job_id'] = (string) $job['id'];
+        }
+
+        if (function_exists('do_action')) {
+            do_action('tejlg_export_persist_archive_failed', $job, $payload);
+        }
+
+        $should_log = true;
+
+        if (function_exists('apply_filters')) {
+            $should_log = (bool) apply_filters('tejlg_export_persist_archive_log_errors', $should_log, $reason, $job, $payload);
+        }
+
+        if ($should_log) {
+            $encoded_context = function_exists('wp_json_encode') ? wp_json_encode($payload) : json_encode($payload);
+            $message         = sprintf('[TEJLG] persist_export_archive failure (%s): %s', (string) $reason, (string) $encoded_context);
+
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            error_log($message);
+        }
     }
     /**
      * Aborts the ZIP export, cleans up temporary files and stops execution.
