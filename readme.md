@@ -32,6 +32,7 @@ Theme Export - JLG est un plugin WordPress pour administrateurs de sites blocs q
 - Lorsqu’un nouveau bloc d’interface est ajouté, réutilisez les cartes existantes (`tejlg-card components-card is-elevated`) plutôt que de créer un style personnalisé. Les boutons doivent combiner les classes historiques (`button button-primary|secondary`) et la variante `wp-ui-*` adaptée pour bénéficier de la coloration dynamique.【F:theme-export-jlg/templates/admin/export.php†L36-L113】【F:theme-export-jlg/templates/admin/import.php†L22-L63】【F:theme-export-jlg/templates/admin/debug.php†L12-L74】
 - Testez systématiquement les écrans dans les différents schémas de couleurs de l’administration (préférences utilisateur) **et** dans l’éditeur de site en modes clair et sombre afin de valider les contrastes. En local, utilisez la commande `wp-admin/options-general.php?page=global-settings` ou la palette rapide (`Options → Administration color scheme`).
 - Pensez à vérifier le rendu des cartes dans l’éditeur du site (`/wp-admin/site-editor.php`) où les styles admin sont partagés. Les variables CSS adoptées ici garantissent un contraste suffisant quelles que soient les combinaisons activées.
+- Pour explorer des presets graphiques prêts à l’emploi inspirés de Headless UI, Shadcn UI, Radix UI, Bootstrap, Semantic UI et Anime.js, consultez le document [`docs/ui-presets.md`](docs/ui-presets.md).
 
 ## Utilisation en ligne de commande (WP-CLI)
 
