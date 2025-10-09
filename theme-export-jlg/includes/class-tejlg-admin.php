@@ -70,6 +70,14 @@ class TEJLG_Admin {
             $saved_exclusions = '';
         }
 
+        $preview_concurrency_limit = apply_filters('tejlg_preview_concurrency_limit', 2);
+
+        if (!is_numeric($preview_concurrency_limit)) {
+            $preview_concurrency_limit = 2;
+        }
+
+        $preview_concurrency_limit = max(1, (int) $preview_concurrency_limit);
+
         wp_localize_script(
             'tejlg-admin-scripts',
             'tejlgAdminL10n',
@@ -77,6 +85,8 @@ class TEJLG_Admin {
                 'showBlockCode' => __('Afficher le code du bloc', 'theme-export-jlg'),
                 'hideBlockCode' => __('Masquer le code du bloc', 'theme-export-jlg'),
                 'previewFallbackWarning' => esc_html__("Avertissement : l'aperçu est chargé via un mode de secours (sans Blob). Le rendu peut être limité.", 'theme-export-jlg'),
+                'previewQueueMessage' => esc_html__('Prévisualisation en attente… Une autre composition est en cours de chargement.', 'theme-export-jlg'),
+                'previewConcurrencyLimit' => $preview_concurrency_limit,
                 /* translators: Warning shown before importing a theme zip file. */
                 'themeImportConfirm' => __("⚠️ ATTENTION ⚠️\n\nSi un thème avec le même nom de dossier existe déjà, il sera DÉFINITIVEMENT écrasé.\n\nÊtes-vous sûr de vouloir continuer ?", 'theme-export-jlg'),
                 'metrics' => [
