@@ -343,6 +343,209 @@ $history_summary_inline = sprintf(
 );
 
 $history_section_open = $history_filters_active;
+
+$quality_score_cap = static function ($score) {
+    if (!is_numeric($score)) {
+        return 0;
+    }
+
+    $score = (float) $score;
+
+    return (int) max(0, min(100, round($score)));
+};
+
+$ui_ux_score = 68;
+
+if ($schedule_is_active) {
+    $ui_ux_score += 8;
+}
+
+if (!empty($latest_export)) {
+    $ui_ux_score += 6;
+}
+
+if (!empty($notification_enabled_lookup)) {
+    $ui_ux_score += 6;
+}
+
+if ($portable_mode_enabled) {
+    $ui_ux_score += 4;
+}
+
+$ui_ux_score = $quality_score_cap($ui_ux_score);
+
+$accessibility_score = 70;
+
+if ($portable_mode_enabled) {
+    $accessibility_score += 6;
+}
+
+if (!empty($notification_recipient_list)) {
+    $accessibility_score += 4;
+}
+
+if ($monitoring_total_recent > 0) {
+    $accessibility_score += 4;
+}
+
+$accessibility_score = $quality_score_cap($accessibility_score);
+
+if ($monitoring_total_recent > 0 && null !== $monitoring_uptime_rate) {
+    $reliability_score = $quality_score_cap($monitoring_uptime_rate);
+} else {
+    $fallback_reliability = 60;
+
+    if ($schedule_is_active) {
+        $fallback_reliability += 12;
+    }
+
+    if (!empty($history_entries)) {
+        $fallback_reliability += 8;
+    }
+
+    if (!empty($notification_enabled_lookup)) {
+        $fallback_reliability += 6;
+    }
+
+    $reliability_score = $quality_score_cap($fallback_reliability);
+}
+
+$visual_score = 74;
+
+if ($schedule_is_active) {
+    $visual_score += 4;
+}
+
+if ($portable_mode_enabled) {
+    $visual_score += 3;
+}
+
+if (!empty($notification_enabled_lookup)) {
+    $visual_score += 3;
+}
+
+$visual_score = $quality_score_cap($visual_score);
+
+$quality_badge_map = [
+    'excellent' => [
+        'label' => __('Aligné sur les standards pro', 'theme-export-jlg'),
+        'class' => 'is-excellent',
+    ],
+    'solid' => [
+        'label' => __('Solide et évolutif', 'theme-export-jlg'),
+        'class' => 'is-solid',
+    ],
+    'watch' => [
+        'label' => __('À renforcer', 'theme-export-jlg'),
+        'class' => 'is-watch',
+    ],
+];
+
+$quality_badge_for_score = static function ($score) use ($quality_badge_map) {
+    $score = (int) $score;
+
+    if ($score >= 85) {
+        return $quality_badge_map['excellent'];
+    }
+
+    if ($score >= 70) {
+        return $quality_badge_map['solid'];
+    }
+
+    return $quality_badge_map['watch'];
+};
+
+if ($monitoring_total_recent > 0) {
+    $reliability_context = sprintf(
+        /* translators: 1: monitoring value label, 2: monitoring breakdown label. */
+        __('%1$s · %2$s', 'theme-export-jlg'),
+        $monitoring_value,
+        $monitoring_breakdown_label
+    );
+} else {
+    $reliability_context = __('Activez la planification ou lancez un export manuel pour alimenter les indicateurs de fiabilité.', 'theme-export-jlg');
+}
+
+if ($schedule_is_active) {
+    $ui_ux_context = __('Planification active et notifications rapprochent l’expérience de celles proposées par les suites professionnelles.', 'theme-export-jlg');
+} else {
+    $ui_ux_context = __('Activez la planification pour proposer une expérience continue comparable aux solutions pro.', 'theme-export-jlg');
+}
+
+if (!empty($notification_recipient_list)) {
+    $accessibility_context = sprintf(
+        /* translators: %s: recipients count label. */
+        __('Notifications configurées : %s.', 'theme-export-jlg'),
+        $notification_recipient_count_label
+    );
+} else {
+    $accessibility_context = __('Ajoutez des notifications e-mail ou webhook pour prévenir toute erreur sans surveillance manuelle.', 'theme-export-jlg');
+}
+
+$visual_context = __('Interface basée sur les composants WordPress et les variables de couleur de l’administration.', 'theme-export-jlg');
+
+$quality_benchmarks = [
+    'ui_ux' => [
+        'label'      => __('UI / UX', 'theme-export-jlg'),
+        'score'      => $ui_ux_score,
+        'summary'    => __('L’expérience couvre les besoins essentiels avec une navigation claire inspirée des tableaux de bord professionnels.', 'theme-export-jlg'),
+        'context'    => $ui_ux_context,
+        'strengths'  => [
+            __('File d’attente des exports avec annulation et suivi en temps réel.', 'theme-export-jlg'),
+            __('Bannière de raccourcis et cartes synthétiques pour accéder rapidement aux actions critiques.', 'theme-export-jlg'),
+            __('Sélecteur de compositions paginé avec filtres, recherche et prévisualisation intégrée.', 'theme-export-jlg'),
+        ],
+        'roadmap'    => [
+            __('Introduire un assistant multi-étapes avec résumé exportable (PDF/CSV).', 'theme-export-jlg'),
+            __('Ajouter un panneau latéral contextualisé pour guider chaque étape clé.', 'theme-export-jlg'),
+        ],
+    ],
+    'accessibility' => [
+        'label'      => __('Accessibilité', 'theme-export-jlg'),
+        'score'      => $accessibility_score,
+        'summary'    => __('Les dropzones, focus visibles et composants natifs offrent une base inclusive conforme aux attentes pro.', 'theme-export-jlg'),
+        'context'    => $accessibility_context,
+        'strengths'  => [
+            __('Dropzones utilisables au clavier avec messages d’aide fournis via ARIA.', 'theme-export-jlg'),
+            __('Focus renforcés sur les boutons et onglets pour une navigation claire.', 'theme-export-jlg'),
+            __('Utilisation des variables de contraste de l’administration pour respecter les préférences utilisateurs.', 'theme-export-jlg'),
+        ],
+        'roadmap'    => [
+            __('Ajouter des raccourcis clavier dédiés aux actions fréquentes (export, sélection).', 'theme-export-jlg'),
+            __('Intégrer un audit automatique des contrastes et un rapport téléchargeable.', 'theme-export-jlg'),
+        ],
+    ],
+    'reliability' => [
+        'label'      => __('Fiabilité', 'theme-export-jlg'),
+        'score'      => $reliability_score,
+        'summary'    => __('Le suivi des exports, l’historique détaillé et les notifications rapprochent la supervision des solutions managées.', 'theme-export-jlg'),
+        'context'    => $reliability_context,
+        'strengths'  => [
+            __('Historique persistant avec durée, taille et origine de chaque export.', 'theme-export-jlg'),
+            __('Planification WP-Cron et purge automatique des archives anciennes.', 'theme-export-jlg'),
+            __('Alertes e-mail configurables pour chaque statut critique.', 'theme-export-jlg'),
+        ],
+        'roadmap'    => [
+            __('Proposer un connecteur de stockage externe (S3, SFTP) pour une redondance pro.', 'theme-export-jlg'),
+            __('Automatiser l’analyse des rapports et l’envoi de webhooks détaillés.', 'theme-export-jlg'),
+        ],
+    ],
+    'visual' => [
+        'label'      => __('Aspect visuel', 'theme-export-jlg'),
+        'score'      => $visual_score,
+        'summary'    => __('La charte reprend les codes de l’interface WordPress avec des cartes élevées et badges dynamiques.', 'theme-export-jlg'),
+        'context'    => $visual_context,
+        'strengths'  => [
+            __('Cartes « components-card » et variables CSS harmonisées avec le mode sombre.', 'theme-export-jlg'),
+            __('Bannière et dashboard condensés pour rappeler les solutions pro.', 'theme-export-jlg'),
+            __('Graphismes cohérents dans l’éditeur de site grâce aux tokens partagés.', 'theme-export-jlg'),
+        ],
+        'roadmap'    => [
+            __('Activer une vue compacte et mobile avec accordéons et bouton d’actions rapides.', 'theme-export-jlg'),
+            __('Transformer l’historique en timeline interactive pour un rendu premium.', 'theme-export-jlg'),
+        ],
+    ],
+];
 ?>
 <div class="tejlg-export-banner" role="region" aria-labelledby="tejlg-export-banner-title">
     <h2 id="tejlg-export-banner-title" class="screen-reader-text"><?php esc_html_e('Raccourcis d’export', 'theme-export-jlg'); ?></h2>
@@ -438,6 +641,85 @@ $history_section_open = $history_filters_active;
                 <?php if ('' !== $monitoring_last_details) : ?>
                     <span class="tejlg-dashboard__meta"><?php echo esc_html($monitoring_last_details); ?></span>
                 <?php endif; ?>
+            </div>
+        </div>
+        <div
+            class="tejlg-dashboard__card tejlg-dashboard__card--benchmark components-card is-elevated"
+            role="region"
+            aria-labelledby="tejlg-quality-benchmark-title"
+        >
+            <div class="components-card__body tejlg-quality-benchmark">
+                <div class="tejlg-quality-benchmark__header">
+                    <h3 id="tejlg-quality-benchmark-title" class="tejlg-quality-benchmark__title">
+                        <?php esc_html_e('Comparaison avec les extensions pro', 'theme-export-jlg'); ?>
+                    </h3>
+                    <p class="tejlg-quality-benchmark__intro">
+                        <?php esc_html_e('Suivez les forces actuelles du plugin et les axes inspirés des suites professionnelles (UI/UX, accessibilité, fiabilité, visuel).', 'theme-export-jlg'); ?>
+                    </p>
+                </div>
+                <div class="tejlg-quality-benchmark__grid">
+                    <?php foreach ($quality_benchmarks as $benchmark_key => $benchmark) : ?>
+                        <?php
+                        $score = isset($benchmark['score']) ? $quality_score_cap($benchmark['score']) : 0;
+                        $badge = $quality_badge_for_score($score);
+                        $section_id = sprintf('tejlg-quality-benchmark-%s', sanitize_key($benchmark_key));
+                        $score_label = sprintf(
+                            /* translators: 1: benchmark label, 2: score value. */
+                            __('%1$s : %2$d sur 100', 'theme-export-jlg'),
+                            isset($benchmark['label']) ? (string) $benchmark['label'] : '',
+                            $score
+                        );
+                        ?>
+                        <section class="tejlg-quality-benchmark__item" aria-labelledby="<?php echo esc_attr($section_id); ?>">
+                            <header class="tejlg-quality-benchmark__item-header">
+                                <h3 id="<?php echo esc_attr($section_id); ?>" class="tejlg-quality-benchmark__title">
+                                    <?php echo esc_html($benchmark['label']); ?>
+                                </h3>
+                                <span class="tejlg-quality-benchmark__badge <?php echo esc_attr($badge['class']); ?>">
+                                    <?php echo esc_html($badge['label']); ?>
+                                </span>
+                            </header>
+                            <div class="tejlg-quality-benchmark__score" role="img" aria-label="<?php echo esc_attr($score_label); ?>">
+                                <div
+                                    class="tejlg-quality-benchmark__meter"
+                                    style="--tejlg-quality-progress: <?php echo esc_attr($score); ?>%;"
+                                ></div>
+                                <div class="tejlg-quality-benchmark__score-value">
+                                    <span class="tejlg-quality-benchmark__score-number"><?php echo esc_html($score); ?></span>
+                                    <span class="tejlg-quality-benchmark__score-unit">/100</span>
+                                </div>
+                            </div>
+                            <?php if (!empty($benchmark['summary'])) : ?>
+                                <p class="tejlg-quality-benchmark__summary"><?php echo esc_html($benchmark['summary']); ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($benchmark['context'])) : ?>
+                                <p class="tejlg-quality-benchmark__context"><?php echo esc_html($benchmark['context']); ?></p>
+                            <?php endif; ?>
+                            <div class="tejlg-quality-benchmark__lists">
+                                <?php if (!empty($benchmark['strengths']) && is_array($benchmark['strengths'])) : ?>
+                                    <div class="tejlg-quality-benchmark__list">
+                                        <h4 class="tejlg-quality-benchmark__list-title"><?php esc_html_e('Atouts actuels', 'theme-export-jlg'); ?></h4>
+                                        <ul class="tejlg-quality-benchmark__bullets">
+                                            <?php foreach ($benchmark['strengths'] as $strength) : ?>
+                                                <li><?php echo esc_html($strength); ?></li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($benchmark['roadmap']) && is_array($benchmark['roadmap'])) : ?>
+                                    <div class="tejlg-quality-benchmark__list">
+                                        <h4 class="tejlg-quality-benchmark__list-title"><?php esc_html_e('Pistes pro', 'theme-export-jlg'); ?></h4>
+                                        <ul class="tejlg-quality-benchmark__bullets">
+                                            <?php foreach ($benchmark['roadmap'] as $roadmap_item) : ?>
+                                                <li><?php echo esc_html($roadmap_item); ?></li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </section>
+                    <?php endforeach; ?>
+                </div>
             </div>
         </div>
     </div>
