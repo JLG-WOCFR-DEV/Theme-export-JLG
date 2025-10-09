@@ -611,6 +611,40 @@ $history_section_open = $history_filters_active;
                         data-export-progress-bar
                     ></progress>
                     <p class="description" data-export-message></p>
+                    <p class="description tejlg-export-feedback__hint" data-export-guidance hidden aria-live="polite"></p>
+                    <div class="tejlg-job-meta" data-export-job-meta hidden>
+                        <p class="tejlg-job-meta__title" data-export-job-title><?php esc_html_e('Diagnostic de la tâche', 'theme-export-jlg'); ?></p>
+                        <dl class="tejlg-job-meta__grid">
+                            <div class="tejlg-job-meta__row">
+                                <dt><?php esc_html_e('Identifiant de la tâche', 'theme-export-jlg'); ?></dt>
+                                <dd>
+                                    <code data-export-job-id></code>
+                                    <button type="button" class="button-link tejlg-job-meta__copy" data-export-job-copy>
+                                        <?php esc_html_e('Copier l’ID', 'theme-export-jlg'); ?>
+                                    </button>
+                                </dd>
+                            </div>
+                            <div class="tejlg-job-meta__row">
+                                <dt><?php esc_html_e('Statut courant', 'theme-export-jlg'); ?></dt>
+                                <dd data-export-job-status></dd>
+                            </div>
+                            <div class="tejlg-job-meta__row">
+                                <dt><?php esc_html_e('Code d’erreur', 'theme-export-jlg'); ?></dt>
+                                <dd data-export-job-code></dd>
+                            </div>
+                            <div class="tejlg-job-meta__row">
+                                <dt><?php esc_html_e('Dernier message', 'theme-export-jlg'); ?></dt>
+                                <dd data-export-job-message></dd>
+                            </div>
+                        </dl>
+                        <p class="tejlg-job-meta__updated" data-export-job-updated></p>
+                        <p class="tejlg-job-meta__hint" data-export-job-hint hidden role="status" aria-live="polite"></p>
+                    </div>
+                    <p>
+                        <button type="button" class="button button-secondary wp-ui-secondary" data-export-retry hidden>
+                            <?php esc_html_e('Relancer la vérification', 'theme-export-jlg'); ?>
+                        </button>
+                    </p>
                     <p><button type="button" class="button button-secondary wp-ui-secondary" data-export-cancel hidden><?php esc_html_e("Annuler l'export", 'theme-export-jlg'); ?></button></p>
                     <p><a href="#" class="button button-secondary wp-ui-secondary" data-export-download hidden target="_blank" rel="noopener"><?php esc_html_e("Télécharger l'archive ZIP", 'theme-export-jlg'); ?></a></p>
                 </div>
@@ -620,7 +654,7 @@ $history_section_open = $history_filters_active;
     </div>
 </div>
 
-<details class="tejlg-collapsible" id="tejlg-schedule-panel"<?php echo $schedule_section_open ? ' open' : ''; ?>>
+<details class="tejlg-collapsible" id="tejlg-schedule-panel" data-tejlg-persist="panel"<?php echo $schedule_section_open ? ' open' : ''; ?>>
     <summary class="tejlg-collapsible__summary">
         <span class="tejlg-collapsible__title"><?php esc_html_e('Planification & alertes', 'theme-export-jlg'); ?></span>
         <span class="tejlg-collapsible__description"><?php echo esc_html($schedule_summary_description); ?></span>
@@ -781,7 +815,7 @@ $history_section_open = $history_filters_active;
     </div>
 </details>
 
-<details class="tejlg-collapsible tejlg-collapsible--grid" id="tejlg-advanced-tools">
+<details class="tejlg-collapsible tejlg-collapsible--grid" id="tejlg-advanced-tools" data-tejlg-persist="panel">
     <summary class="tejlg-collapsible__summary">
         <span class="tejlg-collapsible__title"><?php esc_html_e('Exports complémentaires & outils avancés', 'theme-export-jlg'); ?></span>
         <span class="tejlg-collapsible__description"><?php esc_html_e('Compositions, styles globaux et création de thème enfant.', 'theme-export-jlg'); ?></span>
@@ -830,7 +864,7 @@ $history_section_open = $history_filters_active;
     </div>
 </details>
 
-<details class="tejlg-collapsible" id="tejlg-history-panel"<?php echo $history_section_open ? ' open' : ''; ?>>
+<details class="tejlg-collapsible" id="tejlg-history-panel" data-tejlg-persist="panel"<?php echo $history_section_open ? ' open' : ''; ?>>
     <summary class="tejlg-collapsible__summary">
         <span class="tejlg-collapsible__title"><?php esc_html_e('Historique des exports', 'theme-export-jlg'); ?></span>
         <span class="tejlg-collapsible__description"><?php echo esc_html($history_summary_inline); ?></span>

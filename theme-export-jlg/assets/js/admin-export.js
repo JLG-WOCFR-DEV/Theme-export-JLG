@@ -133,6 +133,29 @@ document.addEventListener('DOMContentLoaded', function() {
             const patternTester = (typeof exportAsync.patternTester === 'object' && exportAsync.patternTester !== null)
                 ? exportAsync.patternTester
                 : null;
+            const guidanceEl = exportForm.querySelector('[data-export-guidance]');
+            const jobMetaContainer = exportForm.querySelector('[data-export-job-meta]');
+            const jobMetaTitle = jobMetaContainer ? jobMetaContainer.querySelector('[data-export-job-title]') : null;
+            const jobMetaId = jobMetaContainer ? jobMetaContainer.querySelector('[data-export-job-id]') : null;
+            const jobMetaStatus = jobMetaContainer ? jobMetaContainer.querySelector('[data-export-job-status]') : null;
+            const jobMetaCode = jobMetaContainer ? jobMetaContainer.querySelector('[data-export-job-code]') : null;
+            const jobMetaMessage = jobMetaContainer ? jobMetaContainer.querySelector('[data-export-job-message]') : null;
+            const jobMetaUpdated = jobMetaContainer ? jobMetaContainer.querySelector('[data-export-job-updated]') : null;
+            const jobMetaHint = jobMetaContainer ? jobMetaContainer.querySelector('[data-export-job-hint]') : null;
+            const jobMetaCopyButton = jobMetaContainer ? jobMetaContainer.querySelector('[data-export-job-copy]') : null;
+            const retryButton = exportForm.querySelector('[data-export-retry]');
+            const jobMetaConfig = (typeof exportAsync.jobMeta === 'object' && exportAsync.jobMeta !== null) ? exportAsync.jobMeta : {};
+            const jobMetaLabels = (typeof jobMetaConfig.labels === 'object' && jobMetaConfig.labels !== null) ? jobMetaConfig.labels : {};
+            const jobStorageKey = typeof jobMetaConfig.storageKey === 'string' && jobMetaConfig.storageKey.length
+                ? jobMetaConfig.storageKey
+                : 'tejlg:export:last-job';
+            const jobRetryLabel = typeof jobMetaConfig.retryButton === 'string' && jobMetaConfig.retryButton.length
+                ? jobMetaConfig.retryButton
+                : (strings.retryReady || '');
+            const jobRetryAnnouncement = typeof jobMetaConfig.retryAnnouncement === 'string' && jobMetaConfig.retryAnnouncement.length
+                ? jobMetaConfig.retryAnnouncement
+                : (strings.retryAnnouncement || '');
+            const supportHint = typeof strings.errorSupportHint === 'string' ? strings.errorSupportHint : '';
             const extractResponseMessage = function(payload) {
                 if (!payload || typeof payload !== 'object') {
                     return '';
@@ -156,6 +179,8 @@ document.addEventListener('DOMContentLoaded', function() {
             let idlePollCount = 0;
             let consecutiveErrors = 0;
             let lastJobSignature = '';
+            let latestKnownJobId = null;
+            let lastKnownJob = null;
 
             if (textarea && defaults && typeof defaults.exclusions === 'string' && !textarea.value) {
                 textarea.value = defaults.exclusions;
@@ -175,6 +200,371 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 return formatted.replace(/%%/g, '%');
             };
+
+            if (jobMetaTitle && jobMetaLabels.title) {
+                jobMetaTitle.textContent = jobMetaLabels.title;
+            }
+
+            if (jobMetaCopyButton && jobMetaLabels.copy) {
+                jobMetaCopyButton.textContent = jobMetaLabels.copy;
+            }
+
+            if (retryButton && jobRetryLabel) {
+                retryButton.textContent = jobRetryLabel;
+            }
+
+            const formatTimestamp = function(timestamp) {
+                if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) {
+                    return '';
+                }
+
+                try {
+                    const value = timestamp * 1000;
+                    const date = new Date(value);
+
+                    if (Number.isNaN(date.getTime())) {
+                        return '';
+                    }
+
+                    if (typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function') {
+                        const formatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+                        return formatter.format(date);
+                    }
+
+                    return date.toLocaleString();
+                } catch (error) {
+                    return '';
+                }
+            };
+
+            const readStoredJobSnapshot = function() {
+                if (!jobStorageKey) {
+                    return null;
+                }
+
+                try {
+                    const raw = window.localStorage.getItem(jobStorageKey);
+
+                    if (!raw) {
+                        return null;
+                    }
+
+                    const parsed = JSON.parse(raw);
+
+                    if (parsed && typeof parsed === 'object') {
+                        return parsed;
+                    }
+                } catch (error) {
+                    return null;
+                }
+
+                return null;
+            };
+
+            const clearStoredJobSnapshot = function() {
+                if (!jobStorageKey) {
+                    return;
+                }
+
+                try {
+                    window.localStorage.removeItem(jobStorageKey);
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            };
+
+            const writeStoredJobSnapshot = function(snapshot) {
+                if (!jobStorageKey) {
+                    return;
+                }
+
+                if (!snapshot || typeof snapshot !== 'object') {
+                    clearStoredJobSnapshot();
+                    return;
+                }
+
+                try {
+                    window.localStorage.setItem(jobStorageKey, JSON.stringify(snapshot));
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            };
+
+            const persistJobSnapshot = function(jobId, job, extra) {
+                if (!jobId) {
+                    clearStoredJobSnapshot();
+                    return;
+                }
+
+                const normalizedExtra = extra && typeof extra === 'object' ? extra : {};
+                const resolvedJob = job && typeof job === 'object' ? job : null;
+
+                const status = resolvedJob && typeof resolvedJob.status === 'string'
+                    ? resolvedJob.status
+                    : (typeof normalizedExtra.status === 'string' ? normalizedExtra.status : '');
+
+                const message = resolvedJob && typeof resolvedJob.message === 'string'
+                    ? resolvedJob.message
+                    : (typeof normalizedExtra.message === 'string' ? normalizedExtra.message : '');
+
+                const failureCode = resolvedJob && typeof resolvedJob.failure_code === 'string'
+                    ? resolvedJob.failure_code
+                    : (typeof normalizedExtra.failureCode === 'string' ? normalizedExtra.failureCode : '');
+
+                let updatedAt = 0;
+
+                if (resolvedJob && typeof resolvedJob.updated_at === 'number' && resolvedJob.updated_at > 0) {
+                    updatedAt = resolvedJob.updated_at;
+                } else if (resolvedJob && typeof resolvedJob.created_at === 'number' && resolvedJob.created_at > 0) {
+                    updatedAt = resolvedJob.created_at;
+                } else if (typeof normalizedExtra.updatedAt === 'number') {
+                    updatedAt = normalizedExtra.updatedAt;
+                } else {
+                    updatedAt = Math.round(Date.now() / 1000);
+                }
+
+                const snapshot = {
+                    id: jobId,
+                    status: status,
+                    message: message,
+                    failureCode: failureCode,
+                    updatedAt: updatedAt,
+                    downloadUrl: typeof normalizedExtra.downloadUrl === 'string' ? normalizedExtra.downloadUrl : '',
+                };
+
+                writeStoredJobSnapshot(snapshot);
+            };
+
+            const updateGuidance = function(message, shouldShow) {
+                if (!guidanceEl) {
+                    return;
+                }
+
+                if (!shouldShow || !message) {
+                    guidanceEl.hidden = true;
+                    guidanceEl.textContent = '';
+                    return;
+                }
+
+                guidanceEl.hidden = false;
+                guidanceEl.textContent = message;
+            };
+
+            const jobHintState = {
+                defaultMessage: jobMetaLabels.supportHint || '',
+                resetTimer: null,
+            };
+
+            const setJobHint = function(message, duration) {
+                if (!jobMetaHint) {
+                    return;
+                }
+
+                if (jobHintState.resetTimer) {
+                    window.clearTimeout(jobHintState.resetTimer);
+                    jobHintState.resetTimer = null;
+                }
+
+                if (!message) {
+                    jobMetaHint.hidden = true;
+                    jobMetaHint.textContent = '';
+                    return;
+                }
+
+                jobMetaHint.hidden = false;
+                jobMetaHint.textContent = message;
+
+                if (typeof duration === 'number' && duration > 0 && jobHintState.defaultMessage && message !== jobHintState.defaultMessage) {
+                    jobHintState.resetTimer = window.setTimeout(function() {
+                        jobHintState.resetTimer = null;
+                        if (jobHintState.defaultMessage) {
+                            jobMetaHint.hidden = false;
+                            jobMetaHint.textContent = jobHintState.defaultMessage;
+                        } else {
+                            jobMetaHint.hidden = true;
+                            jobMetaHint.textContent = '';
+                        }
+                    }, duration);
+                }
+            };
+
+            const updateJobMetaDisplay = function(jobId, job, extra) {
+                if (!jobMetaContainer) {
+                    return;
+                }
+
+                const normalizedJob = job && typeof job === 'object' ? job : null;
+                const normalizedExtra = extra && typeof extra === 'object' ? extra : {};
+                const resolvedJobId = typeof jobId === 'string' && jobId.length
+                    ? jobId
+                    : (normalizedJob && typeof normalizedJob.id === 'string' ? normalizedJob.id : '');
+
+                if (!resolvedJobId) {
+                    jobMetaContainer.hidden = true;
+                    return;
+                }
+
+                jobMetaContainer.hidden = false;
+
+                if (jobMetaId) {
+                    jobMetaId.textContent = resolvedJobId;
+                }
+
+                const jobStatus = normalizedJob && typeof normalizedJob.status === 'string'
+                    ? normalizedJob.status
+                    : (typeof normalizedExtra.status === 'string' ? normalizedExtra.status : '');
+
+                const statusLabel = jobStatus
+                    ? (strings.statusLabel ? formatString(strings.statusLabel, { '1': jobStatus }) : jobStatus)
+                    : (strings.jobStatusUnknown || '');
+
+                if (jobMetaStatus) {
+                    jobMetaStatus.textContent = statusLabel;
+                }
+
+                const failureCode = normalizedJob && typeof normalizedJob.failure_code === 'string' && normalizedJob.failure_code.length
+                    ? normalizedJob.failure_code
+                    : (typeof normalizedExtra.failureCode === 'string' && normalizedExtra.failureCode.length ? normalizedExtra.failureCode : '');
+
+                if (jobMetaCode) {
+                    jobMetaCode.textContent = failureCode || (jobMetaLabels.noFailureCode || '');
+                }
+
+                const message = normalizedJob && typeof normalizedJob.message === 'string' && normalizedJob.message.length
+                    ? normalizedJob.message
+                    : (typeof normalizedExtra.message === 'string' && normalizedExtra.message.length ? normalizedExtra.message : '');
+
+                if (jobMetaMessage) {
+                    jobMetaMessage.textContent = message || (jobMetaLabels.noMessage || '');
+                }
+
+                let updatedAt = 0;
+
+                if (normalizedJob && typeof normalizedJob.updated_at === 'number' && normalizedJob.updated_at > 0) {
+                    updatedAt = normalizedJob.updated_at;
+                } else if (normalizedJob && typeof normalizedJob.created_at === 'number' && normalizedJob.created_at > 0) {
+                    updatedAt = normalizedJob.created_at;
+                } else if (typeof normalizedExtra.updatedAt === 'number') {
+                    updatedAt = normalizedExtra.updatedAt;
+                }
+
+                if (jobMetaUpdated) {
+                    if (updatedAt) {
+                        const formatted = formatTimestamp(updatedAt) || strings.jobTimestampFallback || '';
+                        jobMetaUpdated.textContent = jobMetaLabels.updated
+                            ? formatString(jobMetaLabels.updated, { '1': formatted })
+                            : formatted;
+                    } else if (jobMetaLabels.updated) {
+                        const fallback = strings.jobTimestampFallback || '';
+                        jobMetaUpdated.textContent = fallback
+                            ? formatString(jobMetaLabels.updated, { '1': fallback })
+                            : '';
+                    } else {
+                        jobMetaUpdated.textContent = strings.jobTimestampFallback || '';
+                    }
+                }
+
+                jobHintState.defaultMessage = jobMetaLabels.supportHint || jobHintState.defaultMessage || '';
+
+                if (jobHintState.defaultMessage) {
+                    setJobHint(jobHintState.defaultMessage, 0);
+                } else {
+                    setJobHint('', 0);
+                }
+            };
+
+            if (jobMetaCopyButton) {
+                jobMetaCopyButton.addEventListener('click', function(event) {
+                    if (event && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                    }
+
+                    if (!jobMetaId) {
+                        return;
+                    }
+
+                    const jobIdValue = (jobMetaId.textContent || '').trim();
+
+                    if (!jobIdValue) {
+                        return;
+                    }
+
+                    const fallbackCopy = function(text) {
+                        return new Promise(function(resolve, reject) {
+                            const helper = document.createElement('textarea');
+                            helper.value = text;
+                            helper.setAttribute('readonly', 'readonly');
+                            helper.style.position = 'absolute';
+                            helper.style.left = '-9999px';
+                            document.body.appendChild(helper);
+                            helper.select();
+
+                            let successful = false;
+
+                            try {
+                                successful = document.execCommand('copy');
+                            } catch (error) {
+                                successful = false;
+                            }
+
+                            document.body.removeChild(helper);
+
+                            if (successful) {
+                                resolve();
+                            } else {
+                                reject(new Error('copy-failed'));
+                            }
+                        });
+                    };
+
+                    const executeCopy = function(text) {
+                        if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                            return navigator.clipboard.writeText(text).catch(function() {
+                                return fallbackCopy(text);
+                            });
+                        }
+
+                        return fallbackCopy(text);
+                    };
+
+                    executeCopy(jobIdValue).then(function() {
+                        if (jobMetaLabels.copySuccess) {
+                            setJobHint(jobMetaLabels.copySuccess, 3500);
+                        }
+                    }).catch(function() {
+                        if (jobMetaLabels.copyFailed) {
+                            setJobHint(jobMetaLabels.copyFailed, 4500);
+                        }
+                    });
+                });
+            }
+
+            if (retryButton) {
+                retryButton.addEventListener('click', function(event) {
+                    if (event && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                    }
+
+                    const snapshot = readStoredJobSnapshot();
+                    const jobId = latestKnownJobId
+                        || currentJobId
+                        || (snapshot && typeof snapshot.id === 'string' ? snapshot.id : '');
+
+                    if (!jobId) {
+                        return;
+                    }
+
+                    retryButton.disabled = true;
+
+                    if (statusText && jobRetryAnnouncement) {
+                        statusText.textContent = jobRetryAnnouncement;
+                    }
+
+                    setSpinner(true);
+                    updateGuidance('', false);
+                    fetchStatus(jobId, { isRetry: true });
+                });
+            }
 
             if (patternTester && patternTester.action && patternTester.nonce) {
                 const patternTestContainer = exportForm.querySelector('[data-pattern-test]');
@@ -474,8 +864,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     cancelButton.disabled = false;
                 }
 
+                updateGuidance('', false);
+
+                if (jobMetaContainer) {
+                    jobMetaContainer.hidden = true;
+                }
+
+                setJobHint('', 0);
+
+                if (retryButton) {
+                    retryButton.hidden = true;
+                    retryButton.disabled = false;
+                }
+
                 resetBackoffTracking();
                 lastJobSignature = '';
+                lastKnownJob = null;
             };
 
             const resetBackoffTracking = function() {
@@ -548,14 +952,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
+                const extraData = extra && typeof extra === 'object' ? extra : {};
+                const jobId = typeof extraData.jobId === 'string' && extraData.jobId.length
+                    ? extraData.jobId
+                    : (typeof job.id === 'string' && job.id.length ? job.id : (currentJobId || ''));
+
+                if (jobId) {
+                    latestKnownJobId = jobId;
+                }
+
+                lastKnownJob = job;
+
                 feedback.hidden = false;
                 feedback.classList.remove('notice-error', 'notice-success', 'notice-info');
 
                 let statusLabel = strings.queued || '';
                 let description = '';
+                let finalMessage = '';
                 let progressValue = 0;
                 let shouldShowCancel = false;
                 const failureCode = typeof job.failure_code === 'string' ? job.failure_code : '';
+                const normalizedStatus = typeof job.status === 'string' ? job.status.toLowerCase() : '';
 
                 if (typeof job.progress === 'number') {
                     progressValue = Math.max(0, Math.min(100, Math.round(job.progress)));
@@ -568,18 +985,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (job.status === 'completed') {
                     feedback.classList.add('notice-success');
                     statusLabel = strings.completed || '';
-                    if (downloadLink && extra && typeof extra.downloadUrl === 'string') {
+                    finalMessage = description;
+
+                    if (downloadLink && typeof extraData.downloadUrl === 'string') {
                         downloadLink.hidden = false;
-                        downloadLink.href = extra.downloadUrl;
+                        downloadLink.href = extraData.downloadUrl;
                         downloadLink.textContent = strings.downloadLabel || downloadLink.textContent;
                     }
                 } else if (job.status === 'failed') {
                     feedback.classList.add('notice-error');
+
                     if (failureCode === 'timeout' && strings.autoFailedStatus) {
                         statusLabel = strings.autoFailedStatus;
+                        finalMessage = job.message && job.message.length
+                            ? job.message
+                            : (strings.autoFailedMessage || strings.unknownError || '');
                     } else {
-                        const failureMessage = job.message && job.message.length ? job.message : (strings.failed || '');
-                        statusLabel = strings.failed ? formatString(strings.failed, { '1': failureMessage }) : failureMessage;
+                        const failureMessage = job.message && job.message.length
+                            ? job.message
+                            : (strings.unknownError || '');
+                        statusLabel = strings.failed
+                            ? formatString(strings.failed, { '1': failureMessage })
+                            : failureMessage;
+                        finalMessage = failureMessage;
                     }
                 } else if (job.status === 'cancelled') {
                     feedback.classList.add('notice-info');
@@ -588,7 +1016,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         progressBar.value = 0;
                     }
                     statusLabel = strings.cancelledStatus || strings.cancelled || '';
-                    description = job.message && job.message.length ? job.message : (strings.cancelledMessage || '');
+                    description = job.message && job.message.length
+                        ? job.message
+                        : (strings.cancelledMessage || '');
+                    finalMessage = description;
                 } else {
                     feedback.classList.add('notice-info');
                     statusLabel = job.status === 'queued' && strings.queued
@@ -606,6 +1037,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         shouldShowCancel = true;
                     }
+
+                    finalMessage = description;
                 }
 
                 if (statusText) {
@@ -617,33 +1050,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 if (messageEl) {
-                    if (job.status === 'failed') {
-                        if (failureCode === 'timeout') {
-                            const autoFailureMessage = job.message && job.message.length
-                                ? job.message
-                                : (strings.autoFailedMessage || strings.unknownError || '');
-                            messageEl.textContent = autoFailureMessage;
-                        } else {
-                            const failureMessage = job.message && job.message.length ? job.message : (strings.unknownError || '');
-                            messageEl.textContent = failureMessage;
-                        }
-                    } else if (job.status === 'cancelled') {
-                        const cancelledMessage = description && description.length
-                            ? description
-                            : (strings.cancelledMessage || strings.cancelled || '');
-                        messageEl.textContent = cancelledMessage;
-                    } else {
-                        messageEl.textContent = description;
-                    }
+                    messageEl.textContent = finalMessage;
                 }
 
-                if (downloadLink) {
-                    if (job.status === 'completed') {
-                        // Link already handled above.
-                    } else {
-                        downloadLink.hidden = true;
-                        downloadLink.removeAttribute('href');
-                    }
+                if (downloadLink && job.status !== 'completed') {
+                    downloadLink.hidden = true;
+                    downloadLink.removeAttribute('href');
                 }
 
                 if (cancelButton) {
@@ -655,6 +1067,37 @@ document.addEventListener('DOMContentLoaded', function() {
                         cancelButton.disabled = false;
                     }
                 }
+
+                const metadata = {
+                    downloadUrl: typeof extraData.downloadUrl === 'string' ? extraData.downloadUrl : '',
+                    status: normalizedStatus,
+                    failureCode: failureCode,
+                    message: finalMessage,
+                    updatedAt: (typeof job.updated_at === 'number' && job.updated_at > 0)
+                        ? job.updated_at
+                        : (typeof job.created_at === 'number' && job.created_at > 0
+                            ? job.created_at
+                            : Math.round(Date.now() / 1000)),
+                };
+
+                updateJobMetaDisplay(jobId, job, metadata);
+                persistJobSnapshot(jobId, job, metadata);
+
+                if (retryButton) {
+                    if (normalizedStatus === 'failed') {
+                        retryButton.hidden = false;
+                        retryButton.disabled = false;
+                    } else {
+                        retryButton.hidden = true;
+                        retryButton.disabled = false;
+                    }
+                }
+
+                if (normalizedStatus === 'failed' || normalizedStatus === 'cancelled') {
+                    updateGuidance(supportHint, true);
+                } else {
+                    updateGuidance('', false);
+                }
             };
 
             const handleError = function(message) {
@@ -664,11 +1107,50 @@ document.addEventListener('DOMContentLoaded', function() {
                     feedback.classList.remove('notice-info', 'notice-success');
                     feedback.classList.add('notice-error');
                 }
+                const snapshot = readStoredJobSnapshot();
+                const jobIdForError = latestKnownJobId
+                    || currentJobId
+                    || (snapshot && typeof snapshot.id === 'string' ? snapshot.id : '');
+                const fallbackMessage = message || strings.unknownError || '';
                 if (statusText) {
-                    statusText.textContent = strings.failed ? formatString(strings.failed, { '1': message }) : message;
+                    if (jobIdForError && strings.failedWithId) {
+                        statusText.textContent = formatString(strings.failedWithId, {
+                            '1': fallbackMessage,
+                            '2': jobIdForError,
+                        });
+                    } else if (strings.failed) {
+                        statusText.textContent = formatString(strings.failed, { '1': fallbackMessage });
+                    } else {
+                        statusText.textContent = fallbackMessage;
+                    }
                 }
                 if (messageEl) {
-                    messageEl.textContent = message || strings.unknownError || '';
+                    messageEl.textContent = fallbackMessage;
+                }
+                if (downloadLink) {
+                    downloadLink.hidden = true;
+                    downloadLink.removeAttribute('href');
+                }
+                const metadata = {
+                    status: 'failed',
+                    failureCode: lastKnownJob && typeof lastKnownJob.failure_code === 'string' ? lastKnownJob.failure_code : '',
+                    message: fallbackMessage,
+                    updatedAt: Math.round(Date.now() / 1000),
+                };
+                updateJobMetaDisplay(jobIdForError, lastKnownJob, metadata);
+                persistJobSnapshot(jobIdForError, lastKnownJob, metadata);
+                updateGuidance(supportHint, true);
+                if (retryButton) {
+                    if (jobIdForError) {
+                        retryButton.hidden = false;
+                        retryButton.disabled = false;
+                    } else {
+                        retryButton.hidden = true;
+                        retryButton.disabled = true;
+                    }
+                }
+                if (jobHintState.defaultMessage) {
+                    setJobHint(jobHintState.defaultMessage, 0);
                 }
             };
 
@@ -706,7 +1188,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
 
                     const job = payload.data.job;
-                    const extra = { downloadUrl: payload.data.download_url || '' };
+                    const extra = {
+                        downloadUrl: payload.data.download_url || '',
+                        jobId: jobId,
+                    };
                     updateFeedback(job, extra);
 
                     const signature = computeJobSignature(job);
@@ -801,7 +1286,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 resetBackoffTracking();
 
                 if (job) {
-                    updateFeedback(job, { downloadUrl: '' });
+                    updateFeedback(job, { downloadUrl: '', jobId: persistedJobId });
                     lastJobSignature = computeJobSignature(job);
                 }
 
@@ -812,6 +1297,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         : '';
 
                 const normalizedStatus = statusFromSnapshot.toLowerCase();
+
+                if (!job) {
+                    const metadata = {
+                        status: normalizedStatus,
+                        message: '',
+                        updatedAt: Math.round(Date.now() / 1000),
+                    };
+                    updateJobMetaDisplay(persistedJobId, null, metadata);
+                    persistJobSnapshot(persistedJobId, null, metadata);
+                }
 
                 const shouldFetch = ['queued', 'processing', 'completed', 'failed'].indexOf(normalizedStatus) !== -1;
 
@@ -838,6 +1333,66 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (exportAsync.previousJob) {
                 resumePersistedJob(exportAsync.previousJob);
+            }
+
+            if (!exportAsync.previousJob) {
+                const storedSnapshot = readStoredJobSnapshot();
+
+                if (storedSnapshot && typeof storedSnapshot.id === 'string' && storedSnapshot.id.length) {
+                    latestKnownJobId = storedSnapshot.id;
+
+                    const normalizedStatus = typeof storedSnapshot.status === 'string'
+                        ? storedSnapshot.status.toLowerCase()
+                        : '';
+
+                    if (feedback) {
+                        feedback.hidden = false;
+                        feedback.classList.remove('notice-error', 'notice-success');
+                        if (!feedback.classList.contains('notice-info')) {
+                            feedback.classList.add('notice-info');
+                        }
+                    }
+
+                    const statusLabelFromSnapshot = storedSnapshot.status
+                        ? (strings.statusLabel
+                            ? formatString(strings.statusLabel, { '1': storedSnapshot.status })
+                            : storedSnapshot.status)
+                        : (strings.jobStatusUnknown || '');
+
+                    if (statusText) {
+                        statusText.textContent = statusLabelFromSnapshot;
+                    }
+
+                    if (messageEl) {
+                        const storedMessage = typeof storedSnapshot.message === 'string'
+                            ? storedSnapshot.message
+                            : '';
+                        messageEl.textContent = storedMessage;
+                    }
+
+                    updateJobMetaDisplay(storedSnapshot.id, null, {
+                        status: normalizedStatus,
+                        message: typeof storedSnapshot.message === 'string' ? storedSnapshot.message : '',
+                        failureCode: typeof storedSnapshot.failureCode === 'string' ? storedSnapshot.failureCode : '',
+                        updatedAt: typeof storedSnapshot.updatedAt === 'number' ? storedSnapshot.updatedAt : Math.round(Date.now() / 1000),
+                    });
+
+                    if (retryButton) {
+                        if (normalizedStatus === 'failed') {
+                            retryButton.hidden = false;
+                            retryButton.disabled = false;
+                        } else {
+                            retryButton.hidden = true;
+                            retryButton.disabled = false;
+                        }
+                    }
+
+                    if (normalizedStatus === 'failed' || normalizedStatus === 'cancelled') {
+                        updateGuidance(supportHint, true);
+                    } else {
+                        updateGuidance('', false);
+                    }
+                }
             }
 
             if (startButton) {
@@ -890,7 +1445,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             return Promise.reject(strings.unknownError || '');
                         }
 
-                        updateFeedback(job || null, { downloadUrl: '' });
+                        updateFeedback(job || null, { downloadUrl: '', jobId: currentJobId });
                         scheduleNextPoll(currentJobId, 'active');
                     }).catch(function(error) {
                         setSpinner(false);
@@ -990,8 +1545,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         lastJobSignature = '';
                         cancelButton.disabled = false;
                         const job = payload.data.job;
+                        const cancelledJobId = currentJobId;
                         currentJobId = null;
-                        updateFeedback(job, { downloadUrl: '' });
+                        updateFeedback(job, { downloadUrl: '', jobId: cancelledJobId });
                     }).catch(function(error) {
                         const message = (typeof error === 'string' && error.length)
                             ? error

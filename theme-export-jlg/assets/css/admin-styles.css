@@ -1,15 +1,15 @@
 :root {
     --tejlg-surface-color: var(--wp-components-color-surface, #ffffff);
-    --tejlg-surface-alt-color: var(--wp-components-color-surface-alt, #f5f7fb);
-    --tejlg-surface-muted-color: #eef2ff;
-    --tejlg-border-color: #d0d7e3;
-    --tejlg-border-strong-color: #7c8aa5;
-    --tejlg-text-color: var(--wp-components-color-foreground, #0f172a);
-    --tejlg-text-muted-color: var(--wp-components-color-foreground-muted, #475569);
-    --tejlg-text-subtle-color: var(--wp-components-color-foreground-subtle, #64748b);
-    --tejlg-accent-color: var(--wp-admin-theme-color, #2563eb);
-    --tejlg-accent-color-darker: var(--wp-admin-theme-color-darker-10, #1d4ed8);
-    --tejlg-accent-color-soft: rgba(37, 99, 235, 0.08);
+    --tejlg-surface-alt-color: var(--wp-components-color-surface-alt, #f1f5ff);
+    --tejlg-surface-muted-color: #e8efff;
+    --tejlg-border-color: #c4d0e5;
+    --tejlg-border-strong-color: #475569;
+    --tejlg-text-color: var(--wp-components-color-foreground, #0b1120);
+    --tejlg-text-muted-color: #1f2937;
+    --tejlg-text-subtle-color: #334155;
+    --tejlg-accent-color: var(--wp-admin-theme-color, #1d4ed8);
+    --tejlg-accent-color-darker: var(--wp-admin-theme-color-darker-10, #1e3a8a);
+    --tejlg-accent-color-soft: rgba(30, 64, 175, 0.12);
     --tejlg-page-background: #f8fafc;
     --tejlg-shadow-sm: 0 6px 16px rgba(15, 23, 42, 0.08);
     --tejlg-shadow-md: 0 12px 28px rgba(15, 23, 42, 0.08);
@@ -176,7 +176,7 @@ body.toplevel_page_theme-export-jlg .nav-tab:focus-visible {
 
 body.toplevel_page_theme-export-jlg .nav-tab.nav-tab-active {
     color: #fff;
-    background: var(--tejlg-accent-color);
+    background: var(--tejlg-accent-color-darker);
     box-shadow: none;
 }
 
@@ -1365,6 +1365,11 @@ textarea.has-pattern-error {
     padding: 12px 15px;
 }
 
+.tejlg-export-feedback__hint {
+    margin: 0.35rem 0 0;
+    color: var(--tejlg-text-muted-color);
+}
+
 .tejlg-theme-export-feedback progress {
     width: 100%;
     height: 16px;
@@ -1373,6 +1378,75 @@ textarea.has-pattern-error {
 
 .tejlg-theme-export-feedback [data-export-download] {
     margin-top: 4px;
+}
+
+.tejlg-job-meta {
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    border-left: 4px solid var(--tejlg-accent-color-darker);
+    background: color-mix(in srgb, var(--tejlg-surface-muted-color) 65%, #ffffff);
+    border-radius: var(--tejlg-radius-md);
+    display: grid;
+    gap: 0.75rem;
+}
+
+@supports not (color-mix(in srgb, #000 50%, #fff 50%)) {
+    .tejlg-job-meta {
+        background: var(--tejlg-surface-alt-color);
+    }
+}
+
+.tejlg-job-meta__title {
+    margin: 0;
+    font-weight: 600;
+    color: var(--tejlg-text-color);
+}
+
+.tejlg-job-meta__grid {
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.65rem;
+}
+
+.tejlg-job-meta__row {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.tejlg-job-meta__row dt {
+    margin: 0;
+    font-weight: 600;
+    color: var(--tejlg-text-muted-color);
+}
+
+.tejlg-job-meta__row dd {
+    margin: 0;
+    color: var(--tejlg-text-color);
+    word-break: break-word;
+}
+
+.tejlg-job-meta__row code {
+    padding: 0.1rem 0.45rem;
+    border-radius: var(--tejlg-radius-sm);
+    background: #e2e8f0;
+    color: var(--tejlg-text-color);
+}
+
+.tejlg-job-meta__copy {
+    margin-left: 0.75rem;
+    color: var(--tejlg-accent-color-darker);
+}
+
+.tejlg-job-meta__updated,
+.tejlg-job-meta__hint {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--tejlg-text-muted-color);
+}
+
+.tejlg-job-meta__hint[hidden] {
+    display: none !important;
 }
 
 .tejlg-custom-patterns-summary {
