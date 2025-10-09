@@ -16,6 +16,17 @@ document.addEventListener('DOMContentLoaded', function() {
         ? localization.previewFallbackWarning
         : 'La prévisualisation a été chargée via un mode de secours. Certaines fonctionnalités peuvent être limitées.';
 
+    const previewQueueMessage = typeof localization.previewQueueMessage === 'string'
+        ? localization.previewQueueMessage
+        : '';
+
+    const previewConcurrencyLimit = Math.max(
+        1,
+        Number.isFinite(parseInt(localization.previewConcurrencyLimit, 10))
+            ? parseInt(localization.previewConcurrencyLimit, 10)
+            : 2
+    );
+
     const exportAsync = (localization && typeof localization.exportAsync === 'object')
         ? localization.exportAsync
         : null;
@@ -136,6 +147,85 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    (function initializeContrastToggle() {
+        const toggle = document.querySelector('[data-contrast-toggle]');
+
+        if (!toggle) {
+            return;
+        }
+
+        const storageKey = 'tejlg:admin:contrast-mode';
+        const root = document.body || document.documentElement;
+
+        const readStoredPreference = function() {
+            try {
+                return window.localStorage.getItem(storageKey);
+            } catch (error) {
+                return null;
+            }
+        };
+
+        let storedPreference = readStoredPreference();
+        let hasStoredPreference = storedPreference === '0' || storedPreference === '1';
+
+        const prefersHighContrast = typeof window.matchMedia === 'function'
+            ? window.matchMedia('(prefers-contrast: more)').matches
+            : false;
+
+        let enabled = storedPreference === '1' || (!hasStoredPreference && prefersHighContrast);
+
+        const applyState = function(state) {
+            if (root) {
+                root.classList.toggle('tejlg-contrast-enabled', state);
+            }
+
+            if (toggle.checked !== state) {
+                toggle.checked = state;
+            }
+        };
+
+        const persistState = function(state) {
+            try {
+                window.localStorage.setItem(storageKey, state ? '1' : '0');
+                storedPreference = state ? '1' : '0';
+                hasStoredPreference = true;
+            } catch (error) {
+                // Ignore storage failures to keep the UI responsive.
+            }
+        };
+
+        applyState(enabled);
+
+        toggle.addEventListener('change', function() {
+            enabled = !!toggle.checked;
+            applyState(enabled);
+            persistState(enabled);
+        });
+
+        if (!hasStoredPreference && typeof window.matchMedia === 'function') {
+            try {
+                const mediaQuery = window.matchMedia('(prefers-contrast: more)');
+
+                const handlePreferenceChange = function(event) {
+                    if (hasStoredPreference) {
+                        return;
+                    }
+
+                    enabled = !!event.matches;
+                    applyState(enabled);
+                };
+
+                if (typeof mediaQuery.addEventListener === 'function') {
+                    mediaQuery.addEventListener('change', handlePreferenceChange);
+                } else if (typeof mediaQuery.addListener === 'function') {
+                    mediaQuery.addListener(handlePreferenceChange);
+                }
+            } catch (error) {
+                // Ignore preference observer errors to avoid breaking other scripts.
+            }
+        }
+    })();
 
     if (exportAsync) {
         const exportForm = document.querySelector('[data-export-form]');
@@ -1193,6 +1283,74 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     const previewWrappers = document.querySelectorAll('.pattern-preview-wrapper');
+
+    const MAX_PREVIEW_CONCURRENCY = Math.max(1, previewConcurrencyLimit);
+    const previewLoadQueue = [];
+    let activePreviewLoads = 0;
+
+    const enqueuePreviewLoad = function(state, startCallback) {
+        if (!state || typeof startCallback !== 'function') {
+            return true;
+        }
+
+        const runner = function() {
+            state.queueRunner = null;
+            state.queuePending = false;
+
+            let released = false;
+
+            const release = function() {
+                if (released) {
+                    return;
+                }
+
+                released = true;
+
+                if (state.queueRelease === release) {
+                    state.queueRelease = null;
+                }
+
+                activePreviewLoads = Math.max(0, activePreviewLoads - 1);
+
+                if (previewLoadQueue.length) {
+                    const nextTask = previewLoadQueue.shift();
+
+                    if (typeof nextTask === 'function') {
+                        nextTask();
+                    }
+                }
+            };
+
+            state.queueRelease = release;
+            activePreviewLoads += 1;
+            startCallback(release);
+        };
+
+        if (activePreviewLoads < MAX_PREVIEW_CONCURRENCY) {
+            runner();
+            return true;
+        }
+
+        state.queueRunner = runner;
+        state.queuePending = true;
+        previewLoadQueue.push(runner);
+        return false;
+    };
+
+    const removeQueuedPreview = function(state) {
+        if (!state || !state.queueRunner) {
+            return;
+        }
+
+        const index = previewLoadQueue.indexOf(state.queueRunner);
+
+        if (index !== -1) {
+            previewLoadQueue.splice(index, 1);
+        }
+
+        state.queueRunner = null;
+        state.queuePending = false;
+    };
     const previewControllers = (typeof WeakMap === 'function') ? new WeakMap() : null;
 
     const getPreviewController = function(wrapper) {
@@ -1835,12 +1993,47 @@ document.addEventListener('DOMContentLoaded', function() {
             const collapseButtons = wrapper.querySelectorAll('[data-preview-trigger="collapse"]');
             const patternItem = wrapper.closest('.pattern-item');
 
+            let state = null;
+
+            const hidePreviewMessage = function(target) {
+                if (state) {
+                    state.queueMessageVisible = false;
+                }
+
+                if (!target) {
+                    return;
+                }
+
+                target.hidden = true;
+                target.setAttribute('hidden', 'hidden');
+                target.textContent = '';
+            };
+
+            const showPreviewMessage = function(target, text) {
+                if (state) {
+                    state.queueMessageVisible = false;
+                }
+
+                if (!target) {
+                    return;
+                }
+
+                if (typeof text !== 'string' || text === '') {
+                    hidePreviewMessage(target);
+                    return;
+                }
+
+                target.textContent = text;
+                target.hidden = false;
+                target.removeAttribute('hidden');
+            };
+
             if (!dataElement || !iframe || !liveContainer || !compactContainer) {
                 hidePreviewMessage(messageElement);
                 return null;
             }
 
-            const state = {
+            state = {
                 htmlContent: null,
                 minHeightValue: getEffectiveMinHeight(iframe),
                 blobUrl: null,
@@ -1853,6 +2046,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 loadRequested: false,
                 isVisible: false,
                 previewUsesFallback: false,
+                queuePending: false,
+                queueRunner: null,
+                queueRelease: null,
+                queueMessageVisible: false,
+            };
+
+            const releaseQueueSlot = function() {
+                if (typeof state.queueRelease === 'function') {
+                    const release = state.queueRelease;
+                    state.queueRelease = null;
+
+                    try {
+                        release();
+                    } catch (error) {
+                        // Ignore release errors to keep the queue moving.
+                    }
+                }
+            };
+
+            const clearQueueMessage = function() {
+                if (!state || !state.queueMessageVisible) {
+                    return;
+                }
+
+                if (messageElement) {
+                    hidePreviewMessage(messageElement);
+                } else {
+                    state.queueMessageVisible = false;
+                }
+            };
+
+            const showQueueMessage = function() {
+                if (!previewQueueMessage || !messageElement) {
+                    return;
+                }
+
+                showPreviewMessage(messageElement, previewQueueMessage);
+                state.queueMessageVisible = true;
             };
 
             const setWrapperState = function(value) {
@@ -1951,10 +2182,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 cleanupResizeListeners();
                 cleanupRemovalObserver();
                 hideLoadingIndicator();
+                clearQueueMessage();
 
                 if (handleIframeLoad) {
                     iframe.removeEventListener('load', handleIframeLoad);
                 }
+
+                removeQueuedPreview(state);
+                releaseQueueSlot();
 
                 if (blobSupported && state.blobUrl) {
                     try {
@@ -2098,6 +2333,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 } catch (error) {
                     iframe.style.height = state.minHeightValue + 'px';
                 }
+
+                clearQueueMessage();
+                releaseQueueSlot();
             };
 
             const scheduleHeightSync = function() {
@@ -2157,10 +2395,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 return htmlContent;
             };
 
-            const initializePreview = function() {
-                if (state.previewInitialized) {
-                    return;
-                }
+            const startPreviewInitialization = function() {
+                clearQueueMessage();
 
                 const htmlContent = ensureHtmlContent();
 
@@ -2169,6 +2405,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     state.loadRequested = false;
                     showCompact();
                     setWrapperState('compact');
+                    releaseQueueSlot();
                     return;
                 }
 
@@ -2248,6 +2485,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         showPreviewMessage(messageElement, previewFallbackWarning);
                         showCompact();
                         setWrapperState('compact');
+                        releaseQueueSlot();
                         return;
                     }
 
@@ -2257,8 +2495,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 setWrapperState('expanded');
             };
 
+            const initializePreview = function() {
+                if (state.previewInitialized || state.queuePending) {
+                    return;
+                }
+
+                state.queuePending = true;
+
+                const startedImmediately = enqueuePreviewLoad(state, function() {
+                    startPreviewInitialization();
+                });
+
+                if (!startedImmediately) {
+                    showQueueMessage();
+                }
+            };
+
             const requestLoad = function() {
                 if (state.previewInitialized) {
+                    clearQueueMessage();
                     showLive();
                     setWrapperState('expanded');
                     setExpandedAttributes(true);

@@ -304,6 +304,37 @@ $schedule_retention_label = $schedule_retention_value > 0
 $history_total_all = isset($history_total_all) ? (int) $history_total_all : (int) $history_total;
 $history_total_all_label = number_format_i18n($history_total_all);
 $history_total_filtered_label = number_format_i18n((int) $history_total);
+
+if ($schedule_is_active) {
+    $schedule_summary_description = sprintf(
+        /* translators: 1: schedule frequency label, 2: next run label. */
+        __('%1$s · prochaine exécution : %2$s', 'theme-export-jlg'),
+        $schedule_frequency_label,
+        $schedule_next_run_label
+    );
+} else {
+    $schedule_summary_description = __('Planification désactivée', 'theme-export-jlg');
+}
+
+$schedule_section_open = $schedule_is_active
+    || '' !== trim($schedule_exclusions_value)
+    || !empty($notification_enabled_results);
+
+$history_filters_active = (
+    (isset($history_selected_filters['result']) && '' !== $history_selected_filters['result'])
+    || (isset($history_selected_filters['origin']) && '' !== $history_selected_filters['origin'])
+    || (isset($history_selected_filters['orderby']) && 'timestamp' !== $history_selected_filters['orderby'])
+    || (isset($history_selected_filters['order']) && 'desc' !== $history_selected_filters['order'])
+);
+
+$history_summary_inline = sprintf(
+    /* translators: 1: number of displayed exports, 2: total number of exports recorded. */
+    __('%1$s export(s) visibles sur %2$s', 'theme-export-jlg'),
+    $history_total_filtered_label,
+    $history_total_all_label
+);
+
+$history_section_open = $history_filters_active;
 ?>
 <section class="tejlg-dashboard" aria-labelledby="tejlg-dashboard-title">
     <div class="tejlg-dashboard__header">
@@ -384,6 +415,22 @@ $history_total_filtered_label = number_format_i18n((int) $history_total);
     </div>
 </section>
 
+<div class="tejlg-accessibility-tools" role="region" aria-labelledby="tejlg-accessibility-tools-title">
+    <div class="tejlg-contrast-toggle">
+        <span id="tejlg-accessibility-tools-title" class="tejlg-accessibility-tools__title"><?php esc_html_e('Lisibilité', 'theme-export-jlg'); ?></span>
+        <div class="tejlg-contrast-toggle__control">
+            <input
+                type="checkbox"
+                id="tejlg-contrast-toggle-input"
+                data-contrast-toggle
+                aria-describedby="tejlg-contrast-toggle-help"
+            >
+            <label for="tejlg-contrast-toggle-input"><?php esc_html_e('Activer le mode contraste élevé', 'theme-export-jlg'); ?></label>
+        </div>
+        <p id="tejlg-contrast-toggle-help" class="description"><?php esc_html_e('Renforce les contrastes et simplifie les arrière-plans de cette interface. Votre préférence est retenue sur cet appareil.', 'theme-export-jlg'); ?></p>
+    </div>
+</div>
+
 <h2><?php esc_html_e('Actions sur le Thème Actif', 'theme-export-jlg'); ?></h2>
 <div class="tejlg-cards-container tejlg-cards-container--actions">
     <div class="tejlg-card tejlg-card--primary components-card is-elevated">
@@ -399,6 +446,11 @@ $history_total_filtered_label = number_format_i18n((int) $history_total);
                 data-step-form
             >
                 <?php wp_nonce_field('tejlg_theme_export_action', 'tejlg_theme_export_nonce'); ?>
+                <noscript>
+                    <div class="notice notice-warning tejlg-nojs-notice">
+                        <p><?php esc_html_e('JavaScript est désactivé : toutes les étapes sont affichées en continu. Complétez les champs puis validez l’export avec le bouton final.', 'theme-export-jlg'); ?></p>
+                    </div>
+                </noscript>
                 <ol class="tejlg-stepper" data-stepper>
                     <li class="tejlg-stepper__step" data-stepper-item>
                         <span class="tejlg-stepper__index" aria-hidden="true">1</span>
@@ -414,7 +466,7 @@ $history_total_filtered_label = number_format_i18n((int) $history_total);
                     </li>
                 </ol>
                 <div class="tejlg-steps" data-steps>
-                    <section class="tejlg-step" data-step="0" aria-labelledby="tejlg-export-step-intro">
+                    <section class="tejlg-step is-active" data-step="0" aria-labelledby="tejlg-export-step-intro">
                         <h4 id="tejlg-export-step-intro" class="tejlg-step__title" tabindex="-1"><?php esc_html_e('Vérification du thème actif', 'theme-export-jlg'); ?></h4>
                         <p class="description"><?php esc_html_e('Passez en revue les informations clés du thème avant de générer l’archive.', 'theme-export-jlg'); ?></p>
                         <dl class="tejlg-step__details">
@@ -435,7 +487,7 @@ $history_total_filtered_label = number_format_i18n((int) $history_total);
                             <button type="button" class="button button-primary wp-ui-primary" data-step-next><?php esc_html_e('Définir les filtres', 'theme-export-jlg'); ?></button>
                         </div>
                     </section>
-                    <section class="tejlg-step" data-step="1" aria-labelledby="tejlg-export-step-filters" hidden>
+                    <section class="tejlg-step" data-step="1" aria-labelledby="tejlg-export-step-filters">
                         <h4 id="tejlg-export-step-filters" class="tejlg-step__title" tabindex="-1"><?php esc_html_e('Motifs d’exclusion (optionnel)', 'theme-export-jlg'); ?></h4>
                         <p class="description"><?php esc_html_e('Affinez l’export en excluant certains fichiers. Vous pourrez tester vos motifs avant la confirmation.', 'theme-export-jlg'); ?></p>
                         <label for="tejlg_exclusion_patterns" class="tejlg-step__field-label"><?php esc_html_e('Motifs à exclure', 'theme-export-jlg'); ?></label>
@@ -492,7 +544,7 @@ $history_total_filtered_label = number_format_i18n((int) $history_total);
                             <button type="button" class="button button-primary wp-ui-primary" data-step-next><?php esc_html_e('Passer à la validation', 'theme-export-jlg'); ?></button>
                         </div>
                     </section>
-                    <section class="tejlg-step" data-step="2" aria-labelledby="tejlg-export-step-review" hidden>
+                    <section class="tejlg-step" data-step="2" aria-labelledby="tejlg-export-step-review">
                         <h4 id="tejlg-export-step-review" class="tejlg-step__title" tabindex="-1"><?php esc_html_e('Résumé et lancement', 'theme-export-jlg'); ?></h4>
                         <p class="description"><?php esc_html_e('Relisez les paramètres et lancez l’export. Vous pourrez suivre la progression en direct.', 'theme-export-jlg'); ?></p>
                         <ul class="tejlg-step-summary">
@@ -537,398 +589,426 @@ $history_total_filtered_label = number_format_i18n((int) $history_total);
             </form>
         </div>
     </div>
-    <div class="tejlg-card components-card is-elevated">
-        <div class="components-card__body">
-            <h3><?php esc_html_e('Planification des exports de thème', 'theme-export-jlg'); ?></h3>
-            <p><?php esc_html_e('Automatisez la génération d’archives ZIP du thème actif et contrôlez leur conservation.', 'theme-export-jlg'); ?></p>
-            <form method="post" action="<?php echo esc_url($export_tab_url); ?>">
-                <?php wp_nonce_field('tejlg_schedule_settings_action', 'tejlg_schedule_settings_nonce'); ?>
-                <table class="form-table">
-                    <tbody>
-                        <tr>
-                            <th scope="row">
-                                <label for="tejlg_schedule_frequency"><?php esc_html_e('Fréquence', 'theme-export-jlg'); ?></label>
-                            </th>
-                            <td>
-                                <select name="tejlg_schedule_frequency" id="tejlg_schedule_frequency">
-                                    <?php foreach ($schedule_frequencies as $frequency_value => $frequency_label) : ?>
-                                        <option value="<?php echo esc_attr($frequency_value); ?>" <?php selected($schedule_frequency_value, $frequency_value); ?>>
-                                            <?php echo esc_html($frequency_label); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <?php if (!empty($schedule_next_run)) : ?>
+    </div>
+</div>
+
+<details class="tejlg-collapsible" id="tejlg-schedule-panel"<?php echo $schedule_section_open ? ' open' : ''; ?>>
+    <summary class="tejlg-collapsible__summary">
+        <span class="tejlg-collapsible__title"><?php esc_html_e('Planification & alertes', 'theme-export-jlg'); ?></span>
+        <span class="tejlg-collapsible__description"><?php echo esc_html($schedule_summary_description); ?></span>
+    </summary>
+    <div class="tejlg-collapsible__content">
+        <div class="tejlg-card components-card is-elevated">
+            <div class="components-card__body">
+                <h3><?php esc_html_e('Planification des exports de thème', 'theme-export-jlg'); ?></h3>
+                <p><?php esc_html_e('Automatisez la génération d’archives ZIP du thème actif et contrôlez leur conservation.', 'theme-export-jlg'); ?></p>
+                <form method="post" action="<?php echo esc_url($export_tab_url); ?>">
+                    <?php wp_nonce_field('tejlg_schedule_settings_action', 'tejlg_schedule_settings_nonce'); ?>
+                    <table class="form-table">
+                        <tbody>
+                            <tr>
+                                <th scope="row">
+                                    <label for="tejlg_schedule_frequency"><?php esc_html_e('Fréquence', 'theme-export-jlg'); ?></label>
+                                </th>
+                                <td>
+                                    <select name="tejlg_schedule_frequency" id="tejlg_schedule_frequency">
+                                        <?php foreach ($schedule_frequencies as $frequency_value => $frequency_label) : ?>
+                                            <option value="<?php echo esc_attr($frequency_value); ?>" <?php selected($schedule_frequency_value, $frequency_value); ?>>
+                                                <?php echo esc_html($frequency_label); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <?php if (!empty($schedule_next_run)) : ?>
+                                        <p class="description">
+                                            <?php
+                                            $next_run_format = trim(get_option('date_format', 'Y-m-d') . ' ' . get_option('time_format', 'H:i'));
+                                            if (function_exists('wp_date')) {
+                                                $next_run_label = wp_date($next_run_format, (int) $schedule_next_run);
+                                            } else {
+                                                $next_run_label = date_i18n($next_run_format, (int) $schedule_next_run);
+                                            }
+                                            printf(
+                                                esc_html__('Prochaine exécution prévue : %s', 'theme-export-jlg'),
+                                                esc_html($next_run_label)
+                                            );
+                                            ?>
+                                        </p>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="tejlg_schedule_run_time"><?php esc_html_e("Heure d’exécution", 'theme-export-jlg'); ?></label>
+                                </th>
+                                <td>
+                                    <input
+                                        type="time"
+                                        id="tejlg_schedule_run_time"
+                                        name="tejlg_schedule_run_time"
+                                        value="<?php echo esc_attr($schedule_run_time_value); ?>"
+                                        step="60"
+                                    >
                                     <p class="description">
                                         <?php
-                                        $next_run_format = trim(get_option('date_format', 'Y-m-d') . ' ' . get_option('time_format', 'H:i'));
-                                        if (function_exists('wp_date')) {
-                                            $next_run_label = wp_date($next_run_format, (int) $schedule_next_run);
-                                        } else {
-                                            $next_run_label = date_i18n($next_run_format, (int) $schedule_next_run);
-                                        }
                                         printf(
-                                            esc_html__('Prochaine exécution prévue : %s', 'theme-export-jlg'),
-                                            esc_html($next_run_label)
+                                            esc_html__('Fuseau horaire du site : %s', 'theme-export-jlg'),
+                                            esc_html($site_timezone_string)
                                         );
                                         ?>
                                     </p>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row">
-                                <label for="tejlg_schedule_run_time"><?php esc_html_e("Heure d’exécution", 'theme-export-jlg'); ?></label>
-                            </th>
-                            <td>
-                                <input
-                                    type="time"
-                                    id="tejlg_schedule_run_time"
-                                    name="tejlg_schedule_run_time"
-                                    value="<?php echo esc_attr($schedule_run_time_value); ?>"
-                                    step="60"
-                                >
-                                <p class="description">
-                                    <?php
-                                    printf(
-                                        esc_html__('Fuseau horaire du site : %s', 'theme-export-jlg'),
-                                        esc_html($site_timezone_string)
-                                    );
-                                    ?>
-                                </p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row">
-                                <label for="tejlg_schedule_exclusions"><?php esc_html_e('Motifs d’exclusion', 'theme-export-jlg'); ?></label>
-                            </th>
-                            <td>
-                                <textarea
-                                    name="tejlg_schedule_exclusions"
-                                    id="tejlg_schedule_exclusions"
-                                    class="large-text code"
-                                    rows="4"
-                                    placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"
-                                ><?php echo esc_textarea($schedule_exclusions_value); ?></textarea>
-                                <p class="description"><?php esc_html_e('Un motif par ligne ou séparé par des virgules. Ces exclusions s’appliquent uniquement aux exports planifiés.', 'theme-export-jlg'); ?></p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row">
-                                <label for="tejlg_schedule_retention"><?php esc_html_e('Rétention (jours)', 'theme-export-jlg'); ?></label>
-                            </th>
-                            <td>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    class="small-text"
-                                    name="tejlg_schedule_retention"
-                                    id="tejlg_schedule_retention"
-                                    value="<?php echo esc_attr($schedule_retention_value); ?>"
-                                >
-                                <p class="description"><?php esc_html_e('Durée de conservation des archives stockées dans la médiathèque. Indiquez 0 pour désactiver le nettoyage automatique.', 'theme-export-jlg'); ?></p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row">
-                                <label for="tejlg_notifications_emails"><?php esc_html_e('Destinataires des alertes', 'theme-export-jlg'); ?></label>
-                            </th>
-                            <td>
-                                <textarea
-                                    name="tejlg_notifications_emails"
-                                    id="tejlg_notifications_emails"
-                                    class="large-text code"
-                                    rows="3"
-                                    placeholder="<?php echo esc_attr__('admin@example.com', 'theme-export-jlg'); ?>"
-                                ><?php echo esc_textarea($notification_recipients_value); ?></textarea>
-                                <p class="description"><?php esc_html_e('Une adresse par ligne (ou séparée par des virgules). L’e-mail administrateur du site est utilisé par défaut si cette liste est vide.', 'theme-export-jlg'); ?></p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row"><?php esc_html_e('Évènements surveillés', 'theme-export-jlg'); ?></th>
-                            <td>
-                                <fieldset>
-                                    <legend class="screen-reader-text"><span><?php esc_html_e('Choisissez les statuts qui déclenchent un e-mail', 'theme-export-jlg'); ?></span></legend>
-                                    <label>
-                                        <input type="checkbox" name="tejlg_notifications_events[]" value="error" <?php checked(!empty($notification_enabled_lookup['error'])); ?>>
-                                        <?php esc_html_e('Échecs', 'theme-export-jlg'); ?>
-                                    </label>
-                                    <br>
-                                    <label>
-                                        <input type="checkbox" name="tejlg_notifications_events[]" value="warning" <?php checked(!empty($notification_enabled_lookup['warning'])); ?>>
-                                        <?php esc_html_e('Annulations / avertissements', 'theme-export-jlg'); ?>
-                                    </label>
-                                    <br>
-                                    <label>
-                                        <input type="checkbox" name="tejlg_notifications_events[]" value="success" <?php checked(!empty($notification_enabled_lookup['success'])); ?>>
-                                        <?php esc_html_e('Succès', 'theme-export-jlg'); ?>
-                                    </label>
-                                    <br>
-                                    <label>
-                                        <input type="checkbox" name="tejlg_notifications_events[]" value="info" <?php checked(!empty($notification_enabled_lookup['info'])); ?>>
-                                        <?php esc_html_e('Informations', 'theme-export-jlg'); ?>
-                                    </label>
-                                </fieldset>
-                                <p class="description"><?php esc_html_e('Les notifications s’appliquent aux exports manuels et WP-CLI. Utilisez les filtres PHP pour inclure les exports planifiés si nécessaire.', 'theme-export-jlg'); ?></p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <p><button type="submit" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Enregistrer la planification', 'theme-export-jlg'); ?></button></p>
-            </form>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="tejlg_schedule_exclusions"><?php esc_html_e('Motifs d’exclusion', 'theme-export-jlg'); ?></label>
+                                </th>
+                                <td>
+                                    <textarea
+                                        name="tejlg_schedule_exclusions"
+                                        id="tejlg_schedule_exclusions"
+                                        class="large-text code"
+                                        rows="4"
+                                        placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"
+                                    ><?php echo esc_textarea($schedule_exclusions_value); ?></textarea>
+                                    <p class="description"><?php esc_html_e('Un motif par ligne ou séparé par des virgules. Ces exclusions s’appliquent uniquement aux exports planifiés.', 'theme-export-jlg'); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="tejlg_schedule_retention"><?php esc_html_e('Rétention (jours)', 'theme-export-jlg'); ?></label>
+                                </th>
+                                <td>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        class="small-text"
+                                        name="tejlg_schedule_retention"
+                                        id="tejlg_schedule_retention"
+                                        value="<?php echo esc_attr($schedule_retention_value); ?>"
+                                    >
+                                    <p class="description"><?php esc_html_e('Durée de conservation des archives stockées dans la médiathèque. Indiquez 0 pour désactiver le nettoyage automatique.', 'theme-export-jlg'); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="tejlg_notifications_emails"><?php esc_html_e('Destinataires des alertes', 'theme-export-jlg'); ?></label>
+                                </th>
+                                <td>
+                                    <textarea
+                                        name="tejlg_notifications_emails"
+                                        id="tejlg_notifications_emails"
+                                        class="large-text code"
+                                        rows="3"
+                                        placeholder="<?php echo esc_attr__('admin@example.com', 'theme-export-jlg'); ?>"
+                                    ><?php echo esc_textarea($notification_recipients_value); ?></textarea>
+                                    <p class="description"><?php esc_html_e('Une adresse par ligne (ou séparée par des virgules). L’e-mail administrateur du site est utilisé par défaut si cette liste est vide.', 'theme-export-jlg'); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e('Évènements surveillés', 'theme-export-jlg'); ?></th>
+                                <td>
+                                    <fieldset>
+                                        <legend class="screen-reader-text"><span><?php esc_html_e('Choisissez les statuts qui déclenchent un e-mail', 'theme-export-jlg'); ?></span></legend>
+                                        <label>
+                                            <input type="checkbox" name="tejlg_notifications_events[]" value="error" <?php checked(!empty($notification_enabled_lookup['error'])); ?>>
+                                            <?php esc_html_e('Échecs', 'theme-export-jlg'); ?>
+                                        </label>
+                                        <br>
+                                        <label>
+                                            <input type="checkbox" name="tejlg_notifications_events[]" value="warning" <?php checked(!empty($notification_enabled_lookup['warning'])); ?>>
+                                            <?php esc_html_e('Annulations / avertissements', 'theme-export-jlg'); ?>
+                                        </label>
+                                        <br>
+                                        <label>
+                                            <input type="checkbox" name="tejlg_notifications_events[]" value="success" <?php checked(!empty($notification_enabled_lookup['success'])); ?>>
+                                            <?php esc_html_e('Succès', 'theme-export-jlg'); ?>
+                                        </label>
+                                        <br>
+                                        <label>
+                                            <input type="checkbox" name="tejlg_notifications_events[]" value="info" <?php checked(!empty($notification_enabled_lookup['info'])); ?>>
+                                            <?php esc_html_e('Informations', 'theme-export-jlg'); ?>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e('Les notifications s’appliquent aux exports manuels et WP-CLI. Utilisez les filtres PHP pour inclure les exports planifiés si nécessaire.', 'theme-export-jlg'); ?></p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p><button type="submit" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Enregistrer la planification', 'theme-export-jlg'); ?></button></p>
+                </form>
+            </div>
         </div>
     </div>
-    <div class="tejlg-card components-card is-elevated">
-        <div class="components-card__body">
-            <h3><?php esc_html_e('Exporter les Compositions (.json)', 'theme-export-jlg'); ?></h3>
-            <p><?php echo wp_kses_post(__('Générez un fichier <code>.json</code> contenant vos compositions.', 'theme-export-jlg')); ?></p>
-            <form method="post" action="">
-                <?php wp_nonce_field('tejlg_export_action', 'tejlg_nonce'); ?>
-                <p><label><input type="checkbox" name="export_portable" value="1" <?php checked($portable_mode_enabled); ?>> <strong><?php esc_html_e('Export portable', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(compatibilité maximale)', 'theme-export-jlg'); ?></label></p>
-                <p><button type="submit" name="tejlg_export_patterns" class="button button-primary wp-ui-primary"><?php esc_html_e('Exporter TOUTES les compositions', 'theme-export-jlg'); ?></button></p>
-            </form>
-            <p>
-                <a href="<?php echo esc_url($select_patterns_url); ?>" class="button wp-ui-secondary"><?php esc_html_e('Exporter une sélection...', 'theme-export-jlg'); ?></a>
-            </p>
-        </div>
-    </div>
-    <div class="tejlg-card components-card is-elevated">
-        <div class="components-card__body">
-            <h3><?php esc_html_e('Exporter les Styles Globaux (.json)', 'theme-export-jlg'); ?></h3>
-            <p><?php echo wp_kses_post(__('Téléchargez les réglages globaux pour répliquer la configuration <code>theme.json</code>.', 'theme-export-jlg')); ?></p>
-            <form method="post" action="<?php echo esc_url($export_tab_url); ?>">
-                <?php wp_nonce_field('tejlg_export_global_styles_action', 'tejlg_export_global_styles_nonce'); ?>
-                <p><button type="submit" name="tejlg_export_global_styles" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Exporter les styles globaux', 'theme-export-jlg'); ?></button></p>
-            </form>
-        </div>
-    </div>
-    <div class="tejlg-card components-card is-elevated">
-        <div class="components-card__body">
-            <h3><?php esc_html_e('Créer un Thème Enfant', 'theme-export-jlg'); ?></h3>
-            <p><?php echo wp_kses_post(__('Générez un thème enfant basé sur votre thème actuel. Saisissez un nom personnalisé.', 'theme-export-jlg')); ?></p>
-            <form method="post" action="<?php echo esc_url($export_tab_url); ?>">
-                <?php wp_nonce_field('tejlg_create_child_action', 'tejlg_create_child_nonce'); ?>
-                <p>
-                    <label for="child_theme_name"><?php esc_html_e('Nom du thème enfant :', 'theme-export-jlg'); ?></label>
-                    <input type="text" name="child_theme_name" id="child_theme_name" class="regular-text" value="<?php echo esc_attr($child_theme_value); ?>" placeholder="<?php echo esc_attr(wp_get_theme()->get('Name') . ' ' . __('Enfant', 'theme-export-jlg')); ?>" required>
-                </p>
-                <p><button type="submit" name="tejlg_create_child" class="button button-primary wp-ui-primary"><?php esc_html_e('Créer le Thème Enfant', 'theme-export-jlg'); ?></button></p>
-            </form>
-        </div>
-    </div>
-</div>
+</details>
 
-<h2><?php esc_html_e('Historique des exports', 'theme-export-jlg'); ?></h2>
-<div class="tejlg-card components-card is-elevated">
-    <div class="components-card__body">
-        <form method="get" class="tejlg-history-filters" aria-label="<?php esc_attr_e('Filtres de l\'historique d\'export', 'theme-export-jlg'); ?>">
-            <input type="hidden" name="page" value="<?php echo esc_attr($history_base_args['page']); ?>">
-            <input type="hidden" name="tab" value="<?php echo esc_attr($history_base_args['tab']); ?>">
-            <div class="tejlg-history-filters__group">
-                <label for="tejlg-history-result"><?php esc_html_e('Statut', 'theme-export-jlg'); ?></label>
-                <select name="history_result" id="tejlg-history-result">
-                    <option value=""><?php esc_html_e('Tous les statuts', 'theme-export-jlg'); ?></option>
-                    <?php foreach ($available_history_results as $result_key) :
-                        $result_label = isset($history_result_labels[$result_key])
-                            ? $history_result_labels[$result_key]
-                            : ucfirst($result_key);
-                    ?>
-                        <option value="<?php echo esc_attr($result_key); ?>" <?php selected($history_selected_filters['result'], $result_key); ?>>
-                            <?php echo esc_html($result_label); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="tejlg-history-filters__group">
-                <label for="tejlg-history-origin"><?php esc_html_e('Origine', 'theme-export-jlg'); ?></label>
-                <select name="history_origin" id="tejlg-history-origin">
-                    <option value=""><?php esc_html_e('Toutes les origines', 'theme-export-jlg'); ?></option>
-                    <?php foreach ($available_history_origins as $origin_key) :
-                        $origin_label = isset($history_origin_labels[$origin_key])
-                            ? $history_origin_labels[$origin_key]
-                            : ucfirst($origin_key);
-                    ?>
-                        <option value="<?php echo esc_attr($origin_key); ?>" <?php selected($history_selected_filters['origin'], $origin_key); ?>>
-                            <?php echo esc_html($origin_label); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="tejlg-history-filters__group">
-                <label for="tejlg-history-orderby"><?php esc_html_e('Trier par', 'theme-export-jlg'); ?></label>
-                <select name="history_orderby" id="tejlg-history-orderby">
-                    <option value="timestamp" <?php selected($history_selected_filters['orderby'], 'timestamp'); ?>><?php esc_html_e('Date', 'theme-export-jlg'); ?></option>
-                    <option value="duration" <?php selected($history_selected_filters['orderby'], 'duration'); ?>><?php esc_html_e('Durée', 'theme-export-jlg'); ?></option>
-                    <option value="zip_file_size" <?php selected($history_selected_filters['orderby'], 'zip_file_size'); ?>><?php esc_html_e('Taille', 'theme-export-jlg'); ?></option>
-                </select>
-            </div>
-            <div class="tejlg-history-filters__group">
-                <label for="tejlg-history-order"><?php esc_html_e('Ordre', 'theme-export-jlg'); ?></label>
-                <select name="history_order" id="tejlg-history-order">
-                    <option value="desc" <?php selected($history_selected_filters['order'], 'desc'); ?>><?php esc_html_e('Décroissant', 'theme-export-jlg'); ?></option>
-                    <option value="asc" <?php selected($history_selected_filters['order'], 'asc'); ?>><?php esc_html_e('Croissant', 'theme-export-jlg'); ?></option>
-                </select>
-            </div>
-            <div class="tejlg-history-filters__actions">
-                <button type="submit" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Filtrer', 'theme-export-jlg'); ?></button>
-                <a class="button button-link" href="<?php echo esc_url(add_query_arg($history_base_args, admin_url('admin.php'))); ?>"><?php esc_html_e('Réinitialiser', 'theme-export-jlg'); ?></a>
-            </div>
-        </form>
-        <p class="tejlg-history-summary">
-            <?php
-            printf(
-                /* translators: 1: number of displayed exports, 2: total number of exports recorded */
-                esc_html__('Affichage de %1$s export(s) sur %2$s.', 'theme-export-jlg'),
-                esc_html($history_total_filtered_label),
-                esc_html($history_total_all_label)
-            );
-            ?>
-        </p>
-        <?php if (!empty($history_entries)) : ?>
-            <table class="wp-list-table widefat striped">
-                <thead>
-                    <tr>
-                        <th scope="col"><?php esc_html_e('Tâche', 'theme-export-jlg'); ?></th>
-                        <th scope="col"><?php esc_html_e('Utilisateur', 'theme-export-jlg'); ?></th>
-                        <th scope="col"><?php esc_html_e('Date', 'theme-export-jlg'); ?></th>
-                        <th scope="col"><?php esc_html_e('Durée', 'theme-export-jlg'); ?></th>
-                        <th scope="col"><?php esc_html_e('Taille', 'theme-export-jlg'); ?></th>
-                        <th scope="col"><?php esc_html_e('Exclusions', 'theme-export-jlg'); ?></th>
-                        <th scope="col"><?php esc_html_e('Origine', 'theme-export-jlg'); ?></th>
-                        <th scope="col"><?php esc_html_e('Statut', 'theme-export-jlg'); ?></th>
-                        <th scope="col"><?php esc_html_e('Téléchargement', 'theme-export-jlg'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($history_entries as $entry) :
-                        $job_id   = isset($entry['job_id']) ? (string) $entry['job_id'] : '';
-                        $file_name = isset($entry['zip_file_name']) && '' !== $entry['zip_file_name'] ? (string) $entry['zip_file_name'] : __('Archive ZIP', 'theme-export-jlg');
-                        $user_name = isset($entry['user_name']) ? (string) $entry['user_name'] : '';
-                        $user_id   = isset($entry['user_id']) ? (int) $entry['user_id'] : 0;
-
-                        if ('' === $user_name) {
-                            $user_name = $user_id > 0
-                                ? sprintf(__('Utilisateur #%d', 'theme-export-jlg'), $user_id)
-                                : __('Système', 'theme-export-jlg');
-                        }
-
-                        $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
-                        $formatted_date = '';
-
-                        if ($timestamp > 0) {
-                            if (function_exists('wp_date')) {
-                                $formatted_date = wp_date($datetime_format, $timestamp);
-                            } else {
-                                $formatted_date = date_i18n($datetime_format, $timestamp);
-                            }
-                        }
-
-                        $duration_seconds = isset($entry['duration']) ? (int) $entry['duration'] : 0;
-                        $duration_label   = __('Instantané', 'theme-export-jlg');
-
-                        if ($duration_seconds > 0) {
-                            $duration_parts = [];
-
-                            $hours = (int) floor($duration_seconds / HOUR_IN_SECONDS);
-                            if ($hours > 0) {
-                                $duration_parts[] = sprintf(
-                                    _n('%d heure', '%d heures', $hours, 'theme-export-jlg'),
-                                    $hours
-                                );
-                            }
-
-                            $remaining = $duration_seconds % HOUR_IN_SECONDS;
-                            $minutes   = (int) floor($remaining / MINUTE_IN_SECONDS);
-                            if ($minutes > 0) {
-                                $duration_parts[] = sprintf(
-                                    _n('%d minute', '%d minutes', $minutes, 'theme-export-jlg'),
-                                    $minutes
-                                );
-                            }
-
-                            $seconds = $remaining % MINUTE_IN_SECONDS;
-                            if ($seconds > 0 || empty($duration_parts)) {
-                                $duration_parts[] = sprintf(
-                                    _n('%d seconde', '%d secondes', $seconds, 'theme-export-jlg'),
-                                    $seconds
-                                );
-                            }
-
-                            $duration_label = implode(' ', $duration_parts);
-                        }
-
-                        $size_bytes = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
-                        $size_label = $size_bytes > 0 ? size_format($size_bytes, 2) : __('Inconnue', 'theme-export-jlg');
-
-                        $exclusions = isset($entry['exclusions']) ? (array) $entry['exclusions'] : [];
-                        $exclusions_clean = array_map('sanitize_text_field', $exclusions);
-                        $exclusions_label = !empty($exclusions_clean)
-                            ? implode(', ', $exclusions_clean)
-                            : __('Aucune', 'theme-export-jlg');
-
-                        $download_url = isset($entry['persistent_url']) ? esc_url($entry['persistent_url']) : '';
-
-                        $origin_key = isset($entry['origin']) ? (string) $entry['origin'] : '';
-                        $origin_label = isset($history_origin_labels[$origin_key])
-                            ? $history_origin_labels[$origin_key]
-                            : ($origin_key ? ucfirst($origin_key) : __('Non défini', 'theme-export-jlg'));
-
-                        $context_label = isset($entry['context']) ? (string) $entry['context'] : '';
-
-                        $status_key = isset($entry['result']) ? (string) $entry['result'] : '';
-                        $status_label = isset($history_result_labels[$status_key])
-                            ? $history_result_labels[$status_key]
-                            : (isset($entry['status']) && '' !== $entry['status']
-                                ? (string) $entry['status']
-                                : __('Inconnu', 'theme-export-jlg'));
-
-                        $status_message = isset($entry['status_message']) ? (string) $entry['status_message'] : '';
-                        $status_css = '' !== $status_key
-                            ? 'tejlg-history-status--' . sanitize_html_class($status_key)
-                            : 'tejlg-history-status--neutral';
-
-                    ?>
-                        <tr>
-                            <td>
-                                <strong><?php echo esc_html($file_name); ?></strong><br>
-                                <code><?php echo esc_html($job_id); ?></code>
-                            </td>
-                            <td><?php echo esc_html($user_name); ?></td>
-                            <td><?php echo esc_html($formatted_date); ?></td>
-                            <td><?php echo esc_html($duration_label); ?></td>
-                            <td><?php echo esc_html($size_label); ?></td>
-                            <td><?php echo esc_html($exclusions_label); ?></td>
-                            <td>
-                                <span class="tejlg-history-origin"><?php echo esc_html($origin_label); ?></span>
-                                <?php if ('' !== $context_label && $context_label !== $origin_label) : ?>
-                                    <span class="tejlg-history-origin__context"><?php echo esc_html($context_label); ?></span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <span class="tejlg-history-status <?php echo esc_attr($status_css); ?>"><?php echo esc_html($status_label); ?></span>
-                                <?php if ('' !== $status_message) : ?>
-                                    <span class="tejlg-history-status__message"><?php echo esc_html($status_message); ?></span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if ('' !== $download_url) : ?>
-                                    <a href="<?php echo esc_url($download_url); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Télécharger', 'theme-export-jlg'); ?></a>
-                                <?php else : ?>
-                                    <span aria-hidden="true">—</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-            <?php if (!empty($history_pagination_links)) : ?>
-                <div class="tablenav bottom">
-                    <div class="tablenav-pages">
-                        <?php echo wp_kses_post(implode(' ', $history_pagination_links)); ?>
-                    </div>
+<details class="tejlg-collapsible tejlg-collapsible--grid" id="tejlg-advanced-tools">
+    <summary class="tejlg-collapsible__summary">
+        <span class="tejlg-collapsible__title"><?php esc_html_e('Exports complémentaires & outils avancés', 'theme-export-jlg'); ?></span>
+        <span class="tejlg-collapsible__description"><?php esc_html_e('Compositions, styles globaux et création de thème enfant.', 'theme-export-jlg'); ?></span>
+    </summary>
+    <div class="tejlg-collapsible__content">
+        <div class="tejlg-cards-container tejlg-cards-container--secondary">
+            <div class="tejlg-card components-card is-elevated">
+                <div class="components-card__body">
+                    <h3><?php esc_html_e('Exporter les Compositions (.json)', 'theme-export-jlg'); ?></h3>
+                    <p><?php echo wp_kses_post(__('Générez un fichier <code>.json</code> contenant vos compositions.', 'theme-export-jlg')); ?></p>
+                    <form method="post" action="">
+                        <?php wp_nonce_field('tejlg_export_action', 'tejlg_nonce'); ?>
+                        <p><label><input type="checkbox" name="export_portable" value="1" <?php checked($portable_mode_enabled); ?>> <strong><?php esc_html_e('Export portable', 'theme-export-jlg'); ?></strong> <?php esc_html_e('(compatibilité maximale)', 'theme-export-jlg'); ?></label></p>
+                        <p><button type="submit" name="tejlg_export_patterns" class="button button-primary wp-ui-primary"><?php esc_html_e('Exporter TOUTES les compositions', 'theme-export-jlg'); ?></button></p>
+                    </form>
+                    <p>
+                        <a href="<?php echo esc_url($select_patterns_url); ?>" class="button wp-ui-secondary"><?php esc_html_e('Exporter une sélection...', 'theme-export-jlg'); ?></a>
+                    </p>
                 </div>
-            <?php endif; ?>
-        <?php else : ?>
-            <p><?php esc_html_e("Aucun export n'a encore été enregistré.", 'theme-export-jlg'); ?></p>
-        <?php endif; ?>
+            </div>
+            <div class="tejlg-card components-card is-elevated">
+                <div class="components-card__body">
+                    <h3><?php esc_html_e('Exporter les Styles Globaux (.json)', 'theme-export-jlg'); ?></h3>
+                    <p><?php echo wp_kses_post(__('Téléchargez les réglages globaux pour répliquer la configuration <code>theme.json</code>.', 'theme-export-jlg')); ?></p>
+                    <form method="post" action="<?php echo esc_url($export_tab_url); ?>">
+                        <?php wp_nonce_field('tejlg_export_global_styles_action', 'tejlg_export_global_styles_nonce'); ?>
+                        <p><button type="submit" name="tejlg_export_global_styles" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Exporter les styles globaux', 'theme-export-jlg'); ?></button></p>
+                    </form>
+                </div>
+            </div>
+            <div class="tejlg-card components-card is-elevated">
+                <div class="components-card__body">
+                    <h3><?php esc_html_e('Créer un Thème Enfant', 'theme-export-jlg'); ?></h3>
+                    <p><?php echo wp_kses_post(__('Générez un thème enfant basé sur votre thème actuel. Saisissez un nom personnalisé.', 'theme-export-jlg')); ?></p>
+                    <form method="post" action="<?php echo esc_url($export_tab_url); ?>">
+                        <?php wp_nonce_field('tejlg_create_child_action', 'tejlg_create_child_nonce'); ?>
+                        <p>
+                            <label for="child_theme_name"><?php esc_html_e('Nom du thème enfant :', 'theme-export-jlg'); ?></label>
+                            <input type="text" name="child_theme_name" id="child_theme_name" class="regular-text" value="<?php echo esc_attr($child_theme_value); ?>" placeholder="<?php echo esc_attr(wp_get_theme()->get('Name') . ' ' . __('Enfant', 'theme-export-jlg')); ?>" required>
+                        </p>
+                        <p><button type="submit" name="tejlg_create_child" class="button button-primary wp-ui-primary"><?php esc_html_e('Créer le Thème Enfant', 'theme-export-jlg'); ?></button></p>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+</details>
+
+<details class="tejlg-collapsible" id="tejlg-history-panel"<?php echo $history_section_open ? ' open' : ''; ?>>
+    <summary class="tejlg-collapsible__summary">
+        <span class="tejlg-collapsible__title"><?php esc_html_e('Historique des exports', 'theme-export-jlg'); ?></span>
+        <span class="tejlg-collapsible__description"><?php echo esc_html($history_summary_inline); ?></span>
+    </summary>
+    <div class="tejlg-collapsible__content">
+        <div class="tejlg-card components-card is-elevated">
+            <div class="components-card__body">
+                <form method="get" class="tejlg-history-filters" aria-label="<?php esc_attr_e('Filtres de l\'historique d\'export', 'theme-export-jlg'); ?>">
+                    <input type="hidden" name="page" value="<?php echo esc_attr($history_base_args['page']); ?>">
+                    <input type="hidden" name="tab" value="<?php echo esc_attr($history_base_args['tab']); ?>">
+                    <div class="tejlg-history-filters__group">
+                        <label for="tejlg-history-result"><?php esc_html_e('Statut', 'theme-export-jlg'); ?></label>
+                        <select name="history_result" id="tejlg-history-result">
+                            <option value=""><?php esc_html_e('Tous les statuts', 'theme-export-jlg'); ?></option>
+                            <?php foreach ($available_history_results as $result_key) :
+                                $result_label = isset($history_result_labels[$result_key])
+                                    ? $history_result_labels[$result_key]
+                                    : ucfirst($result_key);
+                            ?>
+                                <option value="<?php echo esc_attr($result_key); ?>" <?php selected($history_selected_filters['result'], $result_key); ?>>
+                                    <?php echo esc_html($result_label); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="tejlg-history-filters__group">
+                        <label for="tejlg-history-origin"><?php esc_html_e('Origine', 'theme-export-jlg'); ?></label>
+                        <select name="history_origin" id="tejlg-history-origin">
+                            <option value=""><?php esc_html_e('Toutes les origines', 'theme-export-jlg'); ?></option>
+                            <?php foreach ($available_history_origins as $origin_key) :
+                                $origin_label = isset($history_origin_labels[$origin_key])
+                                    ? $history_origin_labels[$origin_key]
+                                    : ucfirst($origin_key);
+                            ?>
+                                <option value="<?php echo esc_attr($origin_key); ?>" <?php selected($history_selected_filters['origin'], $origin_key); ?>>
+                                    <?php echo esc_html($origin_label); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="tejlg-history-filters__group">
+                        <label for="tejlg-history-orderby"><?php esc_html_e('Trier par', 'theme-export-jlg'); ?></label>
+                        <select name="history_orderby" id="tejlg-history-orderby">
+                            <option value="timestamp" <?php selected($history_selected_filters['orderby'], 'timestamp'); ?>><?php esc_html_e('Date', 'theme-export-jlg'); ?></option>
+                            <option value="duration" <?php selected($history_selected_filters['orderby'], 'duration'); ?>><?php esc_html_e('Durée', 'theme-export-jlg'); ?></option>
+                            <option value="zip_file_size" <?php selected($history_selected_filters['orderby'], 'zip_file_size'); ?>><?php esc_html_e('Taille', 'theme-export-jlg'); ?></option>
+                        </select>
+                    </div>
+                    <div class="tejlg-history-filters__group">
+                        <label for="tejlg-history-order"><?php esc_html_e('Ordre', 'theme-export-jlg'); ?></label>
+                        <select name="history_order" id="tejlg-history-order">
+                            <option value="desc" <?php selected($history_selected_filters['order'], 'desc'); ?>><?php esc_html_e('Décroissant', 'theme-export-jlg'); ?></option>
+                            <option value="asc" <?php selected($history_selected_filters['order'], 'asc'); ?>><?php esc_html_e('Croissant', 'theme-export-jlg'); ?></option>
+                        </select>
+                    </div>
+                    <div class="tejlg-history-filters__actions">
+                        <button type="submit" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Filtrer', 'theme-export-jlg'); ?></button>
+                        <a class="button button-link" href="<?php echo esc_url(add_query_arg($history_base_args, admin_url('admin.php'))); ?>"><?php esc_html_e('Réinitialiser', 'theme-export-jlg'); ?></a>
+                    </div>
+                </form>
+                <p class="tejlg-history-summary">
+                    <?php
+                    printf(
+                        /* translators: 1: number of displayed exports, 2: total number of exports recorded */
+                        esc_html__('Affichage de %1$s export(s) sur %2$s.', 'theme-export-jlg'),
+                        esc_html($history_total_filtered_label),
+                        esc_html($history_total_all_label)
+                    );
+                    ?>
+                </p>
+                <?php if (!empty($history_entries)) : ?>
+                    <table class="wp-list-table widefat striped">
+                        <thead>
+                            <tr>
+                                <th scope="col"><?php esc_html_e('Tâche', 'theme-export-jlg'); ?></th>
+                                <th scope="col"><?php esc_html_e('Utilisateur', 'theme-export-jlg'); ?></th>
+                                <th scope="col"><?php esc_html_e('Date', 'theme-export-jlg'); ?></th>
+                                <th scope="col"><?php esc_html_e('Durée', 'theme-export-jlg'); ?></th>
+                                <th scope="col"><?php esc_html_e('Taille', 'theme-export-jlg'); ?></th>
+                                <th scope="col"><?php esc_html_e('Exclusions', 'theme-export-jlg'); ?></th>
+                                <th scope="col"><?php esc_html_e('Origine', 'theme-export-jlg'); ?></th>
+                                <th scope="col"><?php esc_html_e('Statut', 'theme-export-jlg'); ?></th>
+                                <th scope="col"><?php esc_html_e('Téléchargement', 'theme-export-jlg'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($history_entries as $entry) :
+                                $job_id   = isset($entry['job_id']) ? (string) $entry['job_id'] : '';
+                                $file_name = isset($entry['zip_file_name']) && '' !== $entry['zip_file_name'] ? (string) $entry['zip_file_name'] : __('Archive ZIP', 'theme-export-jlg');
+                                $user_name = isset($entry['user_name']) ? (string) $entry['user_name'] : '';
+                                $user_id   = isset($entry['user_id']) ? (int) $entry['user_id'] : 0;
+
+                                if ('' === $user_name) {
+                                    $user_name = $user_id > 0
+                                        ? sprintf(__('Utilisateur #%d', 'theme-export-jlg'), $user_id)
+                                        : __('Système', 'theme-export-jlg');
+                                }
+
+                                $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+                                $formatted_date = '';
+
+                                if ($timestamp > 0) {
+                                    if (function_exists('wp_date')) {
+                                        $formatted_date = wp_date($datetime_format, $timestamp);
+                                    } else {
+                                        $formatted_date = date_i18n($datetime_format, $timestamp);
+                                    }
+                                }
+
+                                $duration_seconds = isset($entry['duration']) ? (int) $entry['duration'] : 0;
+                                $duration_label   = __('Instantané', 'theme-export-jlg');
+
+                                if ($duration_seconds > 0) {
+                                    $duration_parts = [];
+
+                                    $hours = (int) floor($duration_seconds / HOUR_IN_SECONDS);
+                                    if ($hours > 0) {
+                                        $duration_parts[] = sprintf(
+                                            _n('%d heure', '%d heures', $hours, 'theme-export-jlg'),
+                                            $hours
+                                        );
+                                    }
+
+                                    $remaining = $duration_seconds % HOUR_IN_SECONDS;
+                                    $minutes   = (int) floor($remaining / MINUTE_IN_SECONDS);
+                                    if ($minutes > 0) {
+                                        $duration_parts[] = sprintf(
+                                            _n('%d minute', '%d minutes', $minutes, 'theme-export-jlg'),
+                                            $minutes
+                                        );
+                                    }
+
+                                    $seconds = $remaining % MINUTE_IN_SECONDS;
+                                    if ($seconds > 0 || empty($duration_parts)) {
+                                        $duration_parts[] = sprintf(
+                                            _n('%d seconde', '%d secondes', $seconds, 'theme-export-jlg'),
+                                            $seconds
+                                        );
+                                    }
+
+                                    $duration_label = implode(' ', $duration_parts);
+                                }
+
+                                $size_bytes = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
+                                $size_label = $size_bytes > 0 ? size_format($size_bytes, 2) : __('Inconnue', 'theme-export-jlg');
+
+                                $exclusions = isset($entry['exclusions']) ? (array) $entry['exclusions'] : [];
+                                $exclusions_clean = array_map('sanitize_text_field', $exclusions);
+                                $exclusions_label = !empty($exclusions_clean)
+                                    ? implode(', ', $exclusions_clean)
+                                    : __('Aucune', 'theme-export-jlg');
+
+                                $download_url = isset($entry['persistent_url']) ? esc_url($entry['persistent_url']) : '';
+
+                                $origin_key = isset($entry['origin']) ? (string) $entry['origin'] : '';
+                                $origin_label = isset($history_origin_labels[$origin_key])
+                                    ? $history_origin_labels[$origin_key]
+                                    : ($origin_key ? ucfirst($origin_key) : __('Non défini', 'theme-export-jlg'));
+
+                                $context_label = isset($entry['context']) ? (string) $entry['context'] : '';
+
+                                $status_key = isset($entry['result']) ? (string) $entry['result'] : '';
+                                $status_label = isset($history_result_labels[$status_key])
+                                    ? $history_result_labels[$status_key]
+                                    : (isset($entry['status']) && '' !== $entry['status']
+                                        ? (string) $entry['status']
+                                        : __('Inconnu', 'theme-export-jlg'));
+
+                                $status_message = isset($entry['status_message']) ? (string) $entry['status_message'] : '';
+                                $status_css = '' !== $status_key
+                                    ? 'tejlg-history-status--' . sanitize_html_class($status_key)
+                                    : 'tejlg-history-status--neutral';
+
+                            ?>
+                                <tr>
+                                    <td>
+                                        <strong><?php echo esc_html($file_name); ?></strong><br>
+                                        <code><?php echo esc_html($job_id); ?></code>
+                                    </td>
+                                    <td><?php echo esc_html($user_name); ?></td>
+                                    <td><?php echo esc_html($formatted_date); ?></td>
+                                    <td><?php echo esc_html($duration_label); ?></td>
+                                    <td><?php echo esc_html($size_label); ?></td>
+                                    <td><?php echo esc_html($exclusions_label); ?></td>
+                                    <td>
+                                        <span class="tejlg-history-origin"><?php echo esc_html($origin_label); ?></span>
+                                        <?php if ('' !== $context_label && $context_label !== $origin_label) : ?>
+                                            <span class="tejlg-history-origin__context"><?php echo esc_html($context_label); ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <span class="tejlg-history-status <?php echo esc_attr($status_css); ?>"><?php echo esc_html($status_label); ?></span>
+                                        <?php if ('' !== $status_message) : ?>
+                                            <span class="tejlg-history-status__message"><?php echo esc_html($status_message); ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ('' !== $download_url) : ?>
+                                            <a href="<?php echo esc_url($download_url); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Télécharger', 'theme-export-jlg'); ?></a>
+                                        <?php else : ?>
+                                            <span aria-hidden="true">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <?php if (!empty($history_pagination_links)) : ?>
+                        <div class="tablenav bottom">
+                            <div class="tablenav-pages">
+                                <?php echo wp_kses_post(implode(' ', $history_pagination_links)); ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                <?php else : ?>
+                    <p><?php esc_html_e("Aucun export n'a encore été enregistré.", 'theme-export-jlg'); ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</details>
