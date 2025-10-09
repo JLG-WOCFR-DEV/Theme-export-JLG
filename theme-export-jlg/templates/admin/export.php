@@ -597,7 +597,15 @@ $history_section_open = $history_filters_active;
                         </div>
                     </section>
                 </div>
-                <div class="tejlg-theme-export-feedback notice notice-info" data-export-feedback hidden>
+                <div
+                    class="tejlg-theme-export-feedback notice notice-info"
+                    data-export-feedback
+                    hidden
+                    role="region"
+                    aria-live="polite"
+                    aria-atomic="false"
+                    aria-labelledby="tejlg-theme-export-status"
+                >
                     <p
                         id="tejlg-theme-export-status"
                         class="tejlg-theme-export-status"
@@ -610,7 +618,7 @@ $history_section_open = $history_filters_active;
                         aria-labelledby="tejlg-theme-export-status"
                         data-export-progress-bar
                     ></progress>
-                    <p class="description" data-export-message></p>
+                    <p class="description" data-export-message aria-live="polite"></p>
                     <p class="description tejlg-export-feedback__hint" data-export-guidance hidden aria-live="polite"></p>
                     <div class="tejlg-job-meta" data-export-job-meta hidden>
                         <p class="tejlg-job-meta__title" data-export-job-title><?php esc_html_e('Diagnostic de la tâche', 'theme-export-jlg'); ?></p>

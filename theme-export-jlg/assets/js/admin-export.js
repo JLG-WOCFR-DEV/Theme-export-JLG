@@ -820,14 +820,20 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const setSpinner = function(isActive) {
-                if (!spinner) {
-                    return;
+                if (spinner) {
+                    if (isActive) {
+                        spinner.classList.add('is-active');
+                    } else {
+                        spinner.classList.remove('is-active');
+                    }
                 }
 
-                if (isActive) {
-                    spinner.classList.add('is-active');
-                } else {
-                    spinner.classList.remove('is-active');
+                if (exportForm) {
+                    if (isActive) {
+                        exportForm.setAttribute('aria-busy', 'true');
+                    } else {
+                        exportForm.setAttribute('aria-busy', 'false');
+                    }
                 }
             };
 
@@ -1262,6 +1268,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     handleError(message || strings.unknownError || '');
                 });
             };
+
+            const requestImmediateStatus = function() {
+                if (!currentJobId) {
+                    return;
+                }
+
+                stopPolling();
+                fetchStatus(currentJobId);
+            };
+
+            const handleForegroundRefresh = function() {
+                if (typeof document !== 'undefined' && document.hidden) {
+                    return;
+                }
+
+                requestImmediateStatus();
+            };
+
+            window.addEventListener('focus', handleForegroundRefresh);
+            document.addEventListener('visibilitychange', handleForegroundRefresh);
 
             const resumePersistedJob = function(snapshot) {
                 if (!snapshot || typeof snapshot !== 'object') {
