@@ -31,123 +31,6 @@ document.addEventListener('DOMContentLoaded', function() {
         ? localization.exportAsync
         : null;
 
-    const dropzones = document.querySelectorAll('[data-tejlg-dropzone]');
-
-    if (dropzones.length) {
-        const preventDefaults = function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-        };
-
-        const buildFileList = function(files) {
-            if (!files || typeof DataTransfer === 'undefined') {
-                return files;
-            }
-
-            const dataTransfer = new DataTransfer();
-
-            Array.prototype.forEach.call(files, function(file) {
-                dataTransfer.items.add(file);
-            });
-
-            return dataTransfer.files;
-        };
-
-        dropzones.forEach(function(dropzone) {
-            const fileInput = dropzone.querySelector('input[type="file"]');
-
-            if (!fileInput) {
-                return;
-            }
-
-            const setDragState = function(isActive) {
-                if (isActive) {
-                    dropzone.classList.add('is-dragover');
-                    dropzone.setAttribute('data-tejlg-dropzone-state', 'dragover');
-                } else {
-                    dropzone.classList.remove('is-dragover');
-                    dropzone.setAttribute('data-tejlg-dropzone-state', 'idle');
-                }
-            };
-
-            setDragState(false);
-
-            ['dragenter', 'dragover'].forEach(function(eventName) {
-                dropzone.addEventListener(eventName, function(event) {
-                    preventDefaults(event);
-                    if (event.dataTransfer) {
-                        try {
-                            event.dataTransfer.dropEffect = 'copy';
-                        } catch (error) {
-                            // Certains navigateurs empêchent l'écriture directe du dropEffect.
-                        }
-                    }
-                    setDragState(true);
-                });
-            });
-
-            dropzone.addEventListener('dragleave', function(event) {
-                preventDefaults(event);
-
-                if (event.relatedTarget && dropzone.contains(event.relatedTarget)) {
-                    return;
-                }
-
-                setDragState(false);
-            });
-
-            dropzone.addEventListener('drop', function(event) {
-                preventDefaults(event);
-                setDragState(false);
-
-                if (!event.dataTransfer || !event.dataTransfer.files || !event.dataTransfer.files.length) {
-                    return;
-                }
-
-                const files = buildFileList(event.dataTransfer.files);
-
-                try {
-                    fileInput.files = files;
-                } catch (error) {
-                    // En cas d'environnement ne permettant pas l'assignation programmée.
-                }
-
-                fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-                if (typeof dropzone.focus === 'function') {
-                    try {
-                        dropzone.focus({ preventScroll: true });
-                    } catch (error) {
-                        dropzone.focus();
-                    }
-                }
-            });
-
-            dropzone.addEventListener('dragend', function() {
-                setDragState(false);
-            });
-
-            dropzone.addEventListener('click', function(event) {
-                if (event.target === fileInput) {
-                    return;
-                }
-
-                fileInput.click();
-            });
-
-            dropzone.addEventListener('keydown', function(event) {
-                if (event.target === fileInput) {
-                    return;
-                }
-
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    fileInput.click();
-                }
-            });
-        });
-    }
-
     (function initializeContrastToggle() {
         const toggle = document.querySelector('[data-contrast-toggle]');
 
@@ -241,7 +124,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const cancelButton = exportForm.querySelector('[data-export-cancel]');
             const spinner = exportForm.querySelector('[data-export-spinner]');
             const strings = typeof exportAsync.strings === 'object' ? exportAsync.strings : {};
-            const pollInterval = typeof exportAsync.pollInterval === 'number' ? exportAsync.pollInterval : 4000;
+            const basePollInterval = Math.max(1000, typeof exportAsync.pollInterval === 'number' ? exportAsync.pollInterval : 4000);
+            const maxPollInterval = Math.max(basePollInterval, typeof exportAsync.maxPollInterval === 'number' ? exportAsync.maxPollInterval : Math.max(basePollInterval * 4, basePollInterval + 8000));
+            const maxErrorRetries = Math.max(0, typeof exportAsync.maxErrorRetries === 'number' ? exportAsync.maxErrorRetries : 4);
             const defaults = (typeof exportAsync.defaults === 'object' && exportAsync.defaults !== null)
                 ? exportAsync.defaults
                 : null;
@@ -268,6 +153,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             let currentJobId = null;
             let pollTimeout = null;
+            let idlePollCount = 0;
+            let consecutiveErrors = 0;
+            let lastJobSignature = '';
 
             if (textarea && defaults && typeof defaults.exclusions === 'string' && !textarea.value) {
                 textarea.value = defaults.exclusions;
@@ -585,6 +473,30 @@ document.addEventListener('DOMContentLoaded', function() {
                     cancelButton.hidden = true;
                     cancelButton.disabled = false;
                 }
+
+                resetBackoffTracking();
+                lastJobSignature = '';
+            };
+
+            const resetBackoffTracking = function() {
+                idlePollCount = 0;
+                consecutiveErrors = 0;
+            };
+
+            const computeJobSignature = function(job) {
+                if (!job || typeof job !== 'object') {
+                    return '';
+                }
+
+                const parts = [
+                    typeof job.status === 'string' ? job.status : '',
+                    typeof job.progress === 'number' ? job.progress : '',
+                    typeof job.processed_items === 'number' ? job.processed_items : '',
+                    typeof job.total_items === 'number' ? job.total_items : '',
+                    job.updated_at || job.last_activity || job.timestamp || ''
+                ];
+
+                return parts.join('|');
             };
 
             const stopPolling = function() {
@@ -594,12 +506,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
 
-            const scheduleNextPoll = function(jobId) {
+            const scheduleNextPoll = function(jobId, reason) {
+                if (!jobId) {
+                    return 0;
+                }
+
                 stopPolling();
+
+                let delay = basePollInterval;
+
+                if (reason === 'error') {
+                    consecutiveErrors += 1;
+                    if (consecutiveErrors > maxErrorRetries) {
+                        return 0;
+                    }
+                    idlePollCount = 0;
+                    delay = Math.min(maxPollInterval, basePollInterval * Math.pow(2, consecutiveErrors));
+                } else if (reason === 'idle') {
+                    consecutiveErrors = 0;
+                    idlePollCount = Math.min(idlePollCount + 1, 6);
+                    delay = Math.min(maxPollInterval, basePollInterval + idlePollCount * 1500);
+                } else {
+                    consecutiveErrors = 0;
+                    idlePollCount = 0;
+                    delay = basePollInterval;
+                }
 
                 pollTimeout = window.setTimeout(function() {
                     fetchStatus(jobId);
-                }, pollInterval);
+                }, delay);
+
+                return delay;
             };
 
             const updateFeedback = function(job, extra) {
@@ -772,7 +709,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     const extra = { downloadUrl: payload.data.download_url || '' };
                     updateFeedback(job, extra);
 
+                    const signature = computeJobSignature(job);
+                    const unchanged = signature === lastJobSignature;
+                    lastJobSignature = signature;
+
                     if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+                        resetBackoffTracking();
+                        lastJobSignature = '';
                         stopPolling();
                         setSpinner(false);
                         if (startButton) {
@@ -780,18 +723,57 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         currentJobId = null;
                     } else {
-                        scheduleNextPoll(jobId);
+                        scheduleNextPoll(jobId, unchanged ? 'idle' : 'active');
                     }
                 }).catch(function(error) {
-                    setSpinner(false);
-                    if (startButton) {
-                        startButton.disabled = false;
-                    }
                     const message = (typeof error === 'string' && error.length)
                         ? error
                         : (error && typeof error.message === 'string' && error.message.length)
                             ? error.message
                             : strings.unknownError || '';
+
+                    if (currentJobId) {
+                        const retryDelay = scheduleNextPoll(currentJobId, 'error');
+
+                        if (retryDelay > 0) {
+                            if (feedback) {
+                                feedback.hidden = false;
+                                feedback.classList.remove('notice-error', 'notice-success');
+                                if (!feedback.classList.contains('notice-info')) {
+                                    feedback.classList.add('notice-info');
+                                }
+                            }
+
+                            if (statusText) {
+                                if (strings.retrying) {
+                                    const seconds = Math.max(1, Math.round(retryDelay / 1000));
+                                    statusText.textContent = formatString(strings.retrying, { '1': seconds });
+                                } else {
+                                    statusText.textContent = message;
+                                }
+                            }
+
+                            if (messageEl) {
+                                messageEl.textContent = message;
+                            }
+
+                            setSpinner(true);
+                            if (startButton) {
+                                startButton.disabled = true;
+                            }
+
+                            return;
+                        }
+                    }
+
+                    resetBackoffTracking();
+                    lastJobSignature = '';
+                    stopPolling();
+                    setSpinner(false);
+                    if (startButton) {
+                        startButton.disabled = false;
+                    }
+                    currentJobId = null;
                     handleError(message || strings.unknownError || '');
                 });
             };
@@ -816,9 +798,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 currentJobId = persistedJobId;
+                resetBackoffTracking();
 
                 if (job) {
                     updateFeedback(job, { downloadUrl: '' });
+                    lastJobSignature = computeJobSignature(job);
                 }
 
                 const statusFromSnapshot = typeof snapshot.status === 'string' && snapshot.status.length
@@ -863,6 +847,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
 
                     stopPolling();
+                    resetBackoffTracking();
+                    lastJobSignature = '';
                     setSpinner(true);
                     if (startButton) {
                         startButton.disabled = true;
@@ -905,12 +891,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
 
                         updateFeedback(job || null, { downloadUrl: '' });
-                        scheduleNextPoll(currentJobId);
+                        scheduleNextPoll(currentJobId, 'active');
                     }).catch(function(error) {
                         setSpinner(false);
                         if (startButton) {
                             startButton.disabled = false;
                         }
+                        resetBackoffTracking();
+                        lastJobSignature = '';
+                        currentJobId = null;
                         const message = (typeof error === 'string' && error.length)
                             ? error
                             : (error && typeof error.message === 'string' && error.message.length)
@@ -997,6 +986,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             startButton.disabled = false;
                         }
 
+                        resetBackoffTracking();
+                        lastJobSignature = '';
                         cancelButton.disabled = false;
                         const job = payload.data.job;
                         currentJobId = null;
@@ -1029,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         cancelButton.disabled = false;
 
                         if (currentJobId) {
-                            scheduleNextPoll(currentJobId);
+                            scheduleNextPoll(currentJobId, 'active');
                         } else {
                             setSpinner(false);
                             if (startButton) {
@@ -1040,101 +1031,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         }
-    }
-
-    const themeImportConfirmMessage = typeof localization.themeImportConfirm === 'string'
-        ? localization.themeImportConfirm
-        : '';
-
-    if (themeImportConfirmMessage) {
-        const themeImportForm = document.getElementById('tejlg-import-theme-form');
-
-        if (themeImportForm) {
-            const overwriteField = themeImportForm.querySelector('#tejlg_confirm_theme_overwrite');
-
-            if (overwriteField) {
-                overwriteField.value = '0';
-            }
-
-            themeImportForm.addEventListener('submit', function(event) {
-                if (!window.confirm(themeImportConfirmMessage)) {
-                    if (overwriteField) {
-                        overwriteField.value = '0';
-                    }
-                    event.preventDefault();
-                    event.stopImmediatePropagation();
-                    return;
-                }
-
-                if (overwriteField) {
-                    overwriteField.value = '1';
-                }
-            });
-        }
-    }
-
-    // Gérer la case "Tout sélectionner" pour l'import
-
-    // Gérer l'accordéon sur la page de débogage
-    const accordionContainer = document.getElementById('debug-accordion');
-    if (accordionContainer) {
-        const accordionButtons = accordionContainer.querySelectorAll('.accordion-section-title');
-
-        const updateSectionState = function(button, content, section, expanded) {
-            const isExpanded = Boolean(expanded);
-            button.setAttribute('aria-expanded', String(isExpanded));
-
-            if (content) {
-                content.hidden = !isExpanded;
-                content.setAttribute('aria-hidden', String(!isExpanded));
-            }
-
-            if (section) {
-                section.classList.toggle('open', isExpanded);
-            }
-        };
-
-        accordionButtons.forEach(function(button) {
-            const section = button.closest('.accordion-section');
-            const controlledId = button.getAttribute('aria-controls');
-            let content = null;
-
-            if (controlledId) {
-                content = document.getElementById(controlledId);
-            } else if (section) {
-                content = section.querySelector('.accordion-section-content');
-            }
-
-            if (content) {
-                const initialExpanded = button.getAttribute('aria-expanded') === 'true';
-                updateSectionState(button, content, section, initialExpanded);
-            }
-
-            const toggleSection = function() {
-                const isExpanded = button.getAttribute('aria-expanded') === 'true';
-                updateSectionState(button, content, section, !isExpanded);
-            };
-
-            let skipNextClick = false;
-
-            button.addEventListener('click', function(event) {
-                event.preventDefault();
-                if (skipNextClick) {
-                    skipNextClick = false;
-                    return;
-                }
-
-                toggleSection();
-            });
-
-            button.addEventListener('keydown', function(event) {
-                if (event.key === ' ' || event.key === 'Spacebar' || event.key === 'Enter') {
-                    event.preventDefault();
-                    skipNextClick = true;
-                    toggleSection();
-                }
-            });
-        });
     }
 
     // Gérer l'affichage/masquage du code des compositions
@@ -3476,285 +3372,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return item.getAttribute('data-original-index') || null;
         },
     });
-
-    // Mettre à jour en continu les métriques de performance dans le badge.
-    const fpsElement = document.getElementById('tejlg-metric-fps');
-    const latencyElement = document.getElementById('tejlg-metric-latency');
-
-    if (fpsElement && latencyElement) {
-        const metricsLocalization = (typeof localization.metrics === 'object' && localization.metrics !== null)
-            ? localization.metrics
-            : {};
-
-        const locale = typeof metricsLocalization.locale === 'string' && metricsLocalization.locale
-            ? metricsLocalization.locale
-            : undefined;
-
-        const fpsUnit = typeof metricsLocalization.fpsUnit === 'string' && metricsLocalization.fpsUnit.trim() !== ''
-            ? metricsLocalization.fpsUnit
-            : 'FPS';
-
-        const latencyUnit = typeof metricsLocalization.latencyUnit === 'string' && metricsLocalization.latencyUnit.trim() !== ''
-            ? metricsLocalization.latencyUnit
-            : 'ms';
-
-        const placeholderText = typeof metricsLocalization.placeholder === 'string' && metricsLocalization.placeholder !== ''
-            ? metricsLocalization.placeholder
-            : '--';
-
-        const stoppedText = typeof metricsLocalization.stopped === 'string' && metricsLocalization.stopped !== ''
-            ? metricsLocalization.stopped
-            : '⏹';
-
-        const loadingText = typeof metricsLocalization.loading === 'string' && metricsLocalization.loading !== ''
-            ? metricsLocalization.loading
-            : placeholderText;
-
-        const ariaLiveValue = typeof metricsLocalization.ariaLivePolite === 'string' && metricsLocalization.ariaLivePolite !== ''
-            ? metricsLocalization.ariaLivePolite
-            : 'polite';
-
-        const ariaAtomicValue = typeof metricsLocalization.ariaAtomic === 'string' && metricsLocalization.ariaAtomic !== ''
-            ? metricsLocalization.ariaAtomic
-            : 'true';
-
-        const latencyPrecision = typeof metricsLocalization.latencyPrecision === 'number' && metricsLocalization.latencyPrecision >= 0
-            ? metricsLocalization.latencyPrecision
-            : 1;
-
-        fpsElement.setAttribute('aria-live', ariaLiveValue);
-        fpsElement.setAttribute('aria-atomic', ariaAtomicValue);
-        latencyElement.setAttribute('aria-live', ariaLiveValue);
-        latencyElement.setAttribute('aria-atomic', ariaAtomicValue);
-
-        fpsElement.textContent = loadingText;
-        latencyElement.textContent = loadingText;
-
-        const idealFrameDuration = 1000 / 60;
-        const maxSampleSize = 120;
-        const maxFrameGap = 1500;
-
-        const hasPerformanceNow = typeof window.performance === 'object' && typeof window.performance.now === 'function';
-        const now = hasPerformanceNow
-            ? function() { return window.performance.now(); }
-            : function() { return Date.now ? Date.now() : new Date().getTime(); };
-
-        const hasNativeRequestAnimationFrame = typeof window.requestAnimationFrame === 'function';
-        const scheduleFrame = hasNativeRequestAnimationFrame
-            ? function(callback) {
-                return window.requestAnimationFrame(callback);
-            }
-            : function(callback) {
-                return window.setTimeout(function() {
-                    callback(now());
-                }, idealFrameDuration);
-            };
-
-        const cancelFrame = hasNativeRequestAnimationFrame
-            ? function(handle) {
-                window.cancelAnimationFrame(handle);
-            }
-            : function(handle) {
-                window.clearTimeout(handle);
-            };
-
-        const fpsSamples = [];
-        const latencySamplesFromRaf = [];
-        const latencySamplesFromObserver = [];
-
-        let animationFrameId = null;
-        let lastFrameTime;
-        let monitoringActive = true;
-        let performanceObserverInstance = null;
-
-        const hasIntl = typeof window.Intl === 'object' && typeof window.Intl.NumberFormat === 'function';
-        const fpsFormatter = hasIntl
-            ? new window.Intl.NumberFormat(locale, { maximumFractionDigits: 0, minimumFractionDigits: 0 })
-            : null;
-        const latencyFormatter = hasIntl
-            ? new window.Intl.NumberFormat(locale, { maximumFractionDigits: latencyPrecision, minimumFractionDigits: 0 })
-            : null;
-
-        const pushSample = function(samples, value) {
-            samples.push(value);
-            if (samples.length > maxSampleSize) {
-                samples.shift();
-            }
-        };
-
-        const computeAverage = function(samples) {
-            if (!samples.length) {
-                return null;
-            }
-
-            var total = 0;
-            for (var i = 0; i < samples.length; i += 1) {
-                total += samples[i];
-            }
-
-            return total / samples.length;
-        };
-
-        const formatValue = function(value, formatter, fallbackDigits) {
-            if (typeof value !== 'number' || !isFinite(value)) {
-                return placeholderText;
-            }
-
-            if (formatter) {
-                return formatter.format(value);
-            }
-
-            var digits = Math.max(0, fallbackDigits);
-            return value.toFixed(digits);
-        };
-
-        const updateDisplay = function() {
-            if (!monitoringActive) {
-                return;
-            }
-
-            const averageFps = computeAverage(fpsSamples);
-            if (averageFps === null) {
-                fpsElement.textContent = placeholderText;
-            } else {
-                const fpsText = formatValue(averageFps, fpsFormatter, 0);
-                fpsElement.textContent = fpsUnit ? fpsText + '\u00a0' + fpsUnit : fpsText;
-            }
-
-            const observerLatency = computeAverage(latencySamplesFromObserver);
-            const rafLatency = computeAverage(latencySamplesFromRaf);
-            const latencyToDisplay = observerLatency !== null ? observerLatency : rafLatency;
-
-            if (latencyToDisplay === null) {
-                latencyElement.textContent = placeholderText;
-            } else {
-                const latencyText = formatValue(latencyToDisplay, latencyFormatter, latencyPrecision);
-                latencyElement.textContent = latencyUnit ? latencyText + '\u00a0' + latencyUnit : latencyText;
-            }
-        };
-
-        const onAnimationFrame = function(timestamp) {
-            if (!monitoringActive) {
-                return;
-            }
-
-            if (typeof lastFrameTime === 'number') {
-                var frameDelta = timestamp - lastFrameTime;
-
-                if (frameDelta > 0 && frameDelta < maxFrameGap) {
-                    pushSample(fpsSamples, 1000 / frameDelta);
-                    var latencyValue = frameDelta - idealFrameDuration;
-                    if (latencyValue < 0) {
-                        latencyValue = 0;
-                    }
-                    pushSample(latencySamplesFromRaf, latencyValue);
-                }
-            }
-
-            lastFrameTime = timestamp;
-            updateDisplay();
-            scheduleNextFrame();
-        };
-
-        const scheduleNextFrame = function() {
-            animationFrameId = scheduleFrame(onAnimationFrame);
-        };
-
-        const setupPerformanceObserver = function() {
-            if (typeof window.PerformanceObserver !== 'function') {
-                return;
-            }
-
-            const supportedEntryTypes = Array.isArray(window.PerformanceObserver.supportedEntryTypes)
-                ? window.PerformanceObserver.supportedEntryTypes
-                : [];
-
-            var observerType = '';
-            if (supportedEntryTypes.indexOf('event') !== -1) {
-                observerType = 'event';
-            } else if (supportedEntryTypes.indexOf('longtask') !== -1) {
-                observerType = 'longtask';
-            }
-
-            if (!observerType) {
-                return;
-            }
-
-            try {
-                performanceObserverInstance = new window.PerformanceObserver(function(list) {
-                    const entries = list.getEntries();
-                    for (var i = 0; i < entries.length; i += 1) {
-                        var entry = entries[i];
-                        var duration = 0;
-
-                        if (observerType === 'event') {
-                            if (typeof entry.duration === 'number' && entry.duration > 0) {
-                                duration = entry.duration;
-                            } else if (
-                                typeof entry.processingEnd === 'number' &&
-                                typeof entry.startTime === 'number'
-                            ) {
-                                duration = entry.processingEnd - entry.startTime;
-                            }
-                        } else if (observerType === 'longtask') {
-                            duration = entry.duration;
-                        }
-
-                        if (duration > 0) {
-                            pushSample(latencySamplesFromObserver, duration);
-                        }
-                    }
-
-                    updateDisplay();
-                });
-
-                if (observerType === 'event') {
-                    performanceObserverInstance.observe({ type: 'event', buffered: true, durationThreshold: 0 });
-                } else {
-                    performanceObserverInstance.observe({ type: 'longtask', buffered: true });
-                }
-            } catch (error) {
-                performanceObserverInstance = null;
-            }
-        };
-
-        const stopMonitoring = function() {
-            if (!monitoringActive) {
-                return;
-            }
-
-            monitoringActive = false;
-
-            if (animationFrameId !== null) {
-                cancelFrame(animationFrameId);
-                animationFrameId = null;
-            }
-
-            if (performanceObserverInstance) {
-                try {
-                    performanceObserverInstance.disconnect();
-                } catch (error) {
-                    // Ignorer les erreurs de déconnexion.
-                }
-                performanceObserverInstance = null;
-            }
-
-            lastFrameTime = undefined;
-            fpsSamples.length = 0;
-            latencySamplesFromRaf.length = 0;
-            latencySamplesFromObserver.length = 0;
-
-            fpsElement.textContent = stoppedText;
-            latencyElement.textContent = stoppedText;
-        };
-
-        setupPerformanceObserver();
-        scheduleNextFrame();
-
-        ['beforeunload', 'pagehide'].forEach(function(eventName) {
-            window.addEventListener(eventName, stopMonitoring, { once: true });
-        });
-    }
 
     const stepForms = document.querySelectorAll('[data-step-form]');
 
