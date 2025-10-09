@@ -367,6 +367,7 @@ $controls_help_id = 'tejlg-import-controls-help';
                 class="css-accordion"
                 id="<?php echo esc_attr($global_css_section_id); ?>"
                 data-tejlg-global-css="true"
+                data-tejlg-persist="panel"
             >
                 <summary><?php esc_html_e('Afficher le CSS global du thème', 'theme-export-jlg'); ?></summary>
                 <pre><code><?php echo esc_html($global_styles); ?></code></pre>
