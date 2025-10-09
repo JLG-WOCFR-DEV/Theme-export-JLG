@@ -111,6 +111,14 @@ $notification_enabled_results = isset($notification_settings['enabled_results'])
     : [];
 $notification_enabled_lookup = [];
 
+$notification_recipient_list = array_filter(array_map('trim', preg_split('/[\r\n,]+/', $notification_recipients_value)));
+$notification_recipient_list = array_values(array_unique($notification_recipient_list));
+$notification_recipient_count = count($notification_recipient_list);
+$notification_recipient_count_label = sprintf(
+    _n('%d destinataire', '%d destinataires', $notification_recipient_count, 'theme-export-jlg'),
+    $notification_recipient_count
+);
+
 foreach ($notification_enabled_results as $enabled_result) {
     $notification_enabled_lookup[$enabled_result] = true;
 }
@@ -336,10 +344,30 @@ $history_summary_inline = sprintf(
 
 $history_section_open = $history_filters_active;
 ?>
+<div class="tejlg-export-banner" role="region" aria-labelledby="tejlg-export-banner-title">
+    <h2 id="tejlg-export-banner-title" class="screen-reader-text"><?php esc_html_e('Raccourcis d’export', 'theme-export-jlg'); ?></h2>
+    <div class="tejlg-export-banner__grid">
+        <div class="tejlg-export-banner__item">
+            <span class="tejlg-export-banner__label"><?php esc_html_e('Dernier export', 'theme-export-jlg'); ?></span>
+            <span class="tejlg-export-banner__value"><?php echo esc_html($latest_export_date); ?></span>
+            <span class="tejlg-export-banner__meta"><?php echo esc_html($latest_export_status); ?></span>
+        </div>
+        <div class="tejlg-export-banner__item">
+            <span class="tejlg-export-banner__label"><?php esc_html_e('Prochain export', 'theme-export-jlg'); ?></span>
+            <span class="tejlg-export-banner__value"><?php echo esc_html($schedule_next_run_label); ?></span>
+            <span class="tejlg-export-banner__meta"><?php echo esc_html($schedule_frequency_label); ?></span>
+        </div>
+        <div class="tejlg-export-banner__item tejlg-export-banner__item--cta">
+            <span class="tejlg-export-banner__label"><?php esc_html_e('Exporter maintenant', 'theme-export-jlg'); ?></span>
+            <a class="button button-primary wp-ui-primary" href="#tejlg-theme-export-form" data-banner-cta><?php esc_html_e('Lancer un export', 'theme-export-jlg'); ?></a>
+            <span class="tejlg-export-banner__meta"><?php esc_html_e('Accédez directement à l’assistant en 3 étapes.', 'theme-export-jlg'); ?></span>
+        </div>
+    </div>
+</div>
 <section class="tejlg-dashboard" aria-labelledby="tejlg-dashboard-title">
     <div class="tejlg-dashboard__header">
-        <h2 id="tejlg-dashboard-title"><?php esc_html_e('Tableau de bord des exports', 'theme-export-jlg'); ?></h2>
-        <p class="tejlg-dashboard__intro"><?php esc_html_e('Visualisez l’état des exports et de la planification avant de lancer une nouvelle action.', 'theme-export-jlg'); ?></p>
+        <h2 id="tejlg-dashboard-title"><?php esc_html_e('Vue d’ensemble des exports', 'theme-export-jlg'); ?></h2>
+        <p class="tejlg-dashboard__intro"><?php esc_html_e('Surveillez vos archives, la planification et les alertes avant de lancer une nouvelle action.', 'theme-export-jlg'); ?></p>
     </div>
     <div class="tejlg-dashboard__grid">
         <div class="tejlg-dashboard__card components-card is-elevated">
@@ -604,65 +632,79 @@ $history_section_open = $history_filters_active;
                 <p><?php esc_html_e('Automatisez la génération d’archives ZIP du thème actif et contrôlez leur conservation.', 'theme-export-jlg'); ?></p>
                 <form method="post" action="<?php echo esc_url($export_tab_url); ?>">
                     <?php wp_nonce_field('tejlg_schedule_settings_action', 'tejlg_schedule_settings_nonce'); ?>
-                    <table class="form-table">
-                        <tbody>
-                            <tr>
-                                <th scope="row">
-                                    <label for="tejlg_schedule_frequency"><?php esc_html_e('Fréquence', 'theme-export-jlg'); ?></label>
-                                </th>
-                                <td>
-                                    <select name="tejlg_schedule_frequency" id="tejlg_schedule_frequency">
-                                        <?php foreach ($schedule_frequencies as $frequency_value => $frequency_label) : ?>
-                                            <option value="<?php echo esc_attr($frequency_value); ?>" <?php selected($schedule_frequency_value, $frequency_value); ?>>
-                                                <?php echo esc_html($frequency_label); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <?php if (!empty($schedule_next_run)) : ?>
-                                        <p class="description">
-                                            <?php
-                                            $next_run_format = trim(get_option('date_format', 'Y-m-d') . ' ' . get_option('time_format', 'H:i'));
-                                            if (function_exists('wp_date')) {
-                                                $next_run_label = wp_date($next_run_format, (int) $schedule_next_run);
-                                            } else {
-                                                $next_run_label = date_i18n($next_run_format, (int) $schedule_next_run);
-                                            }
-                                            printf(
-                                                esc_html__('Prochaine exécution prévue : %s', 'theme-export-jlg'),
-                                                esc_html($next_run_label)
-                                            );
-                                            ?>
-                                        </p>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th scope="row">
-                                    <label for="tejlg_schedule_run_time"><?php esc_html_e("Heure d’exécution", 'theme-export-jlg'); ?></label>
-                                </th>
-                                <td>
-                                    <input
-                                        type="time"
-                                        id="tejlg_schedule_run_time"
-                                        name="tejlg_schedule_run_time"
-                                        value="<?php echo esc_attr($schedule_run_time_value); ?>"
-                                        step="60"
-                                    >
-                                    <p class="description">
-                                        <?php
-                                        printf(
-                                            esc_html__('Fuseau horaire du site : %s', 'theme-export-jlg'),
-                                            esc_html($site_timezone_string)
-                                        );
-                                        ?>
-                                    </p>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th scope="row">
+                    <div class="tejlg-schedule-grid">
+                        <div class="tejlg-card components-card is-elevated tejlg-schedule-card">
+                            <div class="components-card__body">
+                                <fieldset class="tejlg-schedule-card__fieldset">
+                                    <legend class="tejlg-schedule-card__legend"><?php esc_html_e('Cadence & rétention', 'theme-export-jlg'); ?></legend>
+                                    <p class="tejlg-schedule-card__summary"><?php esc_html_e('Définissez la fréquence des exports automatisés et la durée de conservation des archives.', 'theme-export-jlg'); ?></p>
+                                    <div class="tejlg-schedule-card__fields">
+                                        <div class="tejlg-field">
+                                            <label for="tejlg_schedule_frequency"><?php esc_html_e('Fréquence', 'theme-export-jlg'); ?></label>
+                                            <select name="tejlg_schedule_frequency" id="tejlg_schedule_frequency">
+                                                <?php foreach ($schedule_frequencies as $frequency_value => $frequency_label) : ?>
+                                                    <option value="<?php echo esc_attr($frequency_value); ?>" <?php selected($schedule_frequency_value, $frequency_value); ?>>
+                                                        <?php echo esc_html($frequency_label); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <?php if (!empty($schedule_next_run)) : ?>
+                                                <p class="description">
+                                                    <?php
+                                                    $next_run_format = trim(get_option('date_format', 'Y-m-d') . ' ' . get_option('time_format', 'H:i'));
+                                                    if (function_exists('wp_date')) {
+                                                        $next_run_label = wp_date($next_run_format, (int) $schedule_next_run);
+                                                    } else {
+                                                        $next_run_label = date_i18n($next_run_format, (int) $schedule_next_run);
+                                                    }
+                                                    printf(
+                                                        esc_html__('Prochaine exécution prévue : %s', 'theme-export-jlg'),
+                                                        esc_html($next_run_label)
+                                                    );
+                                                    ?>
+                                                </p>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="tejlg-field">
+                                            <label for="tejlg_schedule_run_time"><?php esc_html_e("Heure d’exécution", 'theme-export-jlg'); ?></label>
+                                            <input
+                                                type="time"
+                                                id="tejlg_schedule_run_time"
+                                                name="tejlg_schedule_run_time"
+                                                value="<?php echo esc_attr($schedule_run_time_value); ?>"
+                                                step="60"
+                                            >
+                                            <p class="description">
+                                                <?php
+                                                printf(
+                                                    esc_html__('Fuseau horaire du site : %s', 'theme-export-jlg'),
+                                                    esc_html($site_timezone_string)
+                                                );
+                                                ?>
+                                            </p>
+                                        </div>
+                                        <div class="tejlg-field">
+                                            <label for="tejlg_schedule_retention"><?php esc_html_e('Rétention (jours)', 'theme-export-jlg'); ?></label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                class="small-text"
+                                                name="tejlg_schedule_retention"
+                                                id="tejlg_schedule_retention"
+                                                value="<?php echo esc_attr($schedule_retention_value); ?>"
+                                            >
+                                            <p class="description"><?php esc_html_e('Durée de conservation des archives stockées dans la médiathèque. Indiquez 0 pour désactiver le nettoyage automatique.', 'theme-export-jlg'); ?></p>
+                                        </div>
+                                    </div>
+                                </fieldset>
+                            </div>
+                        </div>
+                        <div class="tejlg-card components-card is-elevated tejlg-schedule-card">
+                            <div class="components-card__body">
+                                <fieldset class="tejlg-schedule-card__fieldset">
+                                    <legend class="tejlg-schedule-card__legend"><?php esc_html_e('Affiner les archives planifiées', 'theme-export-jlg'); ?></legend>
+                                    <p class="tejlg-schedule-card__summary"><?php esc_html_e('Excluez les fichiers temporaires ou volumineux pour accélérer les exports programmés.', 'theme-export-jlg'); ?></p>
                                     <label for="tejlg_schedule_exclusions"><?php esc_html_e('Motifs d’exclusion', 'theme-export-jlg'); ?></label>
-                                </th>
-                                <td>
                                     <textarea
                                         name="tejlg_schedule_exclusions"
                                         id="tejlg_schedule_exclusions"
@@ -671,29 +713,31 @@ $history_section_open = $history_filters_active;
                                         placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"
                                     ><?php echo esc_textarea($schedule_exclusions_value); ?></textarea>
                                     <p class="description"><?php esc_html_e('Un motif par ligne ou séparé par des virgules. Ces exclusions s’appliquent uniquement aux exports planifiés.', 'theme-export-jlg'); ?></p>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th scope="row">
-                                    <label for="tejlg_schedule_retention"><?php esc_html_e('Rétention (jours)', 'theme-export-jlg'); ?></label>
-                                </th>
-                                <td>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        class="small-text"
-                                        name="tejlg_schedule_retention"
-                                        id="tejlg_schedule_retention"
-                                        value="<?php echo esc_attr($schedule_retention_value); ?>"
-                                    >
-                                    <p class="description"><?php esc_html_e('Durée de conservation des archives stockées dans la médiathèque. Indiquez 0 pour désactiver le nettoyage automatique.', 'theme-export-jlg'); ?></p>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th scope="row">
+                                </fieldset>
+                            </div>
+                        </div>
+                        <div class="tejlg-card components-card is-elevated tejlg-schedule-card">
+                            <div class="components-card__body">
+                                <fieldset class="tejlg-schedule-card__fieldset">
+                                    <legend class="tejlg-schedule-card__legend"><?php esc_html_e('Notifications & alertes', 'theme-export-jlg'); ?></legend>
+                                    <div class="tejlg-chip-field" data-tejlg-recipient-chips data-recipient-input="tejlg_notifications_emails">
+                                        <div class="tejlg-chip-field__header">
+                                            <span class="tejlg-chip-field__title"><?php esc_html_e('Destinataires actifs', 'theme-export-jlg'); ?></span>
+                                            <span
+                                                class="tejlg-chip-field__count"
+                                                data-chip-count
+                                                data-label-singular="<?php echo esc_attr__('%d destinataire', 'theme-export-jlg'); ?>"
+                                                data-label-plural="<?php echo esc_attr__('%d destinataires', 'theme-export-jlg'); ?>"
+                                            ><?php echo esc_html($notification_recipient_count_label); ?></span>
+                                        </div>
+                                        <div class="tejlg-chip-field__list" data-chip-list role="list" aria-live="polite" aria-atomic="true">
+                                            <?php foreach ($notification_recipient_list as $recipient) : ?>
+                                                <span class="tejlg-chip" role="listitem"><?php echo esc_html($recipient); ?></span>
+                                            <?php endforeach; ?>
+                                        </div>
+                                        <p class="tejlg-chip-field__empty" data-chip-empty<?php echo $notification_recipient_count > 0 ? ' hidden' : ''; ?>><?php esc_html_e('Aucun destinataire ajouté', 'theme-export-jlg'); ?></p>
+                                    </div>
                                     <label for="tejlg_notifications_emails"><?php esc_html_e('Destinataires des alertes', 'theme-export-jlg'); ?></label>
-                                </th>
-                                <td>
                                     <textarea
                                         name="tejlg_notifications_emails"
                                         id="tejlg_notifications_emails"
@@ -702,39 +746,35 @@ $history_section_open = $history_filters_active;
                                         placeholder="<?php echo esc_attr__('admin@example.com', 'theme-export-jlg'); ?>"
                                     ><?php echo esc_textarea($notification_recipients_value); ?></textarea>
                                     <p class="description"><?php esc_html_e('Une adresse par ligne (ou séparée par des virgules). L’e-mail administrateur du site est utilisé par défaut si cette liste est vide.', 'theme-export-jlg'); ?></p>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th scope="row"><?php esc_html_e('Évènements surveillés', 'theme-export-jlg'); ?></th>
-                                <td>
-                                    <fieldset>
-                                        <legend class="screen-reader-text"><span><?php esc_html_e('Choisissez les statuts qui déclenchent un e-mail', 'theme-export-jlg'); ?></span></legend>
-                                        <label>
-                                            <input type="checkbox" name="tejlg_notifications_events[]" value="error" <?php checked(!empty($notification_enabled_lookup['error'])); ?>>
-                                            <?php esc_html_e('Échecs', 'theme-export-jlg'); ?>
-                                        </label>
-                                        <br>
-                                        <label>
-                                            <input type="checkbox" name="tejlg_notifications_events[]" value="warning" <?php checked(!empty($notification_enabled_lookup['warning'])); ?>>
-                                            <?php esc_html_e('Annulations / avertissements', 'theme-export-jlg'); ?>
-                                        </label>
-                                        <br>
-                                        <label>
-                                            <input type="checkbox" name="tejlg_notifications_events[]" value="success" <?php checked(!empty($notification_enabled_lookup['success'])); ?>>
-                                            <?php esc_html_e('Succès', 'theme-export-jlg'); ?>
-                                        </label>
-                                        <br>
-                                        <label>
-                                            <input type="checkbox" name="tejlg_notifications_events[]" value="info" <?php checked(!empty($notification_enabled_lookup['info'])); ?>>
-                                            <?php esc_html_e('Informations', 'theme-export-jlg'); ?>
-                                        </label>
-                                    </fieldset>
+                                    <div class="tejlg-checkbox-grid">
+                                        <span class="tejlg-checkbox-grid__label"><?php esc_html_e('Évènements surveillés', 'theme-export-jlg'); ?></span>
+                                        <div class="tejlg-checkbox-grid__items">
+                                            <label class="tejlg-checkbox-grid__item">
+                                                <input type="checkbox" name="tejlg_notifications_events[]" value="error" <?php checked(!empty($notification_enabled_lookup['error'])); ?>>
+                                                <span><?php esc_html_e('Échecs', 'theme-export-jlg'); ?></span>
+                                            </label>
+                                            <label class="tejlg-checkbox-grid__item">
+                                                <input type="checkbox" name="tejlg_notifications_events[]" value="warning" <?php checked(!empty($notification_enabled_lookup['warning'])); ?>>
+                                                <span><?php esc_html_e('Annulations / avertissements', 'theme-export-jlg'); ?></span>
+                                            </label>
+                                            <label class="tejlg-checkbox-grid__item">
+                                                <input type="checkbox" name="tejlg_notifications_events[]" value="success" <?php checked(!empty($notification_enabled_lookup['success'])); ?>>
+                                                <span><?php esc_html_e('Succès', 'theme-export-jlg'); ?></span>
+                                            </label>
+                                            <label class="tejlg-checkbox-grid__item">
+                                                <input type="checkbox" name="tejlg_notifications_events[]" value="info" <?php checked(!empty($notification_enabled_lookup['info'])); ?>>
+                                                <span><?php esc_html_e('Informations', 'theme-export-jlg'); ?></span>
+                                            </label>
+                                        </div>
+                                    </div>
                                     <p class="description"><?php esc_html_e('Les notifications s’appliquent aux exports manuels et WP-CLI. Utilisez les filtres PHP pour inclure les exports planifiés si nécessaire.', 'theme-export-jlg'); ?></p>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p><button type="submit" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Enregistrer la planification', 'theme-export-jlg'); ?></button></p>
+                                </fieldset>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tejlg-schedule-actions">
+                        <button type="submit" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Enregistrer la planification', 'theme-export-jlg'); ?></button>
+                    </div>
                 </form>
             </div>
         </div>
