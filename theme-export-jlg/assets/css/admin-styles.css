@@ -1585,6 +1585,193 @@ textarea.has-pattern-error {
     gap: 0.5rem;
 }
 
+.tejlg-dashboard__card--benchmark {
+    grid-column: 1 / -1;
+}
+
+.tejlg-dashboard__card--benchmark .components-card__body {
+    padding: clamp(1.5rem, 2vw + 1.2rem, 2.4rem);
+}
+
+.tejlg-quality-benchmark {
+    display: grid;
+    gap: 1.75rem;
+}
+
+.tejlg-quality-benchmark__header {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 720px;
+}
+
+.tejlg-quality-benchmark__intro {
+    margin: 0;
+    color: var(--tejlg-text-subtle-color);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.tejlg-quality-benchmark__grid {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.tejlg-quality-benchmark__item {
+    display: grid;
+    gap: 1rem;
+    padding: clamp(1.1rem, 2vw + 0.6rem, 1.5rem);
+    border-radius: var(--tejlg-radius-md);
+    background: color-mix(in srgb, var(--tejlg-surface-alt-color) 82%, #ffffff 18%);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.18);
+}
+
+@supports not (color-mix(in srgb, #000 50%, #fff 50%)) {
+    .tejlg-quality-benchmark__item {
+        background: var(--tejlg-surface-alt-color);
+    }
+}
+
+.tejlg-quality-benchmark__item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.tejlg-quality-benchmark__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 650;
+}
+
+.tejlg-quality-benchmark__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.tejlg-quality-benchmark__badge.is-excellent {
+    background: rgba(34, 197, 94, 0.16);
+    color: #047857;
+}
+
+.tejlg-quality-benchmark__badge.is-solid {
+    background: rgba(59, 130, 246, 0.16);
+    color: #1d4ed8;
+}
+
+.tejlg-quality-benchmark__badge.is-watch {
+    background: rgba(234, 179, 8, 0.18);
+    color: #92400e;
+}
+
+.tejlg-quality-benchmark__score {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.tejlg-quality-benchmark__meter {
+    position: relative;
+    flex: 1 1 auto;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.3);
+    overflow: hidden;
+}
+
+.tejlg-quality-benchmark__meter::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--tejlg-accent-color) 0%, var(--tejlg-accent-color-darker) 100%);
+    width: var(--tejlg-quality-progress, 0%);
+    transition: width 0.45s ease;
+}
+
+.tejlg-quality-benchmark__score-value {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    font-weight: 650;
+    color: var(--tejlg-text-muted-color);
+}
+
+.tejlg-quality-benchmark__score-number {
+    font-size: 1.35rem;
+}
+
+.tejlg-quality-benchmark__score-unit {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.tejlg-quality-benchmark__summary,
+.tejlg-quality-benchmark__context {
+    margin: 0;
+    color: var(--tejlg-text-subtle-color);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.tejlg-quality-benchmark__context {
+    font-size: 0.9rem;
+}
+
+.tejlg-quality-benchmark__lists {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.tejlg-quality-benchmark__list-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--tejlg-text-muted-color);
+}
+
+.tejlg-quality-benchmark__bullets {
+    margin: 0;
+    padding-left: 1.2rem;
+    display: grid;
+    gap: 0.45rem;
+    color: var(--tejlg-text-subtle-color);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.tejlg-quality-benchmark__bullets li::marker {
+    color: var(--tejlg-accent-color);
+}
+
+@media (max-width: 782px) {
+    .tejlg-quality-benchmark__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tejlg-quality-benchmark__lists {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tejlg-quality-benchmark__meter::after {
+        transition: none;
+    }
+}
+
 .tejlg-dashboard__label {
     font-size: 11px;
     text-transform: uppercase;
