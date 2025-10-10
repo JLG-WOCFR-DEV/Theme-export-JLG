@@ -172,6 +172,7 @@ $current_exclusion_summary = __('Aucun motif', 'theme-export-jlg');
 $current_exclusion_count = 0;
 $latest_export_download_url = '';
 $latest_export_status_label_text = __('Aucun export', 'theme-export-jlg');
+$latest_export_status_variant = 'info';
 
 if (is_array($latest_export)) {
     $latest_status_key = isset($latest_export['result']) ? (string) $latest_export['result'] : '';
@@ -187,6 +188,16 @@ if (is_array($latest_export)) {
         $latest_status_label
     );
     $latest_export_status_label_text = $latest_status_label;
+    $status_variant_map = [
+        'success' => 'success',
+        'warning' => 'warning',
+        'error'   => 'error',
+        'info'    => 'info',
+    ];
+
+    if (isset($status_variant_map[$latest_status_key])) {
+        $latest_export_status_variant = $status_variant_map[$latest_status_key];
+    }
 
     $latest_timestamp = isset($latest_export['timestamp']) ? (int) $latest_export['timestamp'] : 0;
 
@@ -215,6 +226,23 @@ if (is_array($latest_export)) {
         $latest_export_download_url = esc_url($latest_export['download_url']);
     }
 }
+
+$schedule_status_variant = $schedule_is_active ? 'success' : 'warning';
+$schedule_status_badge = $schedule_is_active
+    ? __('Automatisation active', 'theme-export-jlg')
+    : __('Planification inactive', 'theme-export-jlg');
+
+$history_status_variant = $history_total_all > 0 ? 'success' : 'info';
+$history_status_badge = $history_total_all > 0
+    ? __('Suivi en cours', 'theme-export-jlg')
+    : __('Aucun export archivé', 'theme-export-jlg');
+
+$monitoring_status_variant = $monitoring_total_recent > 0
+    ? 'success'
+    : ($schedule_is_active ? 'warning' : 'info');
+$monitoring_status_badge = $monitoring_total_recent > 0
+    ? __('Surveillance active', 'theme-export-jlg')
+    : ($schedule_is_active ? __('Aucune alerte récente', 'theme-export-jlg') : __('Surveillance désactivée', 'theme-export-jlg'));
 
 $monitoring_counts = [
     'success' => 0,
@@ -680,9 +708,12 @@ $quality_benchmarks = [
 <div class="tejlg-export-banner" role="region" aria-labelledby="tejlg-export-banner-title">
     <h2 id="tejlg-export-banner-title" class="tejlg-export-banner__title"><?php esc_html_e('Centre de contrôle', 'theme-export-jlg'); ?></h2>
     <div class="tejlg-export-banner__grid">
-        <div class="tejlg-export-banner__item">
+        <div class="tejlg-export-banner__item" data-status-variant="<?php echo esc_attr($latest_export_status_variant); ?>">
             <span class="tejlg-export-banner__label"><?php esc_html_e('Dernier export', 'theme-export-jlg'); ?></span>
-            <strong class="tejlg-export-banner__value"><?php echo esc_html($latest_export_status_label_text); ?></strong>
+            <span class="tejlg-status-badge tejlg-status-badge--<?php echo esc_attr($latest_export_status_variant); ?>">
+                <span class="tejlg-status-badge__icon" aria-hidden="true"></span>
+                <span class="tejlg-status-badge__text"><?php echo esc_html($latest_export_status_label_text); ?></span>
+            </span>
             <span class="tejlg-export-banner__meta"><?php echo esc_html($latest_export_date); ?></span>
             <span class="tejlg-export-banner__meta">
                 <?php
@@ -708,10 +739,15 @@ $quality_benchmarks = [
                 </a>
             <?php endif; ?>
         </div>
-        <div class="tejlg-export-banner__item">
-            <span class="tejlg-export-banner__label"><?php esc_html_e('Planification', 'theme-export-jlg'); ?></span>
-            <strong class="tejlg-export-banner__value"><?php echo esc_html($schedule_frequency_label); ?></strong>
+        <div class="tejlg-export-banner__item" data-status-variant="<?php echo esc_attr($schedule_status_variant); ?>">
+            <span class="tejlg-export-banner__label"><?php esc_html_e('Prochain export', 'theme-export-jlg'); ?></span>
+            <span class="tejlg-status-badge tejlg-status-badge--<?php echo esc_attr($schedule_status_variant); ?>">
+                <span class="tejlg-status-badge__icon" aria-hidden="true"></span>
+                <span class="tejlg-status-badge__text"><?php echo esc_html($schedule_status_badge); ?></span>
+            </span>
             <span class="tejlg-export-banner__meta"><?php echo esc_html($schedule_summary_description); ?></span>
+            <span class="tejlg-export-banner__meta"><?php echo esc_html($schedule_next_run_label); ?></span>
+            <span class="tejlg-export-banner__meta"><?php echo esc_html($schedule_frequency_label); ?></span>
             <span class="tejlg-export-banner__meta">
                 <?php
                 printf(
@@ -727,6 +763,10 @@ $quality_benchmarks = [
             <span class="tejlg-export-banner__label"><?php esc_html_e('Action rapide', 'theme-export-jlg'); ?></span>
             <a class="button button-primary wp-ui-primary" href="#tejlg-theme-export-form" data-banner-cta><?php esc_html_e('Exporter maintenant', 'theme-export-jlg'); ?></a>
             <span class="tejlg-export-banner__meta"><?php esc_html_e('Accédez directement à l’assistant en 3 étapes.', 'theme-export-jlg'); ?></span>
+            <button type="button" class="tejlg-export-banner__preset" data-contrast-preset aria-pressed="false">
+                <span class="tejlg-export-banner__preset-icon" aria-hidden="true"></span>
+                <span class="tejlg-export-banner__preset-text"><?php esc_html_e('Preset Pavillon+ (contraste)', 'theme-export-jlg'); ?></span>
+            </button>
         </div>
     </div>
 </div>
@@ -781,9 +821,15 @@ $quality_benchmarks = [
         </div>
     </div>
     <div class="tejlg-dashboard__grid">
-        <div class="tejlg-dashboard__card components-card is-elevated">
+        <div class="tejlg-dashboard__card components-card is-elevated" data-status-variant="<?php echo esc_attr($latest_export_status_variant); ?>">
             <div class="components-card__body">
-                <span class="tejlg-dashboard__label"><?php esc_html_e('Dernier export', 'theme-export-jlg'); ?></span>
+                <div class="tejlg-dashboard__label-row">
+                    <span class="tejlg-dashboard__label"><?php esc_html_e('Dernier export', 'theme-export-jlg'); ?></span>
+                    <span class="tejlg-status-badge tejlg-status-badge--<?php echo esc_attr($latest_export_status_variant); ?>">
+                        <span class="tejlg-status-badge__icon" aria-hidden="true"></span>
+                        <span class="tejlg-status-badge__text"><?php echo esc_html($latest_export_status_label_text); ?></span>
+                    </span>
+                </div>
                 <strong class="tejlg-dashboard__value"><?php echo esc_html($latest_export_date); ?></strong>
                 <span class="tejlg-dashboard__meta"><?php echo esc_html($latest_export_status); ?></span>
                 <span class="tejlg-dashboard__meta">
@@ -806,9 +852,15 @@ $quality_benchmarks = [
                 </span>
             </div>
         </div>
-        <div class="tejlg-dashboard__card components-card is-elevated">
+        <div class="tejlg-dashboard__card components-card is-elevated" data-status-variant="<?php echo esc_attr($schedule_status_variant); ?>">
             <div class="components-card__body">
-                <span class="tejlg-dashboard__label"><?php esc_html_e('Planification', 'theme-export-jlg'); ?></span>
+                <div class="tejlg-dashboard__label-row">
+                    <span class="tejlg-dashboard__label"><?php esc_html_e('Planification', 'theme-export-jlg'); ?></span>
+                    <span class="tejlg-status-badge tejlg-status-badge--<?php echo esc_attr($schedule_status_variant); ?>">
+                        <span class="tejlg-status-badge__icon" aria-hidden="true"></span>
+                        <span class="tejlg-status-badge__text"><?php echo esc_html($schedule_status_badge); ?></span>
+                    </span>
+                </div>
                 <strong class="tejlg-dashboard__value"><?php echo esc_html($schedule_frequency_label); ?></strong>
                 <span class="tejlg-dashboard__meta"><?php echo esc_html($schedule_next_run_label); ?></span>
                 <span class="tejlg-dashboard__meta">
@@ -823,9 +875,15 @@ $quality_benchmarks = [
                 <span class="tejlg-dashboard__meta"><?php echo esc_html($schedule_retention_label); ?></span>
             </div>
         </div>
-        <div class="tejlg-dashboard__card components-card is-elevated">
+        <div class="tejlg-dashboard__card components-card is-elevated" data-status-variant="<?php echo esc_attr($history_status_variant); ?>">
             <div class="components-card__body">
-                <span class="tejlg-dashboard__label"><?php esc_html_e('Archives suivies', 'theme-export-jlg'); ?></span>
+                <div class="tejlg-dashboard__label-row">
+                    <span class="tejlg-dashboard__label"><?php esc_html_e('Archives suivies', 'theme-export-jlg'); ?></span>
+                    <span class="tejlg-status-badge tejlg-status-badge--<?php echo esc_attr($history_status_variant); ?>">
+                        <span class="tejlg-status-badge__icon" aria-hidden="true"></span>
+                        <span class="tejlg-status-badge__text"><?php echo esc_html($history_status_badge); ?></span>
+                    </span>
+                </div>
                 <strong class="tejlg-dashboard__value"><?php echo esc_html($history_total_all_label); ?></strong>
                 <span class="tejlg-dashboard__meta"><?php esc_html_e('Nombre total d’exports enregistrés', 'theme-export-jlg'); ?></span>
                 <span class="tejlg-dashboard__meta">
@@ -839,9 +897,15 @@ $quality_benchmarks = [
                 </span>
             </div>
         </div>
-        <div class="tejlg-dashboard__card components-card is-elevated">
+        <div class="tejlg-dashboard__card components-card is-elevated" data-status-variant="<?php echo esc_attr($monitoring_status_variant); ?>">
             <div class="components-card__body">
-                <span class="tejlg-dashboard__label"><?php esc_html_e('Surveillance & alertes', 'theme-export-jlg'); ?></span>
+                <div class="tejlg-dashboard__label-row">
+                    <span class="tejlg-dashboard__label"><?php esc_html_e('Surveillance & alertes', 'theme-export-jlg'); ?></span>
+                    <span class="tejlg-status-badge tejlg-status-badge--<?php echo esc_attr($monitoring_status_variant); ?>">
+                        <span class="tejlg-status-badge__icon" aria-hidden="true"></span>
+                        <span class="tejlg-status-badge__text"><?php echo esc_html($monitoring_status_badge); ?></span>
+                    </span>
+                </div>
                 <strong class="tejlg-dashboard__value"><?php echo esc_html($monitoring_value); ?></strong>
                 <span class="tejlg-dashboard__meta"><?php echo esc_html($monitoring_breakdown_label); ?></span>
                 <span class="tejlg-dashboard__meta"><?php echo esc_html($monitoring_window_label); ?></span>
@@ -1029,6 +1093,21 @@ $quality_benchmarks = [
                                 <span class="spinner" aria-hidden="true" data-pattern-test-spinner></span>
                             </div>
                             <p id="tejlg-pattern-test-help" class="description"><?php esc_html_e('Vérifiez les fichiers inclus/exclus avant de lancer un export.', 'theme-export-jlg'); ?></p>
+                            <div class="tejlg-pattern-examples" data-pattern-examples role="list">
+                                <span class="tejlg-pattern-examples__label" role="listitem"><?php esc_html_e('Exemples rapides', 'theme-export-jlg'); ?></span>
+                                <div class="tejlg-pattern-examples__actions">
+                                    <button type="button" class="tejlg-pattern-example" data-pattern-example="assets/*.scss">
+                                        <span class="tejlg-pattern-example__text">assets/*.scss</span>
+                                    </button>
+                                    <button type="button" class="tejlg-pattern-example" data-pattern-example="**/*.log">
+                                        <span class="tejlg-pattern-example__text">**/*.log</span>
+                                    </button>
+                                    <button type="button" class="tejlg-pattern-example" data-pattern-example="node_modules/">
+                                        <span class="tejlg-pattern-example__text">node_modules/</span>
+                                    </button>
+                                </div>
+                                <p class="tejlg-pattern-examples__hint"><?php esc_html_e('Cliquez pour insérer un motif et l’adapter à votre projet.', 'theme-export-jlg'); ?></p>
+                            </div>
                             <p
                                 class="tejlg-pattern-test__invalid"
                                 data-pattern-test-invalid
@@ -1152,16 +1231,65 @@ $quality_benchmarks = [
     </div>
 </div>
 
-<details class="tejlg-collapsible" id="tejlg-schedule-panel" data-tejlg-persist="panel"<?php echo $schedule_section_open ? ' open' : ''; ?>>
-    <summary class="tejlg-collapsible__summary">
-        <span class="tejlg-collapsible__title"><?php esc_html_e('Planification & alertes', 'theme-export-jlg'); ?></span>
-        <span class="tejlg-collapsible__description"><?php echo esc_html($schedule_summary_description); ?></span>
-    </summary>
-    <div class="tejlg-collapsible__content">
+<section
+    class="tejlg-accordion"
+    data-tejlg-accordion
+    data-accordion-id="schedule"
+    data-accordion-open="<?php echo $schedule_section_open ? '1' : '0'; ?>"
+>
+    <header class="tejlg-accordion__header">
+        <div class="tejlg-accordion__title-group">
+            <h3 id="tejlg-schedule-panel-label" class="tejlg-accordion__title"><?php esc_html_e('Planification & alertes', 'theme-export-jlg'); ?></h3>
+            <p class="tejlg-accordion__description"><?php echo esc_html($schedule_summary_description); ?></p>
+        </div>
+        <div class="tejlg-accordion__badges" role="list">
+            <span class="tejlg-accordion__badge" role="listitem"><?php echo esc_html($schedule_frequency_label); ?></span>
+            <span class="tejlg-accordion__badge" role="listitem"><?php echo esc_html($schedule_run_time_value); ?></span>
+            <span class="tejlg-accordion__badge" role="listitem"><?php echo esc_html($notification_events_badge); ?></span>
+        </div>
+        <button
+            type="button"
+            class="tejlg-accordion__trigger"
+            data-accordion-trigger
+            aria-controls="tejlg-schedule-panel"
+            aria-expanded="<?php echo $schedule_section_open ? 'true' : 'false'; ?>"
+        >
+            <span class="tejlg-accordion__trigger-text"><?php esc_html_e('Afficher les réglages', 'theme-export-jlg'); ?></span>
+            <span class="tejlg-accordion__trigger-icon" aria-hidden="true"></span>
+        </button>
+    </header>
+    <div
+        id="tejlg-schedule-panel"
+        class="tejlg-accordion__panel"
+        role="region"
+        aria-labelledby="tejlg-schedule-panel-label"
+        data-accordion-panel
+        <?php echo $schedule_section_open ? '' : 'hidden'; ?>
+    >
         <div class="tejlg-card components-card is-elevated">
             <div class="components-card__body">
                 <h3><?php esc_html_e('Planification des exports de thème', 'theme-export-jlg'); ?></h3>
-                <p><?php esc_html_e('Automatisez la génération d’archives ZIP du thème actif et contrôlez leur conservation.', 'theme-export-jlg'); ?></p>
+                <p>
+                    <?php esc_html_e('Automatisez la génération d’archives ZIP du thème actif et contrôlez leur conservation.', 'theme-export-jlg'); ?>
+                    <button
+                        type="button"
+                        class="tejlg-help-bubble"
+                        data-tejlg-tooltip-trigger
+                        aria-expanded="false"
+                        aria-controls="tejlg-schedule-help"
+                    >
+                        <span class="tejlg-help-bubble__icon" aria-hidden="true"></span>
+                        <span class="screen-reader-text"><?php esc_html_e('Comment structurer vos exclusions ?', 'theme-export-jlg'); ?></span>
+                    </button>
+                </p>
+                <div id="tejlg-schedule-help" class="tejlg-tooltip" role="dialog" aria-modal="false" hidden>
+                    <p><?php esc_html_e('Combinez les exports planifiés avec des motifs ciblés pour éviter les fichiers temporaires.', 'theme-export-jlg'); ?></p>
+                    <p>
+                        <a href="https://developer.wordpress.org/cli/commands/export/" target="_blank" rel="noopener noreferrer">
+                            <?php esc_html_e('Voir le guide sur la préparation des exports', 'theme-export-jlg'); ?>
+                        </a>
+                    </p>
+                </div>
                 <form method="post" action="<?php echo esc_url($export_tab_url); ?>">
                     <?php wp_nonce_field('tejlg_schedule_settings_action', 'tejlg_schedule_settings_nonce'); ?>
                     <div class="tejlg-schedule-grid">
@@ -1313,14 +1441,42 @@ $quality_benchmarks = [
             </div>
         </div>
     </div>
-</details>
+</section>
 
-<details class="tejlg-collapsible tejlg-collapsible--grid" id="tejlg-advanced-tools" data-tejlg-persist="panel">
-    <summary class="tejlg-collapsible__summary">
-        <span class="tejlg-collapsible__title"><?php esc_html_e('Exports complémentaires & outils avancés', 'theme-export-jlg'); ?></span>
-        <span class="tejlg-collapsible__description"><?php esc_html_e('Compositions, styles globaux et création de thème enfant.', 'theme-export-jlg'); ?></span>
-    </summary>
-    <div class="tejlg-collapsible__content">
+<section
+    class="tejlg-accordion tejlg-accordion--grid"
+    data-tejlg-accordion
+    data-accordion-id="advanced-tools"
+    data-accordion-open="<?php echo $is_simple_mode ? '0' : '1'; ?>"
+>
+    <header class="tejlg-accordion__header">
+        <div class="tejlg-accordion__title-group">
+            <h3 id="tejlg-advanced-tools-label" class="tejlg-accordion__title"><?php esc_html_e('Exports complémentaires & outils avancés', 'theme-export-jlg'); ?></h3>
+            <p class="tejlg-accordion__description"><?php esc_html_e('Compositions, styles globaux et création de thème enfant.', 'theme-export-jlg'); ?></p>
+        </div>
+        <div class="tejlg-accordion__badges" role="list">
+            <span class="tejlg-accordion__badge" role="listitem"><?php echo esc_html($current_exclusion_badge); ?></span>
+            <span class="tejlg-accordion__badge" role="listitem"><?php echo esc_html($notification_recipient_count_label); ?></span>
+        </div>
+        <button
+            type="button"
+            class="tejlg-accordion__trigger"
+            data-accordion-trigger
+            aria-controls="tejlg-advanced-tools-panel"
+            aria-expanded="<?php echo $is_simple_mode ? 'false' : 'true'; ?>"
+        >
+            <span class="tejlg-accordion__trigger-text"><?php esc_html_e('Afficher les outils expert', 'theme-export-jlg'); ?></span>
+            <span class="tejlg-accordion__trigger-icon" aria-hidden="true"></span>
+        </button>
+    </header>
+    <div
+        id="tejlg-advanced-tools-panel"
+        class="tejlg-accordion__panel"
+        role="region"
+        aria-labelledby="tejlg-advanced-tools-label"
+        data-accordion-panel
+        <?php echo $is_simple_mode ? 'hidden' : ''; ?>
+    >
         <div class="tejlg-cards-container tejlg-cards-container--secondary">
             <div class="tejlg-card components-card is-elevated">
                 <div class="components-card__body">
@@ -1362,14 +1518,42 @@ $quality_benchmarks = [
             </div>
         </div>
     </div>
-</details>
+</section>
 
-<details class="tejlg-collapsible" id="tejlg-history-panel" data-tejlg-persist="panel"<?php echo $history_section_open ? ' open' : ''; ?>>
-    <summary class="tejlg-collapsible__summary">
-        <span class="tejlg-collapsible__title"><?php esc_html_e('Historique des exports', 'theme-export-jlg'); ?></span>
-        <span class="tejlg-collapsible__description"><?php echo esc_html($history_summary_inline); ?></span>
-    </summary>
-    <div class="tejlg-collapsible__content">
+<section
+    class="tejlg-accordion"
+    data-tejlg-accordion
+    data-accordion-id="history"
+    data-accordion-open="<?php echo $history_section_open ? '1' : '0'; ?>"
+>
+    <header class="tejlg-accordion__header">
+        <div class="tejlg-accordion__title-group">
+            <h3 id="tejlg-history-panel-label" class="tejlg-accordion__title"><?php esc_html_e('Historique des exports', 'theme-export-jlg'); ?></h3>
+            <p class="tejlg-accordion__description"><?php echo esc_html($history_summary_inline); ?></p>
+        </div>
+        <div class="tejlg-accordion__badges" role="list">
+            <span class="tejlg-accordion__badge" role="listitem"><?php echo esc_html($history_total_filtered_label); ?></span>
+            <span class="tejlg-accordion__badge" role="listitem"><?php echo esc_html($history_total_all_label); ?></span>
+        </div>
+        <button
+            type="button"
+            class="tejlg-accordion__trigger"
+            data-accordion-trigger
+            aria-controls="tejlg-history-panel"
+            aria-expanded="<?php echo $history_section_open ? 'true' : 'false'; ?>"
+        >
+            <span class="tejlg-accordion__trigger-text"><?php esc_html_e('Afficher l’historique détaillé', 'theme-export-jlg'); ?></span>
+            <span class="tejlg-accordion__trigger-icon" aria-hidden="true"></span>
+        </button>
+    </header>
+    <div
+        id="tejlg-history-panel"
+        class="tejlg-accordion__panel"
+        role="region"
+        aria-labelledby="tejlg-history-panel-label"
+        data-accordion-panel
+        <?php echo $history_section_open ? '' : 'hidden'; ?>
+    >
         <div class="tejlg-card components-card is-elevated">
             <div class="components-card__body">
                 <form method="get" class="tejlg-history-filters" aria-label="<?php esc_attr_e('Filtres de l\'historique d\'export', 'theme-export-jlg'); ?>">
@@ -1609,4 +1793,4 @@ $quality_benchmarks = [
             </div>
         </div>
     </div>
-</details>
+</section>

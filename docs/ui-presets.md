@@ -9,6 +9,7 @@ Ce document propose plusieurs presets d'interface réutilisables inspirés d'éc
 - **Composants clés** : cartes légères (ombre douce, radius 12px), en-têtes collants, menus déroulants minimalistes utilisant des transitions d'opacité.
 - **Interactions** : focus visibles (anneau 2px accentué), animations discrètes (`transition: 120ms ease-out`).
 - **Cas d'usage** : tableau de bord et écrans listant des exports où la clarté prime, sans surcharge décorative.
+- **Activation rapide** : un bouton « Preset Pavillon+ » est disponible dans le bandeau d’action du centre de contrôle pour appliquer un contraste élevé sans passer par les options avancées.
 
 ## 2. Preset « Spectrum » — esprit Shadcn UI
 - **Intention** : offrir des interfaces ciselées, modulaires, avec un fort travail sur les contrastes et la micro-typographie.
