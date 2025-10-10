@@ -20,6 +20,7 @@ class TEJLG_Capabilities {
         'settings'  => self::MANAGE_SETTINGS,
         'ajax'      => self::MANAGE_EXPORTS,
         'reports'   => self::MANAGE_DEBUG,
+        'history'   => self::MANAGE_EXPORTS,
     ];
 
     /**
