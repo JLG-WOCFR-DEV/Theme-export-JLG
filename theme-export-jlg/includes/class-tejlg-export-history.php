@@ -52,87 +52,15 @@ class TEJLG_Export_History {
     }
 
     public static function get_entries($args = []) {
-        $defaults = [
-            'per_page' => 10,
-            'paged'    => 1,
-            'result'   => '',
-            'origin'   => '',
-            'orderby'  => 'timestamp',
-            'order'    => 'desc',
-        ];
+        $args['limit'] = 0;
 
-        $args = wp_parse_args($args, $defaults);
+        $query   = self::normalize_query_args($args);
+        $entries = self::get_filtered_entries($query);
 
-        $per_page = isset($args['per_page']) ? (int) $args['per_page'] : 10;
-        $per_page = $per_page > 0 ? $per_page : 10;
-
-        $current_page = isset($args['paged']) ? (int) $args['paged'] : 1;
-        $current_page = $current_page > 0 ? $current_page : 1;
-
-        $result_filter = isset($args['result']) ? sanitize_key((string) $args['result']) : '';
-        $origin_filter = isset($args['origin']) ? sanitize_key((string) $args['origin']) : '';
-
-        $orderby = isset($args['orderby']) ? sanitize_key((string) $args['orderby']) : 'timestamp';
-        $allowed_orderby = ['timestamp', 'duration', 'zip_file_size'];
-        if (!in_array($orderby, $allowed_orderby, true)) {
-            $orderby = 'timestamp';
-        }
-
-        $order = isset($args['order']) ? strtolower((string) $args['order']) : 'desc';
-        $order = 'asc' === $order ? 'asc' : 'desc';
-
-        $entries = self::get_raw_entries();
-
-        if ('' !== $result_filter) {
-            $entries = array_values(
-                array_filter(
-                    $entries,
-                    static function ($entry) use ($result_filter) {
-                        return is_array($entry)
-                            && isset($entry['result'])
-                            && (string) $entry['result'] === $result_filter;
-                    }
-                )
-            );
-        }
-
-        if ('' !== $origin_filter) {
-            $entries = array_values(
-                array_filter(
-                    $entries,
-                    static function ($entry) use ($origin_filter) {
-                        return is_array($entry)
-                            && isset($entry['origin'])
-                            && (string) $entry['origin'] === $origin_filter;
-                    }
-                )
-            );
-        }
+        $per_page = isset($query['per_page']) ? (int) $query['per_page'] : 10;
+        $current_page = isset($query['paged']) ? (int) $query['paged'] : 1;
 
         $total = count($entries);
-
-        if ($total > 1) {
-            usort(
-                $entries,
-                static function ($left, $right) use ($orderby, $order) {
-                    $left_value  = isset($left[$orderby]) ? (int) $left[$orderby] : 0;
-                    $right_value = isset($right[$orderby]) ? (int) $right[$orderby] : 0;
-
-                    if ($left_value === $right_value) {
-                        $left_timestamp  = isset($left['timestamp']) ? (int) $left['timestamp'] : 0;
-                        $right_timestamp = isset($right['timestamp']) ? (int) $right['timestamp'] : 0;
-
-                        if ($left_timestamp === $right_timestamp) {
-                            return 0;
-                        }
-
-                        return ('asc' === $order) ? ($left_timestamp <=> $right_timestamp) : ($right_timestamp <=> $left_timestamp);
-                    }
-
-                    return ('asc' === $order) ? ($left_value <=> $right_value) : ($right_value <=> $left_value);
-                }
-            );
-        }
 
         $offset = ($current_page - 1) * $per_page;
         $offset = $offset < 0 ? 0 : $offset;
@@ -149,6 +77,186 @@ class TEJLG_Export_History {
             'per_page'      => $per_page,
             'current_page'  => $current_page,
         ];
+    }
+
+    public static function get_entries_for_export($args = []) {
+        $query   = self::normalize_query_args($args);
+        $entries = self::get_filtered_entries($query);
+
+        $limit = isset($query['limit']) ? (int) $query['limit'] : 0;
+
+        if ($limit > 0 && count($entries) > $limit) {
+            $entries = array_slice($entries, 0, $limit);
+        }
+
+        return [
+            'entries' => $entries,
+            'query'   => $query,
+        ];
+    }
+
+    public static function normalize_query_args($args = []) {
+        $defaults = [
+            'per_page'        => 10,
+            'paged'           => 1,
+            'result'          => '',
+            'origin'          => '',
+            'orderby'         => 'timestamp',
+            'order'           => 'desc',
+            'start_date'      => '',
+            'end_date'        => '',
+            'start_timestamp' => 0,
+            'end_timestamp'   => 0,
+            'limit'           => 0,
+        ];
+
+        $args = wp_parse_args($args, $defaults);
+
+        $per_page = isset($args['per_page']) ? (int) $args['per_page'] : 10;
+        $per_page = $per_page > 0 ? $per_page : 10;
+
+        $paged = isset($args['paged']) ? (int) $args['paged'] : 1;
+        $paged = $paged > 0 ? $paged : 1;
+
+        $result_filter = isset($args['result']) ? sanitize_key((string) $args['result']) : '';
+        $origin_filter = isset($args['origin']) ? sanitize_key((string) $args['origin']) : '';
+
+        $orderby = isset($args['orderby']) ? sanitize_key((string) $args['orderby']) : 'timestamp';
+        $allowed_orderby = ['timestamp', 'duration', 'zip_file_size'];
+        if (!in_array($orderby, $allowed_orderby, true)) {
+            $orderby = 'timestamp';
+        }
+
+        $order = isset($args['order']) ? strtolower((string) $args['order']) : 'desc';
+        $order = 'asc' === $order ? 'asc' : 'desc';
+
+        $start_date = isset($args['start_date']) ? sanitize_text_field((string) $args['start_date']) : '';
+        $end_date   = isset($args['end_date']) ? sanitize_text_field((string) $args['end_date']) : '';
+
+        $start_timestamp = isset($args['start_timestamp']) && is_numeric($args['start_timestamp'])
+            ? (int) $args['start_timestamp']
+            : self::parse_date_filter($start_date, false);
+
+        $end_timestamp = isset($args['end_timestamp']) && is_numeric($args['end_timestamp'])
+            ? (int) $args['end_timestamp']
+            : self::parse_date_filter($end_date, true);
+
+        if ($start_timestamp > 0 && $end_timestamp > 0 && $end_timestamp < $start_timestamp) {
+            $tmp = $start_timestamp;
+            $start_timestamp = $end_timestamp;
+            $end_timestamp   = $tmp;
+        }
+
+        $limit = isset($args['limit']) ? (int) $args['limit'] : 0;
+        $limit = $limit >= 0 ? $limit : 0;
+
+        return [
+            'per_page'        => $per_page,
+            'paged'           => $paged,
+            'result'          => $result_filter,
+            'origin'          => $origin_filter,
+            'orderby'         => $orderby,
+            'order'           => $order,
+            'start_date'      => $start_date,
+            'end_date'        => $end_date,
+            'start_timestamp' => max(0, $start_timestamp),
+            'end_timestamp'   => max(0, $end_timestamp),
+            'limit'           => $limit,
+        ];
+    }
+
+    private static function get_filtered_entries(array $query) {
+        $entries = self::get_raw_entries();
+
+        $entries = array_values(
+            array_filter(
+                $entries,
+                static function ($entry) use ($query) {
+                    if (!is_array($entry)) {
+                        return false;
+                    }
+
+                    if ('' !== $query['result']) {
+                        $entry_result = isset($entry['result']) ? (string) $entry['result'] : '';
+
+                        if ($entry_result !== $query['result']) {
+                            return false;
+                        }
+                    }
+
+                    if ('' !== $query['origin']) {
+                        $entry_origin = isset($entry['origin']) ? (string) $entry['origin'] : '';
+
+                        if ($entry_origin !== $query['origin']) {
+                            return false;
+                        }
+                    }
+
+                    $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+
+                    if ($query['start_timestamp'] > 0 && $timestamp < $query['start_timestamp']) {
+                        return false;
+                    }
+
+                    if ($query['end_timestamp'] > 0 && $timestamp > $query['end_timestamp']) {
+                        return false;
+                    }
+
+                    return true;
+                }
+            )
+        );
+
+        if (count($entries) > 1) {
+            $entries = self::sort_entries($entries, $query['orderby'], $query['order']);
+        }
+
+        return $entries;
+    }
+
+    private static function sort_entries(array $entries, $orderby, $order) {
+        usort(
+            $entries,
+            static function ($left, $right) use ($orderby, $order) {
+                $left_value  = isset($left[$orderby]) ? (int) $left[$orderby] : 0;
+                $right_value = isset($right[$orderby]) ? (int) $right[$orderby] : 0;
+
+                if ($left_value === $right_value) {
+                    $left_timestamp  = isset($left['timestamp']) ? (int) $left['timestamp'] : 0;
+                    $right_timestamp = isset($right['timestamp']) ? (int) $right['timestamp'] : 0;
+
+                    if ($left_timestamp === $right_timestamp) {
+                        return 0;
+                    }
+
+                    return ('asc' === $order) ? ($left_timestamp <=> $right_timestamp) : ($right_timestamp <=> $left_timestamp);
+                }
+
+                return ('asc' === $order) ? ($left_value <=> $right_value) : ($right_value <=> $left_value);
+            }
+        );
+
+        return $entries;
+    }
+
+    private static function parse_date_filter($value, $is_end_of_day) {
+        $value = is_string($value) ? trim($value) : '';
+
+        if ('' === $value) {
+            return 0;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            $value .= $is_end_of_day ? ' 23:59:59' : ' 00:00:00';
+        }
+
+        $timestamp = strtotime($value);
+
+        if (false === $timestamp) {
+            return 0;
+        }
+
+        return (int) $timestamp;
     }
 
     public static function count_entries() {

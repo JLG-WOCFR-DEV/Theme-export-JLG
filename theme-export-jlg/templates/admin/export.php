@@ -59,21 +59,29 @@ $current_theme = wp_get_theme();
 $history_filter_values = is_array($history_filter_values) ? $history_filter_values : ['origins' => [], 'results' => []];
 $history_selected_filters = is_array($history_selected_filters)
     ? wp_parse_args($history_selected_filters, [
-        'result'  => '',
-        'origin'  => '',
-        'orderby' => 'timestamp',
-        'order'   => 'desc',
+        'result'     => '',
+        'origin'     => '',
+        'orderby'    => 'timestamp',
+        'order'      => 'desc',
+        'start_date' => '',
+        'end_date'   => '',
     ])
     : [
-        'result'  => '',
-        'origin'  => '',
-        'orderby' => 'timestamp',
-        'order'   => 'desc',
+        'result'     => '',
+        'origin'     => '',
+        'orderby'    => 'timestamp',
+        'order'      => 'desc',
+        'start_date' => '',
+        'end_date'   => '',
     ];
 $history_base_args = is_array($history_base_args) ? $history_base_args : [
     'page' => $page_slug,
     'tab'  => 'export',
 ];
+
+$history_export_links = isset($history_export_links) && is_array($history_export_links)
+    ? $history_export_links
+    : [];
 
 $history_stats = is_array($history_stats) ? $history_stats : [];
 $notification_settings = is_array($notification_settings) ? $notification_settings : [];
@@ -413,6 +421,8 @@ $history_filters_active = (
     || (isset($history_selected_filters['origin']) && '' !== $history_selected_filters['origin'])
     || (isset($history_selected_filters['orderby']) && 'timestamp' !== $history_selected_filters['orderby'])
     || (isset($history_selected_filters['order']) && 'desc' !== $history_selected_filters['order'])
+    || (isset($history_selected_filters['start_date']) && '' !== $history_selected_filters['start_date'])
+    || (isset($history_selected_filters['end_date']) && '' !== $history_selected_filters['end_date'])
 );
 
 $history_summary_inline = sprintf(
@@ -1382,6 +1392,14 @@ $quality_benchmarks = [
                             <option value="asc" <?php selected($history_selected_filters['order'], 'asc'); ?>><?php esc_html_e('Croissant', 'theme-export-jlg'); ?></option>
                         </select>
                     </div>
+                    <div class="tejlg-history-filters__group">
+                        <label for="tejlg-history-start"><?php esc_html_e('Depuis le', 'theme-export-jlg'); ?></label>
+                        <input type="date" name="history_start_date" id="tejlg-history-start" value="<?php echo esc_attr($history_selected_filters['start_date']); ?>">
+                    </div>
+                    <div class="tejlg-history-filters__group">
+                        <label for="tejlg-history-end"><?php esc_html_e('Jusqu\'au', 'theme-export-jlg'); ?></label>
+                        <input type="date" name="history_end_date" id="tejlg-history-end" value="<?php echo esc_attr($history_selected_filters['end_date']); ?>">
+                    </div>
                     <div class="tejlg-history-filters__actions">
                         <button type="submit" class="button button-secondary wp-ui-secondary"><?php esc_html_e('Filtrer', 'theme-export-jlg'); ?></button>
                         <a class="button button-link" href="<?php echo esc_url(add_query_arg($history_base_args, admin_url('admin.php'))); ?>"><?php esc_html_e('Réinitialiser', 'theme-export-jlg'); ?></a>
@@ -1397,6 +1415,22 @@ $quality_benchmarks = [
                     );
                     ?>
                 </p>
+                <?php if (!empty($history_export_links)) : ?>
+                    <div class="tejlg-history-export-actions" role="region" aria-label="<?php esc_attr_e('Export du journal', 'theme-export-jlg'); ?>">
+                        <div class="tejlg-history-export-actions__info">
+                            <strong><?php esc_html_e('Exporter le journal filtré', 'theme-export-jlg'); ?></strong>
+                            <p><?php esc_html_e('Les filtres ci-dessus seront appliqués au fichier téléchargé.', 'theme-export-jlg'); ?></p>
+                        </div>
+                        <div class="tejlg-history-export-actions__buttons">
+                            <?php if (!empty($history_export_links['json'])) : ?>
+                                <a class="button button-secondary wp-ui-secondary" href="<?php echo esc_url($history_export_links['json']); ?>"><?php esc_html_e('Télécharger (JSON)', 'theme-export-jlg'); ?></a>
+                            <?php endif; ?>
+                            <?php if (!empty($history_export_links['csv'])) : ?>
+                                <a class="button" href="<?php echo esc_url($history_export_links['csv']); ?>"><?php esc_html_e('Télécharger (CSV)', 'theme-export-jlg'); ?></a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
                 <?php if (!empty($history_entries)) : ?>
                     <table class="wp-list-table widefat striped">
                         <thead>
