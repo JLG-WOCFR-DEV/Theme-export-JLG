@@ -20,8 +20,8 @@ class TEJLG_CLI {
         WP_CLI::log('  wp theme-export-jlg patterns [--portable] [--output=<chemin>]');
         WP_CLI::log('  wp theme-export-jlg import theme <chemin_zip> [--overwrite]');
         WP_CLI::log('  wp theme-export-jlg import patterns <chemin_json>');
-        WP_CLI::log('  wp theme-export-jlg history [--per-page=<nombre>] [--page=<nombre>] [--result=<statut>] [--origin=<origine>]');
-        WP_CLI::log('  wp theme-export-jlg history report [--window=<jours>] [--result=<statut>] [--origin=<origine>] [--format=<table|json>] [--limit=<nombre>]');
+        WP_CLI::log('  wp theme-export-jlg history [--per-page=<nombre>] [--page=<nombre>] [--result=<statut>] [--origin=<origine>] [--initiator=<identifiant>]');
+        WP_CLI::log('  wp theme-export-jlg history report [--window=<jours>] [--result=<statut>] [--origin=<origine>] [--initiator=<identifiant>] [--format=<table|json>] [--limit=<nombre>]');
         WP_CLI::log('  wp theme-export-jlg settings export [--output=<chemin>]');
         WP_CLI::log('  wp theme-export-jlg settings import <chemin_json>');
     }
@@ -130,12 +130,14 @@ class TEJLG_CLI {
 
         $result_filter = isset($assoc_args['result']) ? sanitize_key((string) $assoc_args['result']) : '';
         $origin_filter = isset($assoc_args['origin']) ? sanitize_key((string) $assoc_args['origin']) : '';
+        $initiator_filter = isset($assoc_args['initiator']) ? sanitize_text_field((string) $assoc_args['initiator']) : '';
 
         $history = TEJLG_Export_History::get_entries([
             'per_page' => $per_page,
             'paged'    => $page,
             'result'   => $result_filter,
             'origin'   => $origin_filter,
+            'initiator' => $initiator_filter,
         ]);
 
         $entries = isset($history['entries']) ? (array) $history['entries'] : [];
@@ -144,7 +146,7 @@ class TEJLG_CLI {
         $total_pages = $total_pages > 0 ? $total_pages : 1;
 
         if (empty($entries)) {
-            if ('' !== $result_filter || '' !== $origin_filter) {
+            if ('' !== $result_filter || '' !== $origin_filter || '' !== $initiator_filter) {
                 WP_CLI::log(__('Aucun export ne correspond aux filtres fournis.', 'theme-export-jlg'));
             } else {
                 WP_CLI::log(__('Aucun export n\'a encore été enregistré.', 'theme-export-jlg'));
@@ -187,6 +189,23 @@ class TEJLG_CLI {
                     : __('Système', 'theme-export-jlg');
             }
 
+            $user_login = isset($entry['user_login']) ? (string) $entry['user_login'] : '';
+            $user_parts = [];
+
+            if ('' !== $user_login) {
+                $user_parts[] = '@' . $user_login;
+            }
+
+            if ($user_id > 0) {
+                $user_parts[] = '#' . $user_id;
+            }
+
+            $user_label = $user_name;
+
+            if (!empty($user_parts)) {
+                $user_label .= ' (' . implode(' · ', $user_parts) . ')';
+            }
+
             $size_bytes = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
             $size_label = $size_bytes > 0 ? size_format($size_bytes, 2) : __('Inconnue', 'theme-export-jlg');
 
@@ -206,7 +225,7 @@ class TEJLG_CLI {
                 '[%1$s] %2$s | %3$s | %4$s | %5$s | %6$s',
                 $job_id,
                 $formatted_date,
-                $user_name,
+                $user_label,
                 $size_label,
                 $status,
                 $exclusions_label
@@ -226,6 +245,7 @@ class TEJLG_CLI {
 
         $result_filter = isset($assoc_args['result']) ? sanitize_key((string) $assoc_args['result']) : '';
         $origin_filter = isset($assoc_args['origin']) ? sanitize_key((string) $assoc_args['origin']) : '';
+        $initiator_filter = isset($assoc_args['initiator']) ? sanitize_text_field((string) $assoc_args['initiator']) : '';
 
         $format = isset($assoc_args['format']) ? strtolower((string) $assoc_args['format']) : 'table';
         $limit  = isset($assoc_args['limit']) ? (int) $assoc_args['limit'] : 10;
@@ -235,6 +255,7 @@ class TEJLG_CLI {
             'window_days'     => $window_days,
             'result'          => $result_filter,
             'origin'          => $origin_filter,
+            'initiator'       => $initiator_filter,
             'limit'           => $limit,
             'include_entries' => true,
         ]);
@@ -277,6 +298,14 @@ class TEJLG_CLI {
             __('Fenêtre analysée : %d jours', 'theme-export-jlg'),
             isset($report['filters']['window_days']) ? (int) $report['filters']['window_days'] : $window_days
         ));
+
+        if ('' !== $initiator_filter) {
+            WP_CLI::log(sprintf(
+                /* translators: %s: initiator filter value. */
+                __('Filtré par initiateur : %s', 'theme-export-jlg'),
+                $initiator_filter
+            ));
+        }
 
         WP_CLI::log(sprintf(
             /* translators: %d: total number of exports. */
@@ -350,13 +379,40 @@ class TEJLG_CLI {
             $duration = isset($entry['duration']) ? (int) $entry['duration'] : 0;
             $duration_label = $duration > 0 ? human_readable_duration($duration) : __('Non renseignée', 'theme-export-jlg');
 
+            $user_id = isset($entry['user_id']) ? (int) $entry['user_id'] : 0;
+            $user_name = isset($entry['user_name']) ? (string) $entry['user_name'] : '';
+
+            if ('' === $user_name) {
+                $user_name = $user_id > 0
+                    ? sprintf(__('Utilisateur #%d', 'theme-export-jlg'), $user_id)
+                    : __('Système', 'theme-export-jlg');
+            }
+
+            $user_login = isset($entry['user_login']) ? (string) $entry['user_login'] : '';
+            $user_parts = [];
+
+            if ('' !== $user_login) {
+                $user_parts[] = '@' . $user_login;
+            }
+
+            if ($user_id > 0) {
+                $user_parts[] = '#' . $user_id;
+            }
+
+            $user_label = $user_name;
+
+            if (!empty($user_parts)) {
+                $user_label .= ' (' . implode(' · ', $user_parts) . ')';
+            }
+
             WP_CLI::log(sprintf(
-                '[%1$s] %2$s | %3$s | %4$s | %5$s',
+                '[%1$s] %2$s | %3$s | %4$s | %5$s | %6$s',
                 $job_id,
                 $date_label,
                 $result_label,
                 $size_label,
-                $duration_label
+                $duration_label,
+                $user_label
             ));
         }
     }
