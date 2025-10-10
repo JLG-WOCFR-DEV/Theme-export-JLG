@@ -11,9 +11,9 @@
     --tejlg-accent-color-darker: var(--wp-admin-theme-color-darker-10, #1e3a8a);
     --tejlg-accent-color-soft: rgba(30, 64, 175, 0.12);
     --tejlg-page-background: #f8fafc;
-    --tejlg-shadow-sm: 0 6px 16px rgba(15, 23, 42, 0.08);
-    --tejlg-shadow-md: 0 12px 28px rgba(15, 23, 42, 0.08);
-    --tejlg-shadow-lg: 0 18px 44px rgba(15, 23, 42, 0.08);
+    --tejlg-shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.06);
+    --tejlg-shadow-md: 0 10px 24px rgba(15, 23, 42, 0.06);
+    --tejlg-shadow-lg: 0 16px 32px rgba(15, 23, 42, 0.05);
     --tejlg-radius-sm: 8px;
     --tejlg-radius-md: 12px;
     --tejlg-radius-lg: 16px;
@@ -354,10 +354,9 @@ body.toplevel_page_theme-export-jlg .components-card__body {
 }
 
 .tejlg-card {
-    border: 1px solid color-mix(in srgb, var(--tejlg-border-color) 80%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tejlg-border-color) 70%, transparent);
     padding: clamp(1.25rem, 1vw + 1rem, 1.75rem);
-    background:
-        linear-gradient(180deg, color-mix(in srgb, var(--tejlg-surface-color) 90%, #ffffff) 0%, color-mix(in srgb, var(--tejlg-surface-alt-color) 98%, #ffffff) 100%);
+    background: var(--tejlg-surface-color);
     box-shadow: var(--tejlg-shadow-sm);
     border-radius: var(--tejlg-radius-lg);
     transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
@@ -1515,6 +1514,13 @@ textarea.has-pattern-error {
     box-shadow: var(--tejlg-shadow-sm);
 }
 
+.tejlg-export-banner__title {
+    margin: 0 0 1rem;
+    font-size: 1.35rem;
+    font-weight: 650;
+    color: var(--tejlg-text-color);
+}
+
 .tejlg-export-banner__grid {
     display: grid;
     gap: 1.5rem;
@@ -1545,6 +1551,7 @@ textarea.has-pattern-error {
 .tejlg-export-banner__meta {
     font-size: 0.9rem;
     color: var(--tejlg-text-muted-color);
+    line-height: 1.4;
 }
 
 .tejlg-export-banner__item--cta {
@@ -1557,6 +1564,122 @@ textarea.has-pattern-error {
 
 .tejlg-export-banner__item--cta .tejlg-export-banner__meta {
     max-width: 24ch;
+}
+
+.tejlg-export-banner__link {
+    margin-top: 0.25rem;
+    font-weight: 600;
+    color: var(--tejlg-accent-color);
+    text-decoration: none;
+}
+
+.tejlg-export-banner__link:hover,
+.tejlg-export-banner__link:focus {
+    text-decoration: underline;
+}
+
+.tejlg-resume-notice {
+    margin-bottom: 1rem;
+    border-left: 4px solid var(--tejlg-accent-color);
+    padding-left: 1rem;
+}
+
+.tejlg-resume-notice[hidden] {
+    display: none;
+}
+
+.tejlg-resume-notice__actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.tejlg-mode-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1.25rem;
+}
+
+.tejlg-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.tejlg-mode-toggle__label {
+    font-weight: 600;
+    color: var(--tejlg-text-subtle-color);
+}
+
+.tejlg-mode-toggle__group {
+    display: inline-flex;
+    gap: 0.5rem;
+    background: var(--tejlg-surface-alt-color);
+    padding: 0.4rem;
+    border-radius: 999px;
+}
+
+.tejlg-mode-toggle__button {
+    border: none;
+    background: transparent;
+    color: var(--tejlg-text-muted-color);
+    font-weight: 600;
+    padding: 0.35rem 1.1rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tejlg-mode-toggle__button:hover,
+.tejlg-mode-toggle__button:focus-visible {
+    color: var(--tejlg-text-color);
+    background: var(--tejlg-accent-color-soft);
+    outline: none;
+}
+
+.tejlg-mode-toggle__button.is-active {
+    background: var(--tejlg-accent-color);
+    color: #fff;
+    box-shadow: 0 0 0 1px var(--tejlg-accent-color);
+}
+
+.tejlg-mode-summary {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.tejlg-mode-summary__item {
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: var(--tejlg-radius-md);
+    background: var(--tejlg-surface-color);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.tejlg-mode-summary__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--tejlg-text-subtle-color);
+}
+
+.tejlg-mode-summary__value {
+    font-weight: 600;
+    color: var(--tejlg-text-color);
+}
+
+.tejlg-mode-summary__hint {
+    font-size: 0.85rem;
+    color: var(--tejlg-text-muted-color);
+    line-height: 1.35;
 }
 
 .tejlg-dashboard__header {

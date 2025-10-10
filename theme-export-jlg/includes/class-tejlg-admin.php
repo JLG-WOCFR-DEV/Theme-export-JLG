@@ -185,6 +185,7 @@ class TEJLG_Admin {
                         ],
                         'jobMeta' => [
                             'storageKey' => 'tejlg:export:last-job',
+                            'sessionStorageKey' => 'tejlg:export:active-job',
                             'labels'     => [
                                 'title'        => esc_html__('Diagnostic de la tâche', 'theme-export-jlg'),
                                 'jobId'        => esc_html__('Identifiant de la tâche', 'theme-export-jlg'),
@@ -201,6 +202,12 @@ class TEJLG_Admin {
                             ],
                             'retryButton' => esc_html__('Relancer la vérification', 'theme-export-jlg'),
                             'retryAnnouncement' => esc_html__('Relance en cours…', 'theme-export-jlg'),
+                        ],
+                        'resumeNotice' => [
+                            'title'   => esc_html__('Export en cours détecté', 'theme-export-jlg'),
+                            'active'  => esc_html__('Un export est toujours actif. Affichez le suivi pour vérifier sa progression.', 'theme-export-jlg'),
+                            'queued'  => esc_html__('Un export est en attente de traitement. Cliquez sur « Afficher le suivi » pour reprendre.', 'theme-export-jlg'),
+                            'inactive' => esc_html__('Le dernier suivi est indisponible. Relancez l’export pour obtenir un nouveau statut.', 'theme-export-jlg'),
                         ],
                     ],
                 ]
