@@ -10,6 +10,7 @@ Cette feuille de route décline les axes identifiés dans le `readme.md` en lots
   - Documenter un modèle de rapport hebdomadaire (JSON + CSV) à partir des données retournées par `generate_report()`.
 - **Livrables** :
   - ✅ Guide de personnalisation des notifications (filtres, formats d’e-mail, webhooks) illustré par des snippets concrets — voir [`docs/notifications-guide.md`](./notifications-guide.md).
+  - ✅ Export JSON/CSV téléchargeable de l’historique pour alimenter un audit externe depuis l’onglet d’administration.
   - Exemple de rapport hebdomadaire généré à partir des métadonnées existantes.
 - **Indicateurs de succès** :
   - Les intégrateurs peuvent brancher un webhook en moins de 10 minutes grâce à la documentation.

@@ -519,6 +519,55 @@ body.toplevel_page_theme-export-jlg .components-card__body {
     margin: 0 0 1.25rem;
 }
 
+.tejlg-history-export {
+    margin: 1rem 0 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--tejlg-border-color, #dcdcde);
+    border-radius: 6px;
+    background-color: #fff;
+}
+
+.tejlg-history-export__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem 1.25rem;
+}
+
+.tejlg-history-export__group label {
+    display: block;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--tejlg-text-muted-color);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.35rem;
+}
+
+.tejlg-history-export__group select,
+.tejlg-history-export__group input[type='date'],
+.tejlg-history-export__group input[type='number'] {
+    width: 100%;
+    max-width: 260px;
+}
+
+.tejlg-history-export__group .description {
+    margin-top: 0.4rem;
+    color: var(--tejlg-text-muted-color);
+}
+
+.tejlg-history-export__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.tejlg-history-export__helper {
+    font-size: 13px;
+    color: var(--tejlg-text-muted-color);
+}
+
 .tejlg-history-filters__group {
     display: flex;
     flex-direction: column;
@@ -627,6 +676,10 @@ body.toplevel_page_theme-export-jlg .components-card__body {
     .tejlg-history-filters__actions {
         margin-left: 0;
         justify-content: flex-start;
+    }
+
+    .tejlg-history-export__grid {
+        grid-template-columns: 1fr;
     }
 
     .tejlg-history-status__message {

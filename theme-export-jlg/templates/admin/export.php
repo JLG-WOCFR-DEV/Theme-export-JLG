@@ -77,6 +77,34 @@ $history_base_args = is_array($history_base_args) ? $history_base_args : [
 $history_stats = is_array($history_stats) ? $history_stats : [];
 $notification_settings = is_array($notification_settings) ? $notification_settings : [];
 
+$history_export_capable = !empty($history_export_capable);
+$history_export_nonce = isset($history_export_nonce) ? (string) $history_export_nonce : '';
+$history_export_formats = isset($history_export_formats) && is_array($history_export_formats)
+    ? $history_export_formats
+    : [
+        'json' => __('JSON', 'theme-export-jlg'),
+        'csv'  => __('CSV', 'theme-export-jlg'),
+    ];
+$history_export_values = isset($history_export_values) && is_array($history_export_values)
+    ? wp_parse_args($history_export_values, [
+        'format' => 'json',
+        'start'  => '',
+        'end'    => '',
+        'limit'  => 200,
+        'result' => '',
+        'origin' => '',
+    ])
+    : [
+        'format' => 'json',
+        'start'  => '',
+        'end'    => '',
+        'limit'  => 200,
+        'result' => '',
+        'origin' => '',
+    ];
+$history_export_max_limit = isset($history_export_max_limit) ? (int) $history_export_max_limit : 5000;
+$history_export_default_limit = isset($history_export_default_limit) ? (int) $history_export_default_limit : 200;
+
 $history_result_labels = [
     'success' => __('Succès', 'theme-export-jlg'),
     'warning' => __('Avertissement', 'theme-export-jlg'),
@@ -1225,6 +1253,82 @@ $quality_benchmarks = [
                     );
                     ?>
                 </p>
+                <?php if ($history_export_capable) : ?>
+                    <form method="get" action="<?php echo esc_url(admin_url('admin.php')); ?>" class="tejlg-history-export" aria-label="<?php esc_attr_e('Exporter l\'historique des exports', 'theme-export-jlg'); ?>">
+                        <input type="hidden" name="page" value="<?php echo esc_attr($history_base_args['page']); ?>">
+                        <input type="hidden" name="tab" value="<?php echo esc_attr($history_base_args['tab']); ?>">
+                        <input type="hidden" name="action" value="download_history">
+                        <input type="hidden" name="tejlg_history_nonce" value="<?php echo esc_attr($history_export_nonce); ?>">
+                        <div class="tejlg-history-export__grid">
+                            <div class="tejlg-history-export__group">
+                                <label for="tejlg-history-export-format"><?php esc_html_e('Format', 'theme-export-jlg'); ?></label>
+                                <select name="history_format" id="tejlg-history-export-format">
+                                    <?php foreach ($history_export_formats as $format_key => $format_label) : ?>
+                                        <option value="<?php echo esc_attr($format_key); ?>" <?php selected($history_export_values['format'], $format_key); ?>>
+                                            <?php echo esc_html($format_label); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="tejlg-history-export__group">
+                                <label for="tejlg-history-export-start"><?php esc_html_e('Date de début', 'theme-export-jlg'); ?></label>
+                                <input type="date" id="tejlg-history-export-start" name="history_start" value="<?php echo esc_attr($history_export_values['start']); ?>">
+                            </div>
+                            <div class="tejlg-history-export__group">
+                                <label for="tejlg-history-export-end"><?php esc_html_e('Date de fin', 'theme-export-jlg'); ?></label>
+                                <input type="date" id="tejlg-history-export-end" name="history_end" value="<?php echo esc_attr($history_export_values['end']); ?>">
+                            </div>
+                            <div class="tejlg-history-export__group">
+                                <label for="tejlg-history-export-result"><?php esc_html_e('Statut', 'theme-export-jlg'); ?></label>
+                                <select name="history_result" id="tejlg-history-export-result">
+                                    <option value=""><?php esc_html_e('Tous les statuts', 'theme-export-jlg'); ?></option>
+                                    <?php foreach ($available_history_results as $result_key) :
+                                        $result_label = isset($history_result_labels[$result_key])
+                                            ? $history_result_labels[$result_key]
+                                            : ucfirst($result_key);
+                                    ?>
+                                        <option value="<?php echo esc_attr($result_key); ?>" <?php selected($history_export_values['result'], $result_key); ?>>
+                                            <?php echo esc_html($result_label); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="tejlg-history-export__group">
+                                <label for="tejlg-history-export-origin"><?php esc_html_e('Origine', 'theme-export-jlg'); ?></label>
+                                <select name="history_origin" id="tejlg-history-export-origin">
+                                    <option value=""><?php esc_html_e('Toutes les origines', 'theme-export-jlg'); ?></option>
+                                    <?php foreach ($available_history_origins as $origin_key) :
+                                        $origin_label = isset($history_origin_labels[$origin_key])
+                                            ? $history_origin_labels[$origin_key]
+                                            : ucfirst($origin_key);
+                                    ?>
+                                        <option value="<?php echo esc_attr($origin_key); ?>" <?php selected($history_export_values['origin'], $origin_key); ?>>
+                                            <?php echo esc_html($origin_label); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="tejlg-history-export__group">
+                                <label for="tejlg-history-export-limit"><?php esc_html_e('Nombre maximal de lignes', 'theme-export-jlg'); ?></label>
+                                <input type="number" id="tejlg-history-export-limit" name="history_limit" min="1" max="<?php echo esc_attr($history_export_max_limit); ?>" value="<?php echo esc_attr($history_export_values['limit']); ?>">
+                                <p class="description">
+                                    <?php
+                                    printf(
+                                        esc_html__('Limite par défaut : %d lignes.', 'theme-export-jlg'),
+                                        (int) $history_export_default_limit
+                                    );
+                                    ?>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="tejlg-history-export__actions">
+                            <button type="submit" class="button button-primary wp-ui-primary">
+                                <?php esc_html_e('Télécharger l’historique', 'theme-export-jlg'); ?>
+                            </button>
+                            <span class="tejlg-history-export__helper"><?php esc_html_e('Le fichier reprend les filtres ci-dessus et inclut toutes les métadonnées disponibles.', 'theme-export-jlg'); ?></span>
+                        </div>
+                    </form>
+                <?php endif; ?>
                 <?php if (!empty($history_entries)) : ?>
                     <table class="wp-list-table widefat striped">
                         <thead>
