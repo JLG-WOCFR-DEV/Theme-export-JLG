@@ -35,6 +35,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         $this->handle_schedule_settings_submission();
 
+        if ($this->handle_history_export_request()) {
+            return;
+        }
+
         $theme_export_result = $this->handle_theme_export_form_submission();
 
         if (null !== $theme_export_result) {
@@ -118,125 +122,277 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         );
     }
 
-    private function handle_history_download_request() {
-        $action_param = filter_input(INPUT_GET, 'action', FILTER_DEFAULT);
-
-        if (null === $action_param && isset($_GET['action'])) {
-            $action_param = $_GET['action'];
-        }
-
-        $action = is_string($action_param) ? sanitize_key($action_param) : '';
-
-        if ('download_history' !== $action) {
+    private function handle_history_export_request() {
+        if (!isset($_GET['tejlg_history_export'])) {
             return false;
         }
 
-        if (!TEJLG_Capabilities::current_user_can('history')) {
+        if (!TEJLG_Capabilities::current_user_can('exports')) {
             wp_die(
-                esc_html__("Erreur : vous n'avez pas l'autorisation de télécharger l'historique des exports.", 'theme-export-jlg'),
+                esc_html__("Vous n'avez pas les autorisations nécessaires pour exporter le journal.", 'theme-export-jlg'),
                 esc_html__('Accès refusé', 'theme-export-jlg'),
-                [ 'response' => 403 ]
+                [
+                    'response' => 403,
+                ]
             );
         }
 
-        $nonce_value = isset($_GET['tejlg_history_nonce']) ? (string) wp_unslash($_GET['tejlg_history_nonce']) : '';
+        check_admin_referer('tejlg_history_export', 'tejlg_history_nonce');
 
-        if (!wp_verify_nonce($nonce_value, 'tejlg_download_history')) {
-            wp_die(
-                esc_html__('Lien de téléchargement expiré ou invalide.', 'theme-export-jlg'),
-                esc_html__('Requête non valide', 'theme-export-jlg'),
-                [ 'response' => 403 ]
-            );
-        }
+        $format = isset($_GET['history_format']) ? sanitize_key((string) $_GET['history_format']) : 'json';
+        $format = in_array($format, ['json', 'csv'], true) ? $format : 'json';
 
-        $format_param = isset($_GET['history_format']) ? sanitize_key((string) $_GET['history_format']) : 'json';
-        $allowed_formats = [ 'json', 'csv' ];
-
-        if (!in_array($format_param, $allowed_formats, true)) {
-            $format_param = 'json';
-        }
-
-        $result_filter = isset($_GET['history_result']) ? sanitize_key((string) $_GET['history_result']) : '';
-        $origin_filter = isset($_GET['history_origin']) ? sanitize_key((string) $_GET['history_origin']) : '';
-
-        $start_date_input = isset($_GET['history_start']) ? sanitize_text_field((string) wp_unslash($_GET['history_start'])) : '';
-        $end_date_input   = isset($_GET['history_end']) ? sanitize_text_field((string) wp_unslash($_GET['history_end'])) : '';
-
-        $start_timestamp = $this->parse_history_date_input($start_date_input, false);
-        $end_timestamp   = $this->parse_history_date_input($end_date_input, true);
-
-        if ($end_timestamp > 0 && $start_timestamp > 0 && $end_timestamp < $start_timestamp) {
-            $swap_start = $this->parse_history_date_input($end_date_input, false);
-            $swap_end   = $this->parse_history_date_input($start_date_input, true);
-
-            if ($swap_start > 0 && $swap_end > 0) {
-                $start_timestamp = $swap_start;
-                $end_timestamp   = $swap_end;
-            }
-        }
-
-        $default_limit = (int) apply_filters('tejlg_history_export_default_limit', self::HISTORY_EXPORT_DEFAULT_LIMIT);
-        $default_limit = $default_limit > 0 ? $default_limit : self::HISTORY_EXPORT_DEFAULT_LIMIT;
-
-        $max_limit = (int) apply_filters('tejlg_history_export_max_limit', 5000);
-        $max_limit = $max_limit > 0 ? $max_limit : 5000;
-
-        if ($max_limit < $default_limit) {
-            $max_limit = $default_limit;
-        }
-
-        $requested_limit = isset($_GET['history_limit']) ? absint($_GET['history_limit']) : $default_limit;
-        $requested_limit = $requested_limit > 0 ? $requested_limit : $default_limit;
-
-        $limit = min($requested_limit, $max_limit);
-
-        $entries = TEJLG_Export_History::export_entries([
-            'result'          => $result_filter,
-            'origin'          => $origin_filter,
-            'start_timestamp' => $start_timestamp,
-            'end_timestamp'   => $end_timestamp,
-            'limit'           => $limit,
-        ]);
-
-        $export_context = [
-            'format'  => $format_param,
-            'filters' => [
-                'result'          => $result_filter,
-                'origin'          => $origin_filter,
-                'start_timestamp' => $start_timestamp,
-                'end_timestamp'   => $end_timestamp,
-                'limit'           => $limit,
-                'start_date'      => $start_date_input,
-                'end_date'        => $end_date_input,
-            ],
+        $history_request = [
+            'result'     => isset($_GET['history_result']) ? sanitize_key((string) $_GET['history_result']) : '',
+            'origin'     => isset($_GET['history_origin']) ? sanitize_key((string) $_GET['history_origin']) : '',
+            'orderby'    => isset($_GET['history_orderby']) ? sanitize_key((string) $_GET['history_orderby']) : 'timestamp',
+            'order'      => isset($_GET['history_order']) ? strtolower((string) $_GET['history_order']) : 'desc',
+            'start_date' => isset($_GET['history_start_date']) ? sanitize_text_field((string) $_GET['history_start_date']) : '',
+            'end_date'   => isset($_GET['history_end_date']) ? sanitize_text_field((string) $_GET['history_end_date']) : '',
         ];
 
-        /**
-         * Fires before an export history download is streamed to the browser.
-         *
-         * @param array<int,array<string,mixed>> $entries        Filtered history entries.
-         * @param array<string,mixed>            $export_context Context describing the export.
-         */
-        do_action('tejlg_export_history_download_requested', $entries, $export_context);
-
-        $timestamp_slug   = gmdate('Ymd-His');
-        $site_url         = get_site_url();
-        $generated_at     = function_exists('wp_date') ? wp_date(DATE_ATOM) : date_i18n(DATE_ATOM);
-        $timezone_string  = function_exists('wp_timezone_string') ? wp_timezone_string() : get_option('timezone_string');
-
-        if (!is_string($timezone_string)) {
-            $timezone_string = '';
+        if (isset($_GET['history_limit']) && is_numeric($_GET['history_limit'])) {
+            $history_request['limit'] = max(0, (int) $_GET['history_limit']);
         }
 
-        $filename = sprintf('theme-export-history-%s.%s', $timestamp_slug, $format_param);
+        $export_data = TEJLG_Export_History::get_entries_for_export($history_request);
+        $entries     = isset($export_data['entries']) ? (array) $export_data['entries'] : [];
+        $query       = isset($export_data['query']) ? (array) $export_data['query'] : TEJLG_Export_History::normalize_query_args($history_request);
 
-        if ('csv' === $format_param) {
-            $this->stream_history_csv($entries, $export_context, $filename, $generated_at, $site_url, $timezone_string);
+        if ('csv' === $format) {
+            $this->stream_history_csv($entries);
         } else {
-            $this->stream_history_json($entries, $export_context, $filename, $generated_at, $site_url, $timezone_string);
+            $this->stream_history_json($entries, $query);
         }
 
+        return true;
+    }
+
+    private function stream_history_json(array $entries, array $query) {
+        nocache_headers();
+
+        $filename = sprintf('theme-export-history-%s.json', gmdate('Ymd-His'));
+
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        $payload = [
+            'generated_at' => time(),
+            'site_url'     => get_site_url(),
+            'filters'      => [
+                'result'          => $query['result'],
+                'origin'          => $query['origin'],
+                'orderby'         => $query['orderby'],
+                'order'           => $query['order'],
+                'start_date'      => $query['start_date'],
+                'end_date'        => $query['end_date'],
+                'start_timestamp' => $query['start_timestamp'] > 0 ? $query['start_timestamp'] : null,
+                'end_timestamp'   => $query['end_timestamp'] > 0 ? $query['end_timestamp'] : null,
+                'limit'           => isset($query['limit']) ? (int) $query['limit'] : 0,
+            ],
+            'count'        => count($entries),
+            'entries'      => array_map([ $this, 'format_history_entry_for_payload' ], $entries),
+        ];
+
+        $options = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
+
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $options |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+
+        echo wp_json_encode($payload, $options);
         exit;
+    }
+
+    private function stream_history_csv(array $entries) {
+        nocache_headers();
+
+        $filename = sprintf('theme-export-history-%s.csv', gmdate('Ymd-His'));
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        $handle = fopen('php://output', 'w');
+
+        if (false === $handle) {
+            wp_die(
+                esc_html__("Impossible d'ouvrir le flux de sortie pour l'export CSV.", 'theme-export-jlg'),
+                esc_html__('Erreur', 'theme-export-jlg'),
+                [
+                    'response' => 500,
+                ]
+            );
+        }
+
+        // Add UTF-8 BOM for better compatibility with spreadsheet software.
+        fwrite($handle, "\xEF\xBB\xBF");
+
+        $headers = [
+            __('ID de tâche', 'theme-export-jlg'),
+            __('Horodatage (site)', 'theme-export-jlg'),
+            __('Horodatage (UTC)', 'theme-export-jlg'),
+            __('Résultat', 'theme-export-jlg'),
+            __('Statut brut', 'theme-export-jlg'),
+            __('Message de statut', 'theme-export-jlg'),
+            __('Origine', 'theme-export-jlg'),
+            __('Contexte', 'theme-export-jlg'),
+            __('ID utilisateur', 'theme-export-jlg'),
+            __('Utilisateur', 'theme-export-jlg'),
+            __('Durée (s)', 'theme-export-jlg'),
+            __('Durée lisible', 'theme-export-jlg'),
+            __('Taille (octets)', 'theme-export-jlg'),
+            __('Taille lisible', 'theme-export-jlg'),
+            __('Nom de fichier', 'theme-export-jlg'),
+            __('URL persistante', 'theme-export-jlg'),
+            __('Motifs d’exclusion', 'theme-export-jlg'),
+        ];
+
+        fputcsv($handle, $headers);
+
+        foreach ($entries as $entry) {
+            fputcsv($handle, $this->format_history_entry_for_csv((array) $entry));
+        }
+
+        fclose($handle);
+        exit;
+    }
+
+    private function format_history_entry_for_payload(array $entry) {
+        $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+        $duration  = isset($entry['duration']) ? (int) $entry['duration'] : 0;
+        $size      = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
+
+        return [
+            'job_id'   => isset($entry['job_id']) ? (string) $entry['job_id'] : '',
+            'status'   => [
+                'code'    => isset($entry['status']) ? (string) $entry['status'] : '',
+                'result'  => isset($entry['result']) ? (string) $entry['result'] : '',
+                'message' => isset($entry['status_message']) ? (string) $entry['status_message'] : '',
+            ],
+            'timestamps' => [
+                'unix' => $timestamp,
+                'site' => $timestamp > 0 ? $this->format_history_timestamp($timestamp) : '',
+                'utc'  => $timestamp > 0 ? gmdate('c', $timestamp) : '',
+            ],
+            'origin'  => isset($entry['origin']) ? (string) $entry['origin'] : '',
+            'context' => isset($entry['context']) ? (string) $entry['context'] : '',
+            'user'    => [
+                'id'   => isset($entry['user_id']) ? (int) $entry['user_id'] : 0,
+                'name' => isset($entry['user_name']) ? (string) $entry['user_name'] : '',
+            ],
+            'duration' => [
+                'seconds' => $duration,
+                'human'   => $this->format_history_duration($duration),
+            ],
+            'archive' => [
+                'file_name' => isset($entry['zip_file_name']) ? (string) $entry['zip_file_name'] : '',
+                'size'      => [
+                    'bytes' => $size,
+                    'human' => $this->format_history_filesize($size),
+                ],
+                'url'       => isset($entry['persistent_url']) ? (string) $entry['persistent_url'] : '',
+            ],
+            'exclusions' => $this->format_history_exclusions_list(isset($entry['exclusions']) ? (array) $entry['exclusions'] : []),
+        ];
+    }
+
+    private function format_history_entry_for_csv(array $entry) {
+        $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+        $duration  = isset($entry['duration']) ? (int) $entry['duration'] : 0;
+        $size      = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
+
+        $status_message = isset($entry['status_message']) ? (string) $entry['status_message'] : '';
+        $status_message = preg_replace('/\s+/u', ' ', $status_message);
+
+        return [
+            isset($entry['job_id']) ? (string) $entry['job_id'] : '',
+            $timestamp > 0 ? $this->format_history_timestamp($timestamp) : '',
+            $timestamp > 0 ? gmdate('c', $timestamp) : '',
+            isset($entry['result']) ? (string) $entry['result'] : '',
+            isset($entry['status']) ? (string) $entry['status'] : '',
+            $status_message,
+            isset($entry['origin']) ? (string) $entry['origin'] : '',
+            isset($entry['context']) ? (string) $entry['context'] : '',
+            isset($entry['user_id']) ? (int) $entry['user_id'] : 0,
+            isset($entry['user_name']) ? (string) $entry['user_name'] : '',
+            $duration,
+            $this->format_history_duration($duration),
+            $size,
+            $this->format_history_filesize($size),
+            isset($entry['zip_file_name']) ? (string) $entry['zip_file_name'] : '',
+            isset($entry['persistent_url']) ? (string) $entry['persistent_url'] : '',
+            implode(' | ', $this->format_history_exclusions_list(isset($entry['exclusions']) ? (array) $entry['exclusions'] : [])),
+        ];
+    }
+
+    private function format_history_timestamp($timestamp) {
+        if ($timestamp <= 0) {
+            return '';
+        }
+
+        if (function_exists('wp_date')) {
+            return wp_date('c', $timestamp);
+        }
+
+        return date_i18n('c', $timestamp);
+    }
+
+    private function format_history_duration($duration_seconds) {
+        $duration_seconds = (int) $duration_seconds;
+
+        if ($duration_seconds <= 0) {
+            return __('Instantané', 'theme-export-jlg');
+        }
+
+        $parts = [];
+
+        $hours = (int) floor($duration_seconds / HOUR_IN_SECONDS);
+        if ($hours > 0) {
+            $parts[] = sprintf(_n('%d heure', '%d heures', $hours, 'theme-export-jlg'), $hours);
+        }
+
+        $remaining = $duration_seconds % HOUR_IN_SECONDS;
+        $minutes   = (int) floor($remaining / MINUTE_IN_SECONDS);
+        if ($minutes > 0) {
+            $parts[] = sprintf(_n('%d minute', '%d minutes', $minutes, 'theme-export-jlg'), $minutes);
+        }
+
+        $seconds = $remaining % MINUTE_IN_SECONDS;
+        if ($seconds > 0 || empty($parts)) {
+            $parts[] = sprintf(_n('%d seconde', '%d secondes', $seconds, 'theme-export-jlg'), $seconds);
+        }
+
+        return implode(' ', $parts);
+    }
+
+    private function format_history_filesize($bytes) {
+        $bytes = (int) $bytes;
+
+        if ($bytes <= 0) {
+            return __('Inconnue', 'theme-export-jlg');
+        }
+
+        return size_format($bytes, 2);
+    }
+
+    private function format_history_exclusions_list(array $exclusions) {
+        $clean = array_filter(
+            array_map(
+                static function ($item) {
+                    $item = is_string($item) ? $item : (string) $item;
+                    $item = wp_strip_all_tags($item);
+                    $item = trim($item);
+
+                    return $item;
+                },
+                $exclusions
+            ),
+            static function ($item) {
+                return '' !== $item;
+            }
+        );
+
+        return array_values($clean);
     }
 
     public function render() {
@@ -302,15 +458,22 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         }
         $history_order = isset($_GET['history_order']) ? strtolower((string) $_GET['history_order']) : 'desc';
         $history_order = 'asc' === $history_order ? 'asc' : 'desc';
+        $history_start_date = isset($_GET['history_start_date']) ? sanitize_text_field((string) $_GET['history_start_date']) : '';
+        $history_end_date   = isset($_GET['history_end_date']) ? sanitize_text_field((string) $_GET['history_end_date']) : '';
 
-        $history = TEJLG_Export_History::get_entries([
-            'per_page' => $history_per_page,
-            'paged'    => $history_page,
-            'result'   => $history_result,
-            'origin'   => $history_origin,
-            'orderby'  => $history_orderby,
-            'order'    => $history_order,
-        ]);
+        $history_request = [
+            'per_page'   => $history_per_page,
+            'paged'      => $history_page,
+            'result'     => $history_result,
+            'origin'     => $history_origin,
+            'orderby'    => $history_orderby,
+            'order'      => $history_order,
+            'start_date' => $history_start_date,
+            'end_date'   => $history_end_date,
+        ];
+
+        $history = TEJLG_Export_History::get_entries($history_request);
+        $history_query = TEJLG_Export_History::normalize_query_args($history_request);
 
         $history_filters = TEJLG_Export_History::get_available_filters();
         $history_stats   = TEJLG_Export_History::get_recent_stats();
@@ -319,10 +482,24 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $history_total_pages = isset($history['total_pages']) ? (int) $history['total_pages'] : 1;
         $history_total_pages = $history_total_pages > 0 ? $history_total_pages : 1;
 
-        $history_base_url = add_query_arg([
-            'page' => $this->page_slug,
-            'tab'  => 'export',
-        ], admin_url('admin.php'));
+        $history_base_args = [
+            'page'            => $this->page_slug,
+            'tab'             => 'export',
+            'history_result'  => $history_query['result'],
+            'history_origin'  => $history_query['origin'],
+            'history_orderby' => $history_query['orderby'],
+            'history_order'   => $history_query['order'],
+        ];
+
+        if ('' !== $history_query['start_date']) {
+            $history_base_args['history_start_date'] = $history_query['start_date'];
+        }
+
+        if ('' !== $history_query['end_date']) {
+            $history_base_args['history_end_date'] = $history_query['end_date'];
+        }
+
+        $history_base_url = add_query_arg($history_base_args, admin_url('admin.php'));
 
         $history_pagination_links = paginate_links([
             'base'      => add_query_arg('history_page', '%#%', $history_base_url),
@@ -333,54 +510,34 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'add_args'  => false,
         ]);
 
-        $history_export_default_limit = (int) apply_filters('tejlg_history_export_default_limit', self::HISTORY_EXPORT_DEFAULT_LIMIT);
-        $history_export_default_limit = $history_export_default_limit > 0 ? $history_export_default_limit : self::HISTORY_EXPORT_DEFAULT_LIMIT;
+        $history_export_base = add_query_arg(
+            array_merge($history_base_args, ['history_page' => 1]),
+            admin_url('admin.php')
+        );
 
-        $history_export_max_limit = (int) apply_filters('tejlg_history_export_max_limit', 5000);
-        $history_export_max_limit = $history_export_max_limit > 0 ? $history_export_max_limit : 5000;
-
-        if ($history_export_max_limit < $history_export_default_limit) {
-            $history_export_max_limit = $history_export_default_limit;
-        }
-
-        $now_timestamp = current_time('timestamp');
-        $default_export_start = $this->format_history_date_input($now_timestamp - (6 * DAY_IN_SECONDS));
-        $default_export_end   = $this->format_history_date_input($now_timestamp);
-
-        $history_export_start_value = isset($_GET['history_start'])
-            ? sanitize_text_field((string) wp_unslash($_GET['history_start']))
-            : $default_export_start;
-
-        if (!is_string($history_export_start_value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $history_export_start_value)) {
-            $history_export_start_value = $default_export_start;
-        }
-
-        $history_export_end_value = isset($_GET['history_end'])
-            ? sanitize_text_field((string) wp_unslash($_GET['history_end']))
-            : $default_export_end;
-
-        if (!is_string($history_export_end_value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $history_export_end_value)) {
-            $history_export_end_value = $default_export_end;
-        }
-
-        $history_export_format_value = isset($_GET['history_format']) ? sanitize_key((string) $_GET['history_format']) : 'json';
-        $history_export_allowed_formats = [ 'json', 'csv' ];
-
-        if (!in_array($history_export_format_value, $history_export_allowed_formats, true)) {
-            $history_export_format_value = 'json';
-        }
-
-        $history_export_limit_value = isset($_GET['history_limit']) ? absint($_GET['history_limit']) : $history_export_default_limit;
-        $history_export_limit_value = $history_export_limit_value > 0 ? $history_export_limit_value : $history_export_default_limit;
-        $history_export_limit_value = min($history_export_limit_value, $history_export_max_limit);
-
-        $history_export_values = [
-            'format' => $history_export_format_value,
-            'start'  => $history_export_start_value,
-            'end'    => $history_export_end_value,
-            'limit'  => $history_export_limit_value,
-            'result' => $history_result,
-            'origin' => $history_origin,
+        $history_export_links = [
+            'json' => wp_nonce_url(
+                add_query_arg(
+                    [
+                        'tejlg_history_export' => 1,
+                        'history_format'       => 'json',
+                    ],
+                    $history_export_base
+                ),
+                'tejlg_history_export',
+                'tejlg_history_nonce'
+            ),
+            'csv' => wp_nonce_url(
+                add_query_arg(
+                    [
+                        'tejlg_history_export' => 1,
+                        'history_format'       => 'csv',
+                    ],
+                    $history_export_base
+                ),
+                'tejlg_history_export',
+                'tejlg_history_nonce'
+            ),
         ];
 
         $this->render_template('export.php', [
@@ -400,10 +557,12 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'history_per_page'          => $history_per_page,
             'history_filter_values'     => $history_filters,
             'history_selected_filters'  => [
-                'result'  => $history_result,
-                'origin'  => $history_origin,
-                'orderby' => $history_orderby,
-                'order'   => $history_order,
+                'result'     => $history_query['result'],
+                'origin'     => $history_query['origin'],
+                'orderby'    => $history_query['orderby'],
+                'order'      => $history_query['order'],
+                'start_date' => $history_query['start_date'],
+                'end_date'   => $history_query['end_date'],
             ],
             'history_base_args'         => [
                 'page' => $this->page_slug,
@@ -411,15 +570,8 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             ],
             'history_stats'             => $history_stats,
             'notification_settings'     => $notification_settings,
-            'history_export_capable'    => TEJLG_Capabilities::current_user_can('history'),
-            'history_export_nonce'      => wp_create_nonce('tejlg_download_history'),
-            'history_export_values'     => $history_export_values,
-            'history_export_max_limit'  => $history_export_max_limit,
-            'history_export_default_limit' => $history_export_default_limit,
-            'history_export_formats'    => [
-                'json' => __('JSON', 'theme-export-jlg'),
-                'csv'  => __('CSV', 'theme-export-jlg'),
-            ],
+            'interface_mode'            => $this->get_interface_mode(),
+            'history_export_links'      => $history_export_links,
         ]);
     }
 

@@ -18,7 +18,7 @@ Ces propositions complètent les chantiers déjà menés sur l'interface d'expor
 ### A. Victoires rapides (1 à 2 sprints)
 
 - **Webhooks et intégrations** : offrir un connecteur sortant (Slack, Teams, Discord) pour pousser les alertes critiques en temps réel sans dépendre de l'e-mail.
-- ✅ **Flux d'audit exportable** : permettre le téléchargement d'un journal JSON/CSV contenant toutes les métadonnées du job (durée, taille, origine, utilisateur) sur une période donnée, directement depuis l'onglet Historique.
+- **Flux d'audit exportable** : ✅ disponible via l'interface (JSON/CSV + filtres persistants) et documenté dans [`docs/audit-log-export.md`](./audit-log-export.md).
 - **Bibliothèque de motifs** : lister les exclusions les plus courantes (node_modules, cache, assets volumineux) et permettre l'ajout en un clic.
 
 ### B. Améliorations intermédiaires (3 à 5 sprints)
