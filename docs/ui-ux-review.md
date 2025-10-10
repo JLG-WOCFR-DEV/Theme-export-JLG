@@ -48,3 +48,49 @@ L’interface dépasse largement le thème natif de WordPress (cartes, stepper, 
 5. **Fiabilité** : persister l’ID de job côté client, proposer une relance rapide après erreur, exposer les logs/identifiants dans l’UI.
 
 Ces ajustements rapprocheraient l’expérience de celle des solutions professionnelles sans réécrire le socle fonctionnel.
+
+## Comparaison approfondie avec les suites professionnelles
+
+| Axe | Theme Export - JLG aujourd’hui | Suites pro observées (ManageWP, BlogVault, WP Migrate) | Opportunités de convergence |
+| --- | --- | --- | --- |
+| **UI / UX** | Tableau de bord avec badges qualité, raccourcis d’actions et monitoring temps réel intégrés à l’onglet Export.【F:theme-export-jlg/templates/admin/export.php†L487-L724】【F:theme-export-jlg/templates/admin/export.php†L744-L940】 | Wizards multi-écrans, bandeaux d’action persistants, suggestions contextuelles. | Ajouter une barre supérieure collante (Dernier export, CTA primaire), décliner le stepper en wizard plein écran et proposer un panneau latéral d’aide.
+| **Accessibilité** | Bascule contraste mémorisée, dropzones utilisables au clavier et messages ARIA pour le suivi d’export.【F:theme-export-jlg/assets/js/admin-export.js†L34-L200】【F:theme-export-jlg/templates/admin/export.php†L728-L943】 | Modes haute lisibilité préconfigurés, raccourcis globaux, synthèse vocale des alertes. | Prévoir un mode « lisibilité renforcée » par défaut, annoncer les actions clés via `aria-live` et publier une aide clavier (`?`).
+| **Fiabilité** | File d’attente asynchrone avec relance, backoff progressif et journal détaillé (ID, statut, code d’erreur, relance en un clic).【F:theme-export-jlg/assets/js/admin-export.js†L113-L520】【F:theme-export-jlg/templates/admin/export.php†L900-L1040】 | Reprise automatique après coupure, stockage redondant, rapports santé programmés. | Persister le dernier job dans `sessionStorage`, proposer une option « Réexécuter » sur l’historique et exposer un export JSON des logs.
+| **Design** | Palette alignée sur les variables WP et cartes « components-card » harmonisées avec le mode sombre.【F:theme-export-jlg/templates/admin/export.php†L487-L724】 | Interfaces plus épurées (ombres légères, typographie resserrée), composants illustrés avec pictogrammes. | Simplifier les dégradés, introduire des icônes de statut cohérentes (`wp-ui-success|warning|error`) et offrir des thèmes visuels prédéfinis inspirés des presets `docs/ui-presets.md`.【F:docs/ui-presets.md†L1-L57】
+
+Cette lecture met en évidence un socle fonctionnel très proche des apps managées, mais encore perfectible sur la mise en scène des actions critiques, l’assistance continue et la résilience automatique.
+
+## Organisation des options : mode simple vs mode expert
+
+### État actuel
+
+- L’onglet Export regroupe formulaires, historiques et outils avancés dans une même page à volets repliables (`<details>`). Les sections « Planification & alertes », « Outils avancés » et « Historique » exposent toutes les options simultanément.【F:theme-export-jlg/templates/admin/export.php†L947-L1159】
+- Les cartes de planification affichent de nombreux champs (fréquence, heure, rétention, exclusions) dans la même grille, ce qui peut décourager une première configuration rapide.【F:theme-export-jlg/templates/admin/export.php†L959-L1040】
+- Les réglages critiques (exclusions, notifications) ne sont accessibles qu’après avoir ouvert les panneaux, sans résumé clair pour les utilisateurs novices.
+
+### Proposition de bascule Simple / Expert
+
+1. **Mode simple (par défaut)**
+   - N’afficher que les actions essentielles : « Exporter maintenant », téléchargement du dernier ZIP et activation basique de la planification (choix de fréquence prédéfinie + heure).【F:theme-export-jlg/templates/admin/export.php†L744-L1008】
+   - Résumer les options avancées sous forme de badges (« Exclusions actives », « 3 destinataires alertés ») pour signaler leur état sans exposer tous les champs.
+   - Ajouter un encart pédagogique « Bonnes pratiques » inspiré des assistants ManageWP, avec un CTA « Passer en mode expert » pour dévoiler les détails.
+
+2. **Mode expert**
+   - Révéler la configuration fine (exclusions programmées, motifs ligne par ligne, exports portables, historique complet) dans des sections accordéon mémorisant l’état d’ouverture pour chaque utilisateur.【F:theme-export-jlg/templates/admin/export.php†L947-L1159】【F:theme-export-jlg/assets/js/admin-export.js†L360-L474】
+   - Grouper les paramètres par thématique (Planification, Notifications, Nettoyage, Fiabilité) et afficher des descriptions contextuelles issues de la doc interne (`docs/pro-upgrade-ideas.md`).
+   - Offrir un bouton « Basculer vers le mode simple » persisté en option utilisateur (`update_user_meta`) afin de retrouver la configuration favorite.
+
+### Gains attendus
+
+- **Adoption** : réduire le temps nécessaire pour déclencher un premier export tout en rassurant sur la fiabilité grâce aux résumés visibles.
+- **Clarté** : limiter le scroll et rapprocher l’expérience de ManageWP/BlogVault qui séparent « Quick actions » et « Advanced settings ».
+- **Accessibilité** : les volets réduits simplifient la navigation clavier (moins de tabulations) et permettent d’annoncer clairement le contexte actif via `aria-expanded`.
+
+## Améliorations ciblées UI/UX, accessibilité et fiabilité
+
+- **UI / UX** : introduire un bandeau d’état collant listant le dernier export, le prochain job planifié et un bouton primaire « Exporter maintenant », avec badges de statut pour rester proche des dashboards pro.【F:theme-export-jlg/templates/admin/export.php†L744-L1040】
+- **Accessibilité** : compléter la bascule contraste par un mode « lecture épurée » qui désactive les dégradés lourds et augmente la taille des labels critiques. Le script de toggle contraste fournit déjà l’infrastructure de persistance locale.【F:theme-export-jlg/assets/js/admin-export.js†L34-L111】
+- **Fiabilité** : s’appuyer sur la logique de journal (`updateJobMetaDisplay`, `persistJobSnapshot`) pour sauvegarder l’ID de job dans `sessionStorage` et restaurer automatiquement le suivi après rechargement, à l’image des solutions pro qui détectent les jobs en cours.【F:theme-export-jlg/assets/js/admin-export.js†L177-L474】
+- **Design** : harmoniser les ombres et couleurs avec un set de tokens dérivés des presets décrits dans `docs/ui-presets.md` afin d’offrir deux thèmes prêts à l’emploi (sobre et contrasté) sans sacrifier la cohérence WordPress.【F:docs/ui-presets.md†L1-L57】
+
+Ces évolutions structurent l’interface autour d’un double parcours (simple/expert), renforcent l’accessibilité dès le mode par défaut et apportent la résilience attendue des suites professionnelles.
