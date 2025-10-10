@@ -149,6 +149,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const jobStorageKey = typeof jobMetaConfig.storageKey === 'string' && jobMetaConfig.storageKey.length
                 ? jobMetaConfig.storageKey
                 : 'tejlg:export:last-job';
+            const jobSessionStorageKey = typeof jobMetaConfig.sessionStorageKey === 'string' && jobMetaConfig.sessionStorageKey.length
+                ? jobMetaConfig.sessionStorageKey
+                : 'tejlg:export:active-job';
             const jobRetryLabel = typeof jobMetaConfig.retryButton === 'string' && jobMetaConfig.retryButton.length
                 ? jobMetaConfig.retryButton
                 : (strings.retryReady || '');
@@ -156,6 +159,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? jobMetaConfig.retryAnnouncement
                 : (strings.retryAnnouncement || '');
             const supportHint = typeof strings.errorSupportHint === 'string' ? strings.errorSupportHint : '';
+            const resumeBanner = document.querySelector('[data-export-resume]');
+            const resumeTitleEl = resumeBanner ? resumeBanner.querySelector('[data-export-resume-title]') : null;
+            const resumeMessageEl = resumeBanner ? resumeBanner.querySelector('[data-export-resume-text]') : null;
+            const resumeResumeButton = resumeBanner ? resumeBanner.querySelector('[data-export-resume-resume]') : null;
+            const resumeDismissButton = resumeBanner ? resumeBanner.querySelector('[data-export-resume-dismiss]') : null;
+            const resumeNoticeConfig = (typeof exportAsync.resumeNotice === 'object' && exportAsync.resumeNotice !== null)
+                ? exportAsync.resumeNotice
+                : {};
+            const resumeTitleText = typeof resumeNoticeConfig.title === 'string' ? resumeNoticeConfig.title : '';
+            const resumeActiveMessage = typeof resumeNoticeConfig.active === 'string' ? resumeNoticeConfig.active : '';
+            const resumeQueuedMessage = typeof resumeNoticeConfig.queued === 'string' ? resumeNoticeConfig.queued : resumeActiveMessage;
+            const resumeInactiveMessage = typeof resumeNoticeConfig.inactive === 'string' ? resumeNoticeConfig.inactive : '';
             const extractResponseMessage = function(payload) {
                 if (!payload || typeof payload !== 'object') {
                     return '';
@@ -290,9 +305,71 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
 
+            const readSessionJobSnapshot = function() {
+                if (!jobSessionStorageKey) {
+                    return null;
+                }
+
+                try {
+                    const raw = window.sessionStorage.getItem(jobSessionStorageKey);
+
+                    if (!raw) {
+                        return null;
+                    }
+
+                    const parsed = JSON.parse(raw);
+
+                    if (parsed && typeof parsed === 'object' && typeof parsed.id === 'string' && parsed.id.length) {
+                        return {
+                            id: parsed.id,
+                            status: typeof parsed.status === 'string' ? parsed.status : '',
+                        };
+                    }
+                } catch (error) {
+                    return null;
+                }
+
+                return null;
+            };
+
+            const clearSessionJobSnapshot = function() {
+                if (!jobSessionStorageKey) {
+                    return;
+                }
+
+                try {
+                    window.sessionStorage.removeItem(jobSessionStorageKey);
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            };
+
+            const writeSessionJobSnapshot = function(jobId, status) {
+                if (!jobSessionStorageKey) {
+                    return;
+                }
+
+                if (!jobId) {
+                    clearSessionJobSnapshot();
+                    return;
+                }
+
+                const payload = {
+                    id: jobId,
+                    status: typeof status === 'string' ? status : '',
+                };
+
+                try {
+                    window.sessionStorage.setItem(jobSessionStorageKey, JSON.stringify(payload));
+                } catch (error) {
+                    // Ignore storage failures to keep the UI responsive.
+                }
+            };
+
             const persistJobSnapshot = function(jobId, job, extra) {
                 if (!jobId) {
                     clearStoredJobSnapshot();
+                    clearSessionJobSnapshot();
                     return;
                 }
 
@@ -333,7 +410,100 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
 
                 writeStoredJobSnapshot(snapshot);
+                writeSessionJobSnapshot(jobId, status);
             };
+
+            const updateResumeBannerFromSession = function(forceHide) {
+                if (!resumeBanner) {
+                    return;
+                }
+
+                if (forceHide === true) {
+                    resumeBanner.hidden = true;
+                    return;
+                }
+
+                const snapshot = readSessionJobSnapshot();
+
+                if (!snapshot || !snapshot.id) {
+                    resumeBanner.hidden = true;
+                    return;
+                }
+
+                const normalizedStatus = typeof snapshot.status === 'string' ? snapshot.status.toLowerCase() : '';
+
+                if (resumeTitleEl && resumeTitleText) {
+                    resumeTitleEl.textContent = resumeTitleText;
+                }
+
+                if (resumeMessageEl) {
+                    if (normalizedStatus === 'queued' && resumeQueuedMessage) {
+                        resumeMessageEl.textContent = resumeQueuedMessage;
+                    } else if (normalizedStatus === 'processing' && resumeActiveMessage) {
+                        resumeMessageEl.textContent = resumeActiveMessage;
+                    } else if (!resumeMessageEl.textContent && resumeActiveMessage) {
+                        resumeMessageEl.textContent = resumeActiveMessage;
+                    } else if (normalizedStatus === 'failed' && resumeInactiveMessage) {
+                        resumeMessageEl.textContent = resumeInactiveMessage;
+                    }
+                }
+
+                if (resumeBanner.dataset.dismissed === '1') {
+                    resumeBanner.hidden = true;
+                    return;
+                }
+
+                if (['processing', 'queued'].indexOf(normalizedStatus) === -1) {
+                    resumeBanner.hidden = true;
+                    return;
+                }
+
+                resumeBanner.hidden = false;
+                resumeBanner.dataset.jobId = snapshot.id;
+            };
+
+            const rememberActiveJob = function(jobId, status) {
+                if (!jobId) {
+                    forgetActiveJob();
+                    return;
+                }
+
+                writeSessionJobSnapshot(jobId, status);
+
+                if (resumeBanner && resumeBanner.dataset.dismissed !== '1') {
+                    updateResumeBannerFromSession();
+                }
+            };
+
+            const forgetActiveJob = function() {
+                clearSessionJobSnapshot();
+                updateResumeBannerFromSession(true);
+            };
+
+            const registerTestHooks = function() {
+                if (typeof window !== 'object' || !window || !window.__tejlgExportTestHooks) {
+                    return;
+                }
+
+                const container = window.__tejlgExportTestHooks;
+                const existing = (typeof container.adminExport === 'object' && container.adminExport !== null)
+                    ? container.adminExport
+                    : {};
+
+                container.adminExport = Object.assign({}, existing, {
+                    readSessionJobSnapshot: readSessionJobSnapshot,
+                    writeSessionJobSnapshot: writeSessionJobSnapshot,
+                    clearSessionJobSnapshot: clearSessionJobSnapshot,
+                    updateResumeBannerFromSession: updateResumeBannerFromSession,
+                    rememberActiveJob: rememberActiveJob,
+                    forgetActiveJob: forgetActiveJob,
+                    getResumeBannerElement: function() {
+                        return resumeBanner || null;
+                    },
+                });
+            };
+
+            registerTestHooks();
 
             const updateGuidance = function(message, shouldShow) {
                 if (!guidanceEl) {
@@ -387,6 +557,49 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, duration);
                 }
             };
+
+            if (resumeTitleEl && resumeTitleText) {
+                resumeTitleEl.textContent = resumeTitleText;
+            }
+
+            if (resumeResumeButton) {
+                resumeResumeButton.addEventListener('click', function() {
+                    if (resumeBanner) {
+                        resumeBanner.dataset.dismissed = '';
+                    }
+
+                    const snapshot = readSessionJobSnapshot();
+
+                    if (!snapshot || !snapshot.id) {
+                        updateResumeBannerFromSession(true);
+                        return;
+                    }
+
+                    updateResumeBannerFromSession(true);
+
+                    if (!currentJobId || currentJobId !== snapshot.id) {
+                        currentJobId = snapshot.id;
+                        resetBackoffTracking();
+                    }
+
+                    setSpinner(true);
+
+                    if (startButton) {
+                        startButton.disabled = true;
+                    }
+
+                    fetchStatus(snapshot.id);
+                });
+            }
+
+            if (resumeDismissButton) {
+                resumeDismissButton.addEventListener('click', function() {
+                    if (resumeBanner) {
+                        resumeBanner.dataset.dismissed = '1';
+                        resumeBanner.hidden = true;
+                    }
+                });
+            }
 
             const updateJobMetaDisplay = function(jobId, job, extra) {
                 if (!jobMetaContainer) {
@@ -1089,6 +1302,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateJobMetaDisplay(jobId, job, metadata);
                 persistJobSnapshot(jobId, job, metadata);
 
+                if (jobId) {
+                    if (normalizedStatus === 'completed' || normalizedStatus === 'failed' || normalizedStatus === 'cancelled') {
+                        forgetActiveJob();
+                    } else {
+                        rememberActiveJob(jobId, normalizedStatus);
+                    }
+                }
+
                 if (retryButton) {
                     if (normalizedStatus === 'failed') {
                         retryButton.hidden = false;
@@ -1145,6 +1366,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
                 updateJobMetaDisplay(jobIdForError, lastKnownJob, metadata);
                 persistJobSnapshot(jobIdForError, lastKnownJob, metadata);
+                forgetActiveJob();
                 updateGuidance(supportHint, true);
                 if (retryButton) {
                     if (jobIdForError) {
@@ -1324,6 +1546,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const normalizedStatus = statusFromSnapshot.toLowerCase();
 
+                rememberActiveJob(persistedJobId, normalizedStatus);
+
                 if (!job) {
                     const metadata = {
                         status: normalizedStatus,
@@ -1337,6 +1561,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const shouldFetch = ['queued', 'processing', 'completed', 'failed'].indexOf(normalizedStatus) !== -1;
 
                 if (!shouldFetch) {
+                    if (normalizedStatus === 'completed' || normalizedStatus === 'failed' || normalizedStatus === 'cancelled') {
+                        forgetActiveJob();
+                    }
                     if (normalizedStatus === 'cancelled') {
                         setSpinner(false);
                         if (startButton) {
@@ -1421,6 +1648,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
+            const sessionSnapshot = readSessionJobSnapshot();
+
+            if (sessionSnapshot && sessionSnapshot.id) {
+                if (!currentJobId) {
+                    currentJobId = sessionSnapshot.id;
+                    resetBackoffTracking();
+                    setSpinner(true);
+
+                    if (startButton) {
+                        startButton.disabled = true;
+                    }
+
+                    fetchStatus(sessionSnapshot.id);
+                }
+
+                if (resumeBanner && resumeBanner.dataset.dismissed !== '1') {
+                    updateResumeBannerFromSession();
+                }
+            } else {
+                updateResumeBannerFromSession();
+            }
+
             if (startButton) {
                 startButton.addEventListener('click', function(event) {
                     if (event && typeof event.preventDefault === 'function') {
@@ -1472,6 +1721,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
 
                         updateFeedback(job || null, { downloadUrl: '', jobId: currentJobId });
+                        const initialStatus = job && typeof job.status === 'string' ? job.status.toLowerCase() : 'queued';
+                        rememberActiveJob(currentJobId, initialStatus);
                         scheduleNextPoll(currentJobId, 'active');
                     }).catch(function(error) {
                         setSpinner(false);
@@ -1481,6 +1732,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         resetBackoffTracking();
                         lastJobSignature = '';
                         currentJobId = null;
+                        forgetActiveJob();
                         const message = (typeof error === 'string' && error.length)
                             ? error
                             : (error && typeof error.message === 'string' && error.message.length)
@@ -1573,6 +1825,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const job = payload.data.job;
                         const cancelledJobId = currentJobId;
                         currentJobId = null;
+                        forgetActiveJob();
                         updateFeedback(job, { downloadUrl: '', jobId: cancelledJobId });
                     }).catch(function(error) {
                         const message = (typeof error === 'string' && error.length)
