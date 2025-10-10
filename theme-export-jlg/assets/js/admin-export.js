@@ -33,8 +33,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     (function initializeContrastToggle() {
         const toggle = document.querySelector('[data-contrast-toggle]');
+        const presetButtons = document.querySelectorAll('[data-contrast-preset]');
 
-        if (!toggle) {
+        if (!toggle && !presetButtons.length) {
             return;
         }
 
@@ -58,14 +59,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let enabled = storedPreference === '1' || (!hasStoredPreference && prefersHighContrast);
 
+        const syncPresetButtons = function(state) {
+            if (!presetButtons.length) {
+                return;
+            }
+
+            presetButtons.forEach(function(button) {
+                button.classList.toggle('is-active', state);
+                button.setAttribute('aria-pressed', state ? 'true' : 'false');
+            });
+        };
+
         const applyState = function(state) {
             if (root) {
                 root.classList.toggle('tejlg-contrast-enabled', state);
             }
 
-            if (toggle.checked !== state) {
+            if (toggle && toggle.checked !== state) {
                 toggle.checked = state;
             }
+
+            syncPresetButtons(state);
         };
 
         const persistState = function(state) {
@@ -80,11 +94,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         applyState(enabled);
 
-        toggle.addEventListener('change', function() {
-            enabled = !!toggle.checked;
-            applyState(enabled);
-            persistState(enabled);
-        });
+        if (toggle) {
+            toggle.addEventListener('change', function() {
+                enabled = !!toggle.checked;
+                applyState(enabled);
+                persistState(enabled);
+            });
+        }
+
+        if (presetButtons.length) {
+            presetButtons.forEach(function(button) {
+                button.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    const nextState = !button.classList.contains('is-active');
+                    enabled = nextState;
+                    applyState(enabled);
+                    persistState(enabled);
+                });
+            });
+        }
 
         if (!hasStoredPreference && typeof window.matchMedia === 'function') {
             try {
@@ -108,6 +136,194 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Ignore preference observer errors to avoid breaking other scripts.
             }
         }
+    })();
+
+    (function initializeAccordions() {
+        const sections = document.querySelectorAll('[data-tejlg-accordion]');
+
+        if (!sections.length) {
+            return;
+        }
+
+        const storagePrefix = 'tejlg:admin:accordion:';
+
+        const readStoredState = function(key) {
+            if (!key) {
+                return null;
+            }
+
+            try {
+                const raw = window.localStorage.getItem(storagePrefix + key);
+
+                if (raw === '0') {
+                    return false;
+                }
+
+                if (raw === '1') {
+                    return true;
+                }
+            } catch (error) {
+                return null;
+            }
+
+            return null;
+        };
+
+        const writeStoredState = function(key, state) {
+            if (!key) {
+                return;
+            }
+
+            try {
+                window.localStorage.setItem(storagePrefix + key, state ? '1' : '0');
+            } catch (error) {
+                // Ignore storage errors.
+            }
+        };
+
+        sections.forEach(function(section) {
+            const trigger = section.querySelector('[data-accordion-trigger]');
+            const panel = section.querySelector('[data-accordion-panel]');
+
+            if (!trigger || !panel) {
+                return;
+            }
+
+            const id = section.getAttribute('data-accordion-id') || panel.id || '';
+
+            if (!id) {
+                return;
+            }
+
+            const defaultOpen = section.getAttribute('data-accordion-open') === '1';
+            const storedState = readStoredState(id);
+            let expanded = storedState === null ? defaultOpen : storedState;
+
+            const applyState = function(state) {
+                expanded = !!state;
+                trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                section.setAttribute('data-accordion-open', expanded ? '1' : '0');
+
+                if (expanded) {
+                    panel.removeAttribute('hidden');
+                } else {
+                    panel.setAttribute('hidden', '');
+                }
+            };
+
+            applyState(expanded);
+
+            trigger.addEventListener('click', function(event) {
+                event.preventDefault();
+                applyState(!expanded);
+                writeStoredState(id, expanded);
+            });
+
+            trigger.addEventListener('keydown', function(event) {
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    const focusableTriggers = Array.prototype.slice.call(document.querySelectorAll('[data-accordion-trigger]'));
+                    const currentIndex = focusableTriggers.indexOf(trigger);
+
+                    if (currentIndex === -1) {
+                        return;
+                    }
+
+                    const nextIndex = event.key === 'ArrowDown'
+                        ? (currentIndex + 1) % focusableTriggers.length
+                        : (currentIndex - 1 + focusableTriggers.length) % focusableTriggers.length;
+
+                    const nextTrigger = focusableTriggers[nextIndex];
+
+                    if (nextTrigger && typeof nextTrigger.focus === 'function') {
+                        event.preventDefault();
+                        nextTrigger.focus();
+                    }
+                } else if (event.key === 'Home') {
+                    const focusableTriggers = document.querySelectorAll('[data-accordion-trigger]');
+
+                    if (focusableTriggers.length) {
+                        event.preventDefault();
+                        focusableTriggers[0].focus();
+                    }
+                } else if (event.key === 'End') {
+                    const focusableTriggers = document.querySelectorAll('[data-accordion-trigger]');
+
+                    if (focusableTriggers.length) {
+                        event.preventDefault();
+                        focusableTriggers[focusableTriggers.length - 1].focus();
+                    }
+                }
+            });
+        });
+    })();
+
+    (function initializeTooltips() {
+        const triggers = document.querySelectorAll('[data-tejlg-tooltip-trigger]');
+
+        if (!triggers.length) {
+            return;
+        }
+
+        triggers.forEach(function(trigger) {
+            const targetId = trigger.getAttribute('aria-controls');
+            const target = targetId ? document.getElementById(targetId) : null;
+
+            if (!target) {
+                return;
+            }
+
+            let isOpen = false;
+
+            const closeTooltip = function() {
+                isOpen = false;
+                trigger.setAttribute('aria-expanded', 'false');
+                target.setAttribute('hidden', '');
+            };
+
+            const openTooltip = function() {
+                isOpen = true;
+                trigger.setAttribute('aria-expanded', 'true');
+                target.removeAttribute('hidden');
+            };
+
+            const handleDocumentClick = function(event) {
+                if (!isOpen) {
+                    return;
+                }
+
+                if (!trigger.contains(event.target) && !target.contains(event.target)) {
+                    closeTooltip();
+                }
+            };
+
+            document.addEventListener('click', handleDocumentClick);
+
+            trigger.addEventListener('click', function(event) {
+                event.preventDefault();
+
+                if (isOpen) {
+                    closeTooltip();
+                } else {
+                    openTooltip();
+                }
+            });
+
+            trigger.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && isOpen) {
+                    event.preventDefault();
+                    closeTooltip();
+                    trigger.focus();
+                }
+            });
+
+            target.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && isOpen) {
+                    event.preventDefault();
+                    closeTooltip();
+                    trigger.focus();
+                }
+            });
+        });
     })();
 
     if (exportAsync) {
@@ -793,6 +1009,44 @@ document.addEventListener('DOMContentLoaded', function() {
                     const patternTestExcluded = patternTestContainer.querySelector('[data-pattern-test-excluded]');
                     const patternTestInvalid = patternTestContainer.querySelector('[data-pattern-test-invalid]');
                     const patternTestLists = patternTestContainer.querySelector('[data-pattern-test-lists]');
+                    const patternExampleButtons = patternTestContainer.querySelectorAll('[data-pattern-example]');
+
+                    if (patternExampleButtons.length && textarea) {
+                        patternExampleButtons.forEach(function(button) {
+                            button.addEventListener('click', function(event) {
+                                event.preventDefault();
+                                const patternValue = button.getAttribute('data-pattern-example');
+
+                                if (typeof patternValue !== 'string' || !patternValue.length) {
+                                    return;
+                                }
+
+                                const currentValue = textarea.value || '';
+                                const normalizedCurrent = currentValue.trim();
+                                let nextValue = '';
+
+                                if (!normalizedCurrent.length) {
+                                    nextValue = patternValue;
+                                } else if (normalizedCurrent.indexOf(patternValue) !== -1) {
+                                    nextValue = currentValue;
+                                } else {
+                                    nextValue = normalizedCurrent + '\n' + patternValue;
+                                }
+
+                                textarea.value = nextValue;
+                                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+                                if (typeof textarea.focus === 'function') {
+                                    textarea.focus();
+                                }
+
+                                if (typeof textarea.setSelectionRange === 'function') {
+                                    const valueLength = textarea.value.length;
+                                    textarea.setSelectionRange(valueLength, valueLength);
+                                }
+                            });
+                        });
+                    }
 
                     const togglePatternSpinner = function(isActive) {
                         if (!patternTestSpinner) {
