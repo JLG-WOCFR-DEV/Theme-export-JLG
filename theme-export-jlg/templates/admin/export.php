@@ -86,6 +86,34 @@ $history_export_links = isset($history_export_links) && is_array($history_export
 $history_stats = is_array($history_stats) ? $history_stats : [];
 $notification_settings = is_array($notification_settings) ? $notification_settings : [];
 
+$history_export_capable = !empty($history_export_capable);
+$history_export_nonce = isset($history_export_nonce) ? (string) $history_export_nonce : '';
+$history_export_formats = isset($history_export_formats) && is_array($history_export_formats)
+    ? $history_export_formats
+    : [
+        'json' => __('JSON', 'theme-export-jlg'),
+        'csv'  => __('CSV', 'theme-export-jlg'),
+    ];
+$history_export_values = isset($history_export_values) && is_array($history_export_values)
+    ? wp_parse_args($history_export_values, [
+        'format' => 'json',
+        'start'  => '',
+        'end'    => '',
+        'limit'  => 200,
+        'result' => '',
+        'origin' => '',
+    ])
+    : [
+        'format' => 'json',
+        'start'  => '',
+        'end'    => '',
+        'limit'  => 200,
+        'result' => '',
+        'origin' => '',
+    ];
+$history_export_max_limit = isset($history_export_max_limit) ? (int) $history_export_max_limit : 5000;
+$history_export_default_limit = isset($history_export_default_limit) ? (int) $history_export_default_limit : 200;
+
 $history_result_labels = [
     'success' => __('Succès', 'theme-export-jlg'),
     'warning' => __('Avertissement', 'theme-export-jlg'),

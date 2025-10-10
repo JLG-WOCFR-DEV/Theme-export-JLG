@@ -263,6 +263,92 @@ class TEJLG_Export_History {
         return count(self::get_raw_entries());
     }
 
+    /**
+     * Returns filtered history entries suitable for exports and integrations.
+     *
+     * @param array<string,mixed> $args
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public static function export_entries($args = []) {
+        $defaults = [
+            'result'          => '',
+            'origin'          => '',
+            'start_timestamp' => 0,
+            'end_timestamp'   => 0,
+            'limit'           => 0,
+        ];
+
+        $args = wp_parse_args($args, $defaults);
+
+        $allowed_results = [
+            self::RESULT_SUCCESS,
+            self::RESULT_WARNING,
+            self::RESULT_ERROR,
+            self::RESULT_INFO,
+        ];
+
+        $result_filter = isset($args['result']) ? sanitize_key((string) $args['result']) : '';
+
+        if (!in_array($result_filter, $allowed_results, true)) {
+            $result_filter = '';
+        }
+
+        $origin_filter = isset($args['origin']) ? sanitize_key((string) $args['origin']) : '';
+
+        $start_timestamp = isset($args['start_timestamp']) ? (int) $args['start_timestamp'] : 0;
+        $start_timestamp = $start_timestamp > 0 ? $start_timestamp : 0;
+
+        $end_timestamp = isset($args['end_timestamp']) ? (int) $args['end_timestamp'] : 0;
+        $end_timestamp = $end_timestamp > 0 ? $end_timestamp : 0;
+
+        if ($end_timestamp > 0 && $start_timestamp > 0 && $end_timestamp < $start_timestamp) {
+            $end_timestamp = 0;
+        }
+
+        $limit = isset($args['limit']) ? (int) $args['limit'] : 0;
+        $limit = $limit > 0 ? $limit : 0;
+
+        $entries = self::get_raw_entries();
+        $filtered = [];
+
+        foreach ($entries as $entry) {
+            $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+
+            if ($start_timestamp > 0 && $timestamp > 0 && $timestamp < $start_timestamp) {
+                continue;
+            }
+
+            if ($end_timestamp > 0 && $timestamp > 0 && $timestamp > $end_timestamp) {
+                continue;
+            }
+
+            if ('' !== $result_filter) {
+                $entry_result = isset($entry['result']) ? (string) $entry['result'] : '';
+
+                if ($entry_result !== $result_filter) {
+                    continue;
+                }
+            }
+
+            if ('' !== $origin_filter) {
+                $entry_origin = isset($entry['origin']) ? (string) $entry['origin'] : '';
+
+                if ($entry_origin !== $origin_filter) {
+                    continue;
+                }
+            }
+
+            $filtered[] = $entry;
+
+            if ($limit > 0 && count($filtered) >= $limit) {
+                break;
+            }
+        }
+
+        return $filtered;
+    }
+
     public static function clear_history() {
         delete_option(self::OPTION_NAME);
     }
