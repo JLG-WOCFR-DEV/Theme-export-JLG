@@ -101,6 +101,7 @@ class TEJLG_Export_History {
             'paged'           => 1,
             'result'          => '',
             'origin'          => '',
+            'initiator'       => '',
             'orderby'         => 'timestamp',
             'order'           => 'desc',
             'start_date'      => '',
@@ -133,6 +134,9 @@ class TEJLG_Export_History {
         $start_date = isset($args['start_date']) ? sanitize_text_field((string) $args['start_date']) : '';
         $end_date   = isset($args['end_date']) ? sanitize_text_field((string) $args['end_date']) : '';
 
+        $initiator = isset($args['initiator']) ? sanitize_text_field((string) $args['initiator']) : '';
+        $initiator = trim($initiator);
+
         $start_timestamp = isset($args['start_timestamp']) && is_numeric($args['start_timestamp'])
             ? (int) $args['start_timestamp']
             : self::parse_date_filter($start_date, false);
@@ -155,6 +159,7 @@ class TEJLG_Export_History {
             'paged'           => $paged,
             'result'          => $result_filter,
             'origin'          => $origin_filter,
+            'initiator'       => $initiator,
             'orderby'         => $orderby,
             'order'           => $order,
             'start_date'      => $start_date,
@@ -199,6 +204,10 @@ class TEJLG_Export_History {
                     }
 
                     if ($query['end_timestamp'] > 0 && $timestamp > $query['end_timestamp']) {
+                        return false;
+                    }
+
+                    if ('' !== $query['initiator'] && !self::entry_matches_initiator($entry, $query['initiator'])) {
                         return false;
                     }
 
@@ -274,6 +283,7 @@ class TEJLG_Export_History {
         $defaults = [
             'result'          => '',
             'origin'          => '',
+            'initiator'       => '',
             'start_timestamp' => 0,
             'end_timestamp'   => 0,
             'limit'           => 0,
@@ -309,6 +319,9 @@ class TEJLG_Export_History {
         $limit = isset($args['limit']) ? (int) $args['limit'] : 0;
         $limit = $limit > 0 ? $limit : 0;
 
+        $initiator_filter = isset($args['initiator']) ? sanitize_text_field((string) $args['initiator']) : '';
+        $initiator_filter = trim($initiator_filter);
+
         $entries = self::get_raw_entries();
         $filtered = [];
 
@@ -337,6 +350,10 @@ class TEJLG_Export_History {
                 if ($entry_origin !== $origin_filter) {
                     continue;
                 }
+            }
+
+            if ('' !== $initiator_filter && !self::entry_matches_initiator($entry, $initiator_filter)) {
+                continue;
             }
 
             $filtered[] = $entry;
@@ -429,7 +446,8 @@ class TEJLG_Export_History {
             $user_id = (int) get_current_user_id();
         }
 
-        $user_name = '';
+        $user_name  = '';
+        $user_login = '';
 
         if (isset($context['user_name']) && is_string($context['user_name'])) {
             $user_name = $context['user_name'];
@@ -440,10 +458,18 @@ class TEJLG_Export_History {
 
             if ($user instanceof WP_User) {
                 $user_name = $user->display_name;
+                $user_login = $user->user_login;
             }
         }
 
-        $user_name = sanitize_text_field($user_name);
+        if (isset($context['user_login']) && is_string($context['user_login'])) {
+            $user_login = $context['user_login'];
+        } elseif (isset($job['created_by_login']) && is_string($job['created_by_login'])) {
+            $user_login = $job['created_by_login'];
+        }
+
+        $user_name  = sanitize_text_field($user_name);
+        $user_login = sanitize_user($user_login, true);
 
         $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
         $zip_file_name = isset($job['zip_file_name']) && '' !== $job['zip_file_name']
@@ -506,6 +532,7 @@ class TEJLG_Export_History {
             'timestamp'     => $timestamp,
             'user_id'       => $user_id,
             'user_name'     => $user_name,
+            'user_login'    => $user_login,
             'zip_file_name' => $zip_file_name,
             'zip_file_size' => max(0, $zip_file_size),
             'exclusions'    => $exclusions,
@@ -546,6 +573,7 @@ class TEJLG_Export_History {
 
         $entry['user_id'] = isset($entry['user_id']) ? (int) $entry['user_id'] : 0;
         $entry['user_name'] = isset($entry['user_name']) ? sanitize_text_field($entry['user_name']) : '';
+        $entry['user_login'] = isset($entry['user_login']) ? sanitize_user((string) $entry['user_login'], true) : '';
         $entry['zip_file_name'] = isset($entry['zip_file_name']) ? sanitize_text_field((string) $entry['zip_file_name']) : '';
         $entry['zip_file_size'] = isset($entry['zip_file_size']) ? max(0, (int) $entry['zip_file_size']) : 0;
         $entry['origin'] = isset($entry['origin']) ? sanitize_key($entry['origin']) : '';
@@ -639,6 +667,7 @@ class TEJLG_Export_History {
             'window_days'     => 7,
             'result'          => '',
             'origin'          => '',
+            'initiator'       => '',
             'limit'           => 20,
             'include_entries' => true,
         ];
@@ -650,6 +679,8 @@ class TEJLG_Export_History {
 
         $result_filter = isset($args['result']) ? sanitize_key((string) $args['result']) : '';
         $origin_filter = isset($args['origin']) ? sanitize_key((string) $args['origin']) : '';
+        $initiator_filter = isset($args['initiator']) ? sanitize_text_field((string) $args['initiator']) : '';
+        $initiator_filter = trim($initiator_filter);
 
         $limit = isset($args['limit']) ? (int) $args['limit'] : 20;
         $limit = $limit >= 0 ? $limit : 20;
@@ -693,6 +724,10 @@ class TEJLG_Export_History {
             $entry_origin = isset($entry['origin']) ? (string) $entry['origin'] : '';
 
             if ('' !== $origin_filter && $entry_origin !== $origin_filter) {
+                continue;
+            }
+
+            if ('' !== $initiator_filter && !self::entry_matches_initiator($entry, $initiator_filter)) {
                 continue;
             }
 
@@ -751,6 +786,7 @@ class TEJLG_Export_History {
                 'window_days' => $window_days,
                 'result'      => $result_filter,
                 'origin'      => $origin_filter,
+                'initiator'   => $initiator_filter,
                 'limit'       => $limit,
             ],
             'totals'       => [
@@ -864,9 +900,10 @@ class TEJLG_Export_History {
     }
 
     public static function get_available_filters() {
-        $entries = self::get_raw_entries();
-        $origins = [];
-        $results = [];
+        $entries    = self::get_raw_entries();
+        $origins    = [];
+        $results    = [];
+        $initiators = [];
 
         foreach ($entries as $entry) {
             if (isset($entry['origin']) && '' !== $entry['origin']) {
@@ -876,15 +913,180 @@ class TEJLG_Export_History {
             if (isset($entry['result']) && '' !== $entry['result']) {
                 $results[$entry['result']] = true;
             }
+
+            $user_id   = isset($entry['user_id']) ? (int) $entry['user_id'] : 0;
+            $user_name = isset($entry['user_name']) ? (string) $entry['user_name'] : '';
+            $user_login = isset($entry['user_login']) ? (string) $entry['user_login'] : '';
+
+            $initiator_key = self::build_initiator_key($user_id, $user_login, $user_name);
+
+            if (!isset($initiators[$initiator_key])) {
+                $initiators[$initiator_key] = [
+                    'id'    => $user_id,
+                    'name'  => $user_name,
+                    'login' => $user_login,
+                    'value' => self::build_initiator_value($user_id, $user_login, $user_name),
+                    'label' => self::build_initiator_label($user_id, $user_login, $user_name),
+                ];
+            }
         }
 
         ksort($origins);
         ksort($results);
 
+        uasort(
+            $initiators,
+            static function ($left, $right) {
+                $left_label  = isset($left['label']) ? (string) $left['label'] : '';
+                $right_label = isset($right['label']) ? (string) $right['label'] : '';
+
+                return strcasecmp($left_label, $right_label);
+            }
+        );
+
         return [
             'origins' => array_keys($origins),
             'results' => array_keys($results),
+            'initiators' => array_values($initiators),
         ];
+    }
+
+    private static function build_initiator_key($user_id, $user_login, $user_name) {
+        if ($user_id > 0) {
+            return 'id:' . $user_id;
+        }
+
+        if ('' !== $user_login) {
+            return 'login:' . strtolower($user_login);
+        }
+
+        if ('' !== $user_name) {
+            $normalized = self::normalize_initiator_fragment($user_name);
+
+            return 'name:' . $normalized;
+        }
+
+        return 'system';
+    }
+
+    private static function build_initiator_value($user_id, $user_login, $user_name) {
+        if ('' !== $user_login) {
+            return '@' . $user_login;
+        }
+
+        if ($user_id > 0) {
+            return '#' . $user_id;
+        }
+
+        if ('' !== $user_name) {
+            return $user_name;
+        }
+
+        return 'system';
+    }
+
+    private static function build_initiator_label($user_id, $user_login, $user_name) {
+        if ($user_id > 0) {
+            $label = '' !== $user_name
+                ? $user_name
+                : sprintf(__('Utilisateur #%d', 'theme-export-jlg'), $user_id);
+
+            $details = [];
+
+            if ('' !== $user_login) {
+                $details[] = '@' . $user_login;
+            }
+
+            $details[] = '#' . $user_id;
+
+            if (!empty($details)) {
+                $label .= ' (' . implode(' · ', $details) . ')';
+            }
+
+            return $label;
+        }
+
+        if ('' !== $user_name) {
+            if ('' !== $user_login) {
+                return sprintf('%1$s (@%2$s)', $user_name, $user_login);
+            }
+
+            return $user_name;
+        }
+
+        if ('' !== $user_login) {
+            return '@' . $user_login;
+        }
+
+        return __('Système', 'theme-export-jlg');
+    }
+
+    private static function normalize_initiator_fragment($value) {
+        $value = is_string($value) ? $value : '';
+
+        if ('' === $value) {
+            return '';
+        }
+
+        if (function_exists('remove_accents')) {
+            $value = remove_accents($value);
+        }
+
+        return strtolower($value);
+    }
+
+    private static function entry_matches_initiator(array $entry, $search) {
+        $search = is_string($search) ? trim($search) : '';
+
+        if ('' === $search) {
+            return true;
+        }
+
+        $normalized = self::normalize_initiator_fragment($search);
+        $normalized = ltrim($normalized, "#@ \t\n\r\0\x0B");
+
+        if ('' === $normalized) {
+            return true;
+        }
+
+        $candidates = [];
+
+        $user_id = isset($entry['user_id']) ? (int) $entry['user_id'] : 0;
+        if ($user_id > 0) {
+            $candidates[] = (string) $user_id;
+            $candidates[] = '#' . $user_id;
+        }
+
+        $user_login = isset($entry['user_login']) ? (string) $entry['user_login'] : '';
+
+        if ('' !== $user_login) {
+            $candidates[] = $user_login;
+            $candidates[] = '@' . $user_login;
+        }
+
+        $user_name = isset($entry['user_name']) ? (string) $entry['user_name'] : '';
+
+        if ('' !== $user_name) {
+            $candidates[] = $user_name;
+        }
+
+        if ($user_id <= 0 && '' === $user_login && '' === $user_name) {
+            $candidates[] = 'system';
+        }
+
+        foreach ($candidates as $candidate) {
+            $candidate_normalized = self::normalize_initiator_fragment($candidate);
+
+            if ('' === $candidate_normalized) {
+                continue;
+            }
+
+            if (false !== strpos($candidate_normalized, $normalized)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function get_recent_stats($days = 7) {

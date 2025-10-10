@@ -56,11 +56,22 @@ $datetime_format = trim($date_format . ' ' . $time_format);
 
 $current_theme = wp_get_theme();
 
-$history_filter_values = is_array($history_filter_values) ? $history_filter_values : ['origins' => [], 'results' => []];
+$history_filter_values = is_array($history_filter_values)
+    ? wp_parse_args($history_filter_values, [
+        'origins'    => [],
+        'results'    => [],
+        'initiators' => [],
+    ])
+    : [
+        'origins'    => [],
+        'results'    => [],
+        'initiators' => [],
+    ];
 $history_selected_filters = is_array($history_selected_filters)
     ? wp_parse_args($history_selected_filters, [
         'result'     => '',
         'origin'     => '',
+        'initiator'  => '',
         'orderby'    => 'timestamp',
         'order'      => 'desc',
         'start_date' => '',
@@ -69,6 +80,7 @@ $history_selected_filters = is_array($history_selected_filters)
     : [
         'result'     => '',
         'origin'     => '',
+        'initiator'  => '',
         'orderby'    => 'timestamp',
         'order'      => 'desc',
         'start_date' => '',
@@ -113,6 +125,10 @@ $history_export_values = isset($history_export_values) && is_array($history_expo
     ];
 $history_export_max_limit = isset($history_export_max_limit) ? (int) $history_export_max_limit : 5000;
 $history_export_default_limit = isset($history_export_default_limit) ? (int) $history_export_default_limit : 200;
+
+$history_initiators = is_array($history_filter_values['initiators'])
+    ? array_values(array_filter($history_filter_values['initiators'], 'is_array'))
+    : [];
 
 $history_result_labels = [
     'success' => __('Succès', 'theme-export-jlg'),
@@ -475,6 +491,7 @@ if ($is_simple_mode) {
 $history_filters_active = (
     (isset($history_selected_filters['result']) && '' !== $history_selected_filters['result'])
     || (isset($history_selected_filters['origin']) && '' !== $history_selected_filters['origin'])
+    || (isset($history_selected_filters['initiator']) && '' !== $history_selected_filters['initiator'])
     || (isset($history_selected_filters['orderby']) && 'timestamp' !== $history_selected_filters['orderby'])
     || (isset($history_selected_filters['order']) && 'desc' !== $history_selected_filters['order'])
     || (isset($history_selected_filters['start_date']) && '' !== $history_selected_filters['start_date'])
@@ -1588,6 +1605,32 @@ $quality_benchmarks = [
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                    </div>
+                    <div class="tejlg-history-filters__group">
+                        <label for="tejlg-history-initiator"><?php esc_html_e('Initiateur', 'theme-export-jlg'); ?></label>
+                        <input
+                            type="search"
+                            name="history_initiator"
+                            id="tejlg-history-initiator"
+                            value="<?php echo esc_attr($history_selected_filters['initiator']); ?>"
+                            placeholder="<?php esc_attr_e('Nom, login ou ID', 'theme-export-jlg'); ?>"
+                            <?php echo !empty($history_initiators) ? 'list="tejlg-history-initiators"' : ''; ?>
+                        >
+                        <?php if (!empty($history_initiators)) : ?>
+                            <datalist id="tejlg-history-initiators">
+                                <?php foreach ($history_initiators as $initiator_item) :
+                                    $initiator_value = isset($initiator_item['value']) ? (string) $initiator_item['value'] : '';
+                                    $initiator_label = isset($initiator_item['label']) ? (string) $initiator_item['label'] : $initiator_value;
+
+                                    if ('' === $initiator_value) {
+                                        continue;
+                                    }
+                                ?>
+                                    <option value="<?php echo esc_attr($initiator_value); ?>"><?php echo esc_html($initiator_label); ?></option>
+                                <?php endforeach; ?>
+                            </datalist>
+                        <?php endif; ?>
+                        <p class="description"><?php esc_html_e('Saisissez un identifiant utilisateur, un login (@) ou une partie du nom complet.', 'theme-export-jlg'); ?></p>
                     </div>
                     <div class="tejlg-history-filters__group">
                         <label for="tejlg-history-orderby"><?php esc_html_e('Trier par', 'theme-export-jlg'); ?></label>

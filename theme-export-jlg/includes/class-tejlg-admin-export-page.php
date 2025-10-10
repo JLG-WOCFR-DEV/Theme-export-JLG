@@ -145,6 +145,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $history_request = [
             'result'     => isset($_GET['history_result']) ? sanitize_key((string) $_GET['history_result']) : '',
             'origin'     => isset($_GET['history_origin']) ? sanitize_key((string) $_GET['history_origin']) : '',
+            'initiator'  => isset($_GET['history_initiator']) ? sanitize_text_field((string) $_GET['history_initiator']) : '',
             'orderby'    => isset($_GET['history_orderby']) ? sanitize_key((string) $_GET['history_orderby']) : 'timestamp',
             'order'      => isset($_GET['history_order']) ? strtolower((string) $_GET['history_order']) : 'desc',
             'start_date' => isset($_GET['history_start_date']) ? sanitize_text_field((string) $_GET['history_start_date']) : '',
@@ -182,6 +183,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'filters'      => [
                 'result'          => $query['result'],
                 'origin'          => $query['origin'],
+                'initiator'       => isset($query['initiator']) ? (string) $query['initiator'] : '',
                 'orderby'         => $query['orderby'],
                 'order'           => $query['order'],
                 'start_date'      => $query['start_date'],
@@ -238,6 +240,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             __('Contexte', 'theme-export-jlg'),
             __('ID utilisateur', 'theme-export-jlg'),
             __('Utilisateur', 'theme-export-jlg'),
+            __('Identifiant de connexion', 'theme-export-jlg'),
             __('Durée (s)', 'theme-export-jlg'),
             __('Durée lisible', 'theme-export-jlg'),
             __('Taille (octets)', 'theme-export-jlg'),
@@ -279,6 +282,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'user'    => [
                 'id'   => isset($entry['user_id']) ? (int) $entry['user_id'] : 0,
                 'name' => isset($entry['user_name']) ? (string) $entry['user_name'] : '',
+                'login' => isset($entry['user_login']) ? (string) $entry['user_login'] : '',
             ],
             'duration' => [
                 'seconds' => $duration,
@@ -315,6 +319,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             isset($entry['context']) ? (string) $entry['context'] : '',
             isset($entry['user_id']) ? (int) $entry['user_id'] : 0,
             isset($entry['user_name']) ? (string) $entry['user_name'] : '',
+            isset($entry['user_login']) ? (string) $entry['user_login'] : '',
             $duration,
             $this->format_history_duration($duration),
             $size,
@@ -451,6 +456,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         $history_result = isset($_GET['history_result']) ? sanitize_key((string) $_GET['history_result']) : '';
         $history_origin = isset($_GET['history_origin']) ? sanitize_key((string) $_GET['history_origin']) : '';
+        $history_initiator = isset($_GET['history_initiator']) ? sanitize_text_field((string) $_GET['history_initiator']) : '';
         $history_orderby = isset($_GET['history_orderby']) ? sanitize_key((string) $_GET['history_orderby']) : 'timestamp';
         $allowed_history_orderby = ['timestamp', 'duration', 'zip_file_size'];
         if (!in_array($history_orderby, $allowed_history_orderby, true)) {
@@ -466,6 +472,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'paged'      => $history_page,
             'result'     => $history_result,
             'origin'     => $history_origin,
+            'initiator'  => $history_initiator,
             'orderby'    => $history_orderby,
             'order'      => $history_order,
             'start_date' => $history_start_date,
@@ -487,6 +494,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'tab'             => 'export',
             'history_result'  => $history_query['result'],
             'history_origin'  => $history_query['origin'],
+            'history_initiator' => $history_query['initiator'],
             'history_orderby' => $history_query['orderby'],
             'history_order'   => $history_query['order'],
         ];
@@ -559,6 +567,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'history_selected_filters'  => [
                 'result'     => $history_query['result'],
                 'origin'     => $history_query['origin'],
+                'initiator'  => $history_query['initiator'],
                 'orderby'    => $history_query['orderby'],
                 'order'      => $history_query['order'],
                 'start_date' => $history_query['start_date'],
@@ -575,7 +584,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         ]);
     }
 
-    private function stream_history_csv(array $entries, array $context, $filename, $generated_at, $site_url, $timezone_string) {
+    private function stream_history_csv_with_context(array $entries, array $context, $filename, $generated_at, $site_url, $timezone_string) {
         $safe_filename = sanitize_file_name($filename);
 
         if ('' === $safe_filename) {
@@ -611,6 +620,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'zip_file_name',
             'user_id',
             'user_name',
+            'user_login',
             'exclusions',
             'persistent_url',
             'persistent_path',
@@ -656,6 +666,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
                 isset($entry['zip_file_name']) ? (string) $entry['zip_file_name'] : '',
                 isset($entry['user_id']) ? (int) $entry['user_id'] : 0,
                 isset($entry['user_name']) ? (string) $entry['user_name'] : '',
+                isset($entry['user_login']) ? (string) $entry['user_login'] : '',
                 $exclusions_value,
                 isset($entry['persistent_url']) ? (string) $entry['persistent_url'] : '',
                 isset($entry['persistent_path']) ? (string) $entry['persistent_path'] : '',
@@ -667,7 +678,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         fclose($handle);
     }
 
-    private function stream_history_json(array $entries, array $context, $filename, $generated_at, $site_url, $timezone_string) {
+    private function stream_history_json_with_context(array $entries, array $context, $filename, $generated_at, $site_url, $timezone_string) {
         $safe_filename = sanitize_file_name($filename);
 
         if ('' === $safe_filename) {
@@ -684,6 +695,7 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'filters'      => [
                 'result'          => isset($filters['result']) && '' !== $filters['result'] ? (string) $filters['result'] : null,
                 'origin'          => isset($filters['origin']) && '' !== $filters['origin'] ? (string) $filters['origin'] : null,
+                'initiator'       => isset($filters['initiator']) && '' !== $filters['initiator'] ? (string) $filters['initiator'] : null,
                 'start_date'      => isset($filters['start_date']) && '' !== $filters['start_date'] ? (string) $filters['start_date'] : null,
                 'end_date'        => isset($filters['end_date']) && '' !== $filters['end_date'] ? (string) $filters['end_date'] : null,
                 'start_timestamp' => isset($filters['start_timestamp']) && $filters['start_timestamp'] > 0 ? (int) $filters['start_timestamp'] : null,
