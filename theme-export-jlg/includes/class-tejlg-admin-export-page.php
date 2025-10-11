@@ -248,6 +248,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             __('Nom de fichier', 'theme-export-jlg'),
             __('URL persistante', 'theme-export-jlg'),
             __('Motifs d’exclusion', 'theme-export-jlg'),
+            __('URL du résumé', 'theme-export-jlg'),
+            __('Résumé – fichiers inclus', 'theme-export-jlg'),
+            __('Résumé – fichiers exclus', 'theme-export-jlg'),
+            __('Résumé – avertissements', 'theme-export-jlg'),
         ];
 
         fputcsv($handle, $headers);
@@ -264,6 +268,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
         $duration  = isset($entry['duration']) ? (int) $entry['duration'] : 0;
         $size      = isset($entry['zip_file_size']) ? (int) $entry['zip_file_size'] : 0;
+
+        $summary_meta = isset($entry['summary_meta'])
+            ? TEJLG_Export_History::sanitize_summary_meta($entry['summary_meta'])
+            : TEJLG_Export_History::sanitize_summary_meta([]);
 
         return [
             'job_id'   => isset($entry['job_id']) ? (string) $entry['job_id'] : '',
@@ -297,6 +305,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
                 'url'       => isset($entry['persistent_url']) ? (string) $entry['persistent_url'] : '',
             ],
             'exclusions' => $this->format_history_exclusions_list(isset($entry['exclusions']) ? (array) $entry['exclusions'] : []),
+            'summary'    => [
+                'url'   => isset($entry['summary_url']) ? (string) $entry['summary_url'] : '',
+                'meta'  => $summary_meta,
+            ],
         ];
     }
 
@@ -307,6 +319,11 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         $status_message = isset($entry['status_message']) ? (string) $entry['status_message'] : '';
         $status_message = preg_replace('/\s+/u', ' ', $status_message);
+
+        $summary_meta = isset($entry['summary_meta'])
+            ? TEJLG_Export_History::sanitize_summary_meta($entry['summary_meta'])
+            : TEJLG_Export_History::sanitize_summary_meta([]);
+        $summary_warnings = !empty($summary_meta['warnings']) ? implode(' | ', $summary_meta['warnings']) : '';
 
         return [
             isset($entry['job_id']) ? (string) $entry['job_id'] : '',
@@ -327,6 +344,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             isset($entry['zip_file_name']) ? (string) $entry['zip_file_name'] : '',
             isset($entry['persistent_url']) ? (string) $entry['persistent_url'] : '',
             implode(' | ', $this->format_history_exclusions_list(isset($entry['exclusions']) ? (array) $entry['exclusions'] : [])),
+            isset($entry['summary_url']) ? (string) $entry['summary_url'] : '',
+            isset($summary_meta['included_count']) ? (int) $summary_meta['included_count'] : 0,
+            isset($summary_meta['excluded_count']) ? (int) $summary_meta['excluded_count'] : 0,
+            $summary_warnings,
         ];
     }
 

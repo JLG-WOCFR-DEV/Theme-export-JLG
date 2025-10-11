@@ -15,10 +15,11 @@ Les deux liens respectent strictement les filtres affichés : modifier la pér
 - **JSON**
   - Ajoute un en-tête `site_url`, les filtres appliqués, l'horodatage de génération et la liste des entrées.
   - Chaque entrée comprend les timestamps ISO 8601 (timezone du site et UTC), le statut normalisé, le message, l'utilisateur, la durée, la taille de l'archive et les motifs d'exclusion.
+  - Un bloc `summary` regroupe l'URL du résumé JSON et des métadonnées normalisées (fichiers inclus/exclus, avertissements) pour alimenter vos scripts d'analyse sans retraitement.【F:theme-export-jlg/includes/class-tejlg-admin-export-page.php†L173-L214】
   - Structure prête à être consommée par des scripts (Power Automate, n8n, Zapier via Webhooks).
 - **CSV**
   - Encode le fichier en UTF‑8 avec BOM pour conserver les accents dans Excel/LibreOffice.
-  - Colonnes disponibles : identifiant, timestamps site/UTC, statut, message, origine, utilisateur, durée (sec & lisible), taille (octets & lisible), nom du ZIP, URL persistante, exclusions.
+  - Colonnes disponibles : identifiant, timestamps site/UTC, statut, message, origine, utilisateur, durée (sec & lisible), taille (octets & lisible), nom du ZIP, URL persistante, exclusions, URL du résumé JSON, compte de fichiers inclus/exclus et liste des avertissements de synthèse.【F:theme-export-jlg/includes/class-tejlg-admin-export-page.php†L214-L256】
 
 ## Automatisation par URL
 
