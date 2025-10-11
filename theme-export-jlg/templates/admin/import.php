@@ -9,6 +9,7 @@ $import_tab_url = add_query_arg([
     'tab'  => 'import',
 ], admin_url('admin.php'));
 ?>
+<div id="tejlg-section-import" class="tejlg-section-anchor" tabindex="-1"></div>
 <h2><?php esc_html_e('Tutoriel : Que pouvez-vous importer ?', 'theme-export-jlg'); ?></h2>
 <div class="tejlg-cards-container">
     <div class="tejlg-card components-card is-elevated">

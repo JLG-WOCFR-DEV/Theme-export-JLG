@@ -21,6 +21,8 @@ class TEJLG_Admin {
 
     private $template_dir;
 
+    private const COMPACT_MODE_META_KEY = 'tejlg_admin_compact_mode';
+
     public function __construct() {
         $this->template_dir = TEJLG_PATH . 'templates/admin/';
 
@@ -31,6 +33,8 @@ class TEJLG_Admin {
         add_action('admin_menu', [ $this, 'add_menu_page' ]);
         add_action('admin_enqueue_scripts', [ $this, 'enqueue_assets' ]);
         add_action('admin_init', [ $this, 'handle_form_requests' ]);
+        add_action('wp_ajax_tejlg_toggle_compact_mode', [ $this, 'handle_toggle_compact_mode' ]);
+        add_filter('admin_body_class', [ $this, 'filter_admin_body_class' ]);
     }
 
     public function add_menu_page() {
@@ -66,7 +70,23 @@ class TEJLG_Admin {
             wp_add_inline_style('tejlg-admin-styles', $inline_style);
         }
 
+        $compact_mode_enabled = $this->get_compact_mode_preference();
+
         wp_enqueue_script('tejlg-admin-base', TEJLG_URL . 'assets/js/admin-base.js', [], TEJLG_VERSION, true);
+        wp_localize_script(
+            'tejlg-admin-base',
+            'tejlgAdminBaseSettings',
+            [
+                'compactMode' => [
+                    'enabled' => $compact_mode_enabled,
+                    'ajaxUrl' => admin_url('admin-ajax.php'),
+                    'nonce'   => wp_create_nonce('tejlg_toggle_compact_mode'),
+                    'messages' => [
+                        'error' => esc_html__("La préférence d'affichage n'a pas pu être enregistrée.", 'theme-export-jlg'),
+                    ],
+                ],
+            ]
+        );
 
         $action_param = filter_input(INPUT_GET, 'action', FILTER_DEFAULT);
 
@@ -282,19 +302,140 @@ class TEJLG_Admin {
         $requested_tab = isset($_GET['tab']) ? sanitize_key((string) $_GET['tab']) : '';
         $active_tab    = isset($tabs[$requested_tab]) ? $requested_tab : key($tabs);
 
+        $summary_targets = [
+            'export' => '#tejlg-section-export',
+            'import' => '#tejlg-section-import',
+            'debug'  => '#tejlg-section-debug',
+        ];
+
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
-            <h2 class="nav-tab-wrapper">
-                <?php foreach ($tabs as $tab_slug => $tab_config) :
-                    $url = add_query_arg([
-                        'page' => $this->page_slug,
-                        'tab'  => $tab_slug,
-                    ], admin_url('admin.php'));
-                ?>
-                    <a href="<?php echo esc_url($url); ?>" class="nav-tab <?php echo $active_tab === $tab_slug ? 'nav-tab-active' : ''; ?>"><?php echo esc_html($tab_config['label']); ?></a>
-                <?php endforeach; ?>
-            </h2>
+            <div class="tejlg-admin-toolbar" role="toolbar" aria-label="<?php echo esc_attr__('Navigation principale de Theme Export', 'theme-export-jlg'); ?>">
+                <div class="tejlg-admin-toolbar__nav">
+                    <h2 class="nav-tab-wrapper">
+                        <?php foreach ($tabs as $tab_slug => $tab_config) :
+                            $url = add_query_arg([
+                                'page' => $this->page_slug,
+                                'tab'  => $tab_slug,
+                            ], admin_url('admin.php'));
+                            $is_active = ($active_tab === $tab_slug);
+                        ?>
+                            <a
+                                href="<?php echo esc_url($url); ?>"
+                                class="nav-tab <?php echo $is_active ? 'nav-tab-active' : ''; ?>"
+                                <?php echo $is_active ? 'aria-current="page"' : ''; ?>
+                            >
+                                <?php echo esc_html($tab_config['label']); ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </h2>
+                    <div class="tejlg-mobile-accordion" data-tejlg-mobile-accordion>
+                        <?php foreach ($tabs as $tab_slug => $tab_config) :
+                            $url = add_query_arg([
+                                'page' => $this->page_slug,
+                                'tab'  => $tab_slug,
+                            ], admin_url('admin.php'));
+                            $is_active = ($active_tab === $tab_slug);
+                            $trigger_id = sprintf('tejlg-mobile-accordion-trigger-%s', sanitize_html_class($tab_slug));
+                            $panel_id = sprintf('tejlg-mobile-accordion-panel-%s', sanitize_html_class($tab_slug));
+                        ?>
+                            <div class="tejlg-mobile-accordion__item">
+                                <button
+                                    type="button"
+                                    class="tejlg-mobile-accordion__trigger"
+                                    id="<?php echo esc_attr($trigger_id); ?>"
+                                    data-tejlg-accordion-trigger
+                                    data-default-expanded="<?php echo $is_active ? 'true' : 'false'; ?>"
+                                    aria-controls="<?php echo esc_attr($panel_id); ?>"
+                                    aria-expanded="<?php echo $is_active ? 'true' : 'false'; ?>"
+                                >
+                                    <span class="tejlg-mobile-accordion__title"><?php echo esc_html($tab_config['label']); ?></span>
+                                    <span class="tejlg-mobile-accordion__icon" aria-hidden="true"></span>
+                                </button>
+                                <div
+                                    id="<?php echo esc_attr($panel_id); ?>"
+                                    class="tejlg-mobile-accordion__panel"
+                                    data-tejlg-accordion-panel
+                                    role="region"
+                                    aria-labelledby="<?php echo esc_attr($trigger_id); ?>"
+                                    <?php echo $is_active ? '' : 'hidden'; ?>
+                                >
+                                    <a
+                                        class="tejlg-mobile-accordion__link<?php echo $is_active ? ' is-current' : ''; ?>"
+                                        data-tejlg-accordion-link
+                                        href="<?php echo esc_url($url); ?>"
+                                    >
+                                        <?php esc_html_e('Ouvrir la section', 'theme-export-jlg'); ?>
+                                    </a>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div class="tejlg-admin-toolbar__actions">
+                    <?php $compact_mode_enabled = $this->get_compact_mode_preference(); ?>
+                    <div class="tejlg-compact-toggle components-toggle-control">
+                        <div class="components-base-control components-base-control__field">
+                            <div class="components-form-toggle">
+                                <input
+                                    class="components-form-toggle__input"
+                                    type="checkbox"
+                                    id="tejlg-compact-view-toggle"
+                                    data-tejlg-compact-toggle
+                                    <?php checked($compact_mode_enabled); ?>
+                                >
+                                <span class="components-form-toggle__track"></span>
+                                <span class="components-form-toggle__thumb"></span>
+                            </div>
+                            <label class="components-toggle-control__label" for="tejlg-compact-view-toggle">
+                                <?php esc_html_e('Vue compacte', 'theme-export-jlg'); ?>
+                            </label>
+                        </div>
+                        <p class="components-toggle-control__help">
+                            <?php esc_html_e('Réduit les marges et regroupe les cartes pour faciliter la navigation.', 'theme-export-jlg'); ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <?php
+            $summary_items = [];
+
+            foreach ($summary_targets as $summary_slug => $anchor) {
+                if (!isset($tabs[$summary_slug])) {
+                    continue;
+                }
+
+                $target_url = add_query_arg([
+                    'page' => $this->page_slug,
+                    'tab'  => $summary_slug,
+                ], admin_url('admin.php')) . $anchor;
+
+                $summary_items[] = [
+                    'label'     => $tabs[$summary_slug]['label'],
+                    'url'       => $target_url,
+                    'is_active' => ($active_tab === $summary_slug),
+                ];
+            }
+
+            if (!empty($summary_items)) :
+            ?>
+                <nav class="tejlg-section-summary" aria-label="<?php esc_attr_e('Sommaire des sections', 'theme-export-jlg'); ?>">
+                    <ul class="tejlg-section-summary__list">
+                        <?php foreach ($summary_items as $item) : ?>
+                            <li class="tejlg-section-summary__item">
+                                <a
+                                    class="tejlg-section-summary__link<?php echo $item['is_active'] ? ' is-active' : ''; ?>"
+                                    href="<?php echo esc_url($item['url']); ?>"
+                                    <?php echo $item['is_active'] ? 'aria-current="page"' : ''; ?>
+                                >
+                                    <?php echo esc_html($item['label']); ?>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </nav>
+            <?php endif; ?>
             <?php
             $active_tab_config = $tabs[$active_tab];
 
@@ -348,6 +489,73 @@ class TEJLG_Admin {
         }
 
         return $accessible;
+    }
+
+    public function filter_admin_body_class($classes) {
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+
+        if (!$screen || $screen->id !== 'toplevel_page_' . $this->page_slug) {
+            return $classes;
+        }
+
+        if ($this->get_compact_mode_preference()) {
+            $classes .= ' tejlg-compact-mode';
+        }
+
+        return $classes;
+    }
+
+    public function handle_toggle_compact_mode() {
+        if (!TEJLG_Capabilities::current_user_can('menu')) {
+            wp_send_json_error([
+                'message' => esc_html__("Vous n'avez pas les autorisations nécessaires pour modifier cette option.", 'theme-export-jlg'),
+            ], 403);
+        }
+
+        check_ajax_referer('tejlg_toggle_compact_mode');
+
+        $state = isset($_POST['state']) ? (string) $_POST['state'] : '0';
+        $enabled = in_array($state, ['1', 'true', 'on'], true);
+
+        $this->set_compact_mode_preference($enabled);
+
+        wp_send_json_success([
+            'enabled' => $enabled,
+        ]);
+    }
+
+    private function get_compact_mode_preference() {
+        if (!is_user_logged_in()) {
+            return false;
+        }
+
+        $user_id = get_current_user_id();
+
+        if (!$user_id) {
+            return false;
+        }
+
+        $stored = get_user_meta($user_id, self::COMPACT_MODE_META_KEY, true);
+
+        return !empty($stored);
+    }
+
+    private function set_compact_mode_preference($enabled) {
+        if (!is_user_logged_in()) {
+            return;
+        }
+
+        $user_id = get_current_user_id();
+
+        if (!$user_id) {
+            return;
+        }
+
+        if ($enabled) {
+            update_user_meta($user_id, self::COMPACT_MODE_META_KEY, '1');
+        } else {
+            delete_user_meta($user_id, self::COMPACT_MODE_META_KEY);
+        }
     }
 
     private function render_migration_guide_tab() {

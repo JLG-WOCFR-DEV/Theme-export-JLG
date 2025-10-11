@@ -1,5 +1,65 @@
 (function() {
     document.addEventListener('DOMContentLoaded', function() {
+        var baseSettings = (typeof window.tejlgAdminBaseSettings === 'object' && window.tejlgAdminBaseSettings !== null)
+            ? window.tejlgAdminBaseSettings
+            : {};
+
+        var compactConfig = baseSettings.compactMode || {};
+        var compactToggle = document.querySelector('[data-tejlg-compact-toggle]');
+
+        var applyCompactMode = function(enabled) {
+            if (!document.body || !document.body.classList) {
+                return;
+            }
+
+            document.body.classList.toggle('tejlg-compact-mode', !!enabled);
+        };
+
+        applyCompactMode(compactConfig.enabled);
+
+        if (compactToggle) {
+            var initialState = !!compactConfig.enabled;
+
+            if (compactToggle.checked !== initialState) {
+                compactToggle.checked = initialState;
+            }
+
+            compactToggle.addEventListener('change', function() {
+                var nextState = !!compactToggle.checked;
+
+                applyCompactMode(nextState);
+
+                if (!compactConfig.ajaxUrl || !compactConfig.nonce || typeof window.fetch !== 'function' || typeof window.FormData !== 'function') {
+                    return;
+                }
+
+                var payload = new window.FormData();
+                payload.append('action', 'tejlg_toggle_compact_mode');
+                payload.append('_ajax_nonce', compactConfig.nonce);
+                payload.append('state', nextState ? '1' : '0');
+
+                window.fetch(compactConfig.ajaxUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    body: payload,
+                }).then(function(response) {
+                    if (!response || !response.ok) {
+                        throw new Error('Request failed');
+                    }
+
+                    return response.json();
+                }).then(function(data) {
+                    if (!data || data.success !== true) {
+                        throw new Error('Unexpected response');
+                    }
+                }).catch(function(error) {
+                    if (compactConfig.messages && compactConfig.messages.error) {
+                        window.console.error(compactConfig.messages.error, error);
+                    }
+                });
+            });
+        }
+
         var chipContainers = document.querySelectorAll('[data-tejlg-recipient-chips]');
 
         if (chipContainers.length) {
@@ -82,66 +142,187 @@
 
         var persistableDetails = document.querySelectorAll('details[data-tejlg-persist]');
 
-        if (!persistableDetails.length) {
-            return;
+        if (persistableDetails.length) {
+            var storageKey = 'tejlg:details:state';
+
+            var readState = function() {
+                try {
+                    var raw = window.localStorage.getItem(storageKey);
+
+                    if (!raw) {
+                        return {};
+                    }
+
+                    var parsed = JSON.parse(raw);
+
+                    if (parsed && typeof parsed === 'object') {
+                        return parsed;
+                    }
+                } catch (error) {
+                    // Ignore parsing/storage failures to avoid breaking the UI.
+                }
+
+                return {};
+            };
+
+            var writeState = function(state) {
+                try {
+                    window.localStorage.setItem(storageKey, JSON.stringify(state));
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            };
+
+            var stateCache = readState();
+
+            persistableDetails.forEach(function(details) {
+                if (!details || details.nodeName !== 'DETAILS') {
+                    return;
+                }
+
+                var uniqueId = details.getAttribute('data-tejlg-persist-key') || details.id;
+
+                if (!uniqueId) {
+                    return;
+                }
+
+                if (Object.prototype.hasOwnProperty.call(stateCache, uniqueId)) {
+                    var shouldBeOpen = !!stateCache[uniqueId];
+
+                    if (details.open !== shouldBeOpen) {
+                        details.open = shouldBeOpen;
+                    }
+                }
+
+                details.addEventListener('toggle', function() {
+                    stateCache = stateCache || {};
+                    stateCache[uniqueId] = !!details.open;
+                    writeState(stateCache);
+                });
+            });
         }
 
-        var storageKey = 'tejlg:details:state';
+        var accordionContainers = document.querySelectorAll('[data-tejlg-mobile-accordion]');
 
-        var readState = function() {
-            try {
-                var raw = window.localStorage.getItem(storageKey);
-
-                if (!raw) {
-                    return {};
+        if (accordionContainers.length) {
+            var collapseSiblings = function(currentTrigger) {
+                if (!currentTrigger) {
+                    return;
                 }
 
-                var parsed = JSON.parse(raw);
+                var container = currentTrigger.closest('[data-tejlg-mobile-accordion]');
 
-                if (parsed && typeof parsed === 'object') {
-                    return parsed;
+                if (!container) {
+                    return;
                 }
-            } catch (error) {
-                // Ignore parsing/storage failures to avoid breaking the UI.
-            }
 
-            return {};
-        };
+                var triggers = container.querySelectorAll('[data-tejlg-accordion-trigger]');
 
-        var writeState = function(state) {
-            try {
-                window.localStorage.setItem(storageKey, JSON.stringify(state));
-            } catch (error) {
-                // Ignore storage failures.
-            }
-        };
+                triggers.forEach(function(trigger) {
+                    if (trigger === currentTrigger) {
+                        return;
+                    }
 
-        var stateCache = readState();
+                    trigger.setAttribute('aria-expanded', 'false');
 
-        persistableDetails.forEach(function(details) {
-            if (!details || details.nodeName !== 'DETAILS') {
-                return;
-            }
+                    var panelId = trigger.getAttribute('aria-controls');
 
-            var uniqueId = details.getAttribute('data-tejlg-persist-key') || details.id;
+                    if (!panelId) {
+                        return;
+                    }
 
-            if (!uniqueId) {
-                return;
-            }
+                    var panel = document.getElementById(panelId);
 
-            if (Object.prototype.hasOwnProperty.call(stateCache, uniqueId)) {
-                var shouldBeOpen = !!stateCache[uniqueId];
+                    if (panel) {
+                        panel.hidden = true;
+                    }
+                });
+            };
 
-                if (details.open !== shouldBeOpen) {
-                    details.open = shouldBeOpen;
-                }
-            }
+            var syncPanels = function(isMobile) {
+                accordionContainers.forEach(function(container) {
+                    var triggers = container.querySelectorAll('[data-tejlg-accordion-trigger]');
 
-            details.addEventListener('toggle', function() {
-                stateCache = stateCache || {};
-                stateCache[uniqueId] = !!details.open;
-                writeState(stateCache);
+                    triggers.forEach(function(trigger) {
+                        var panelId = trigger.getAttribute('aria-controls');
+
+                        if (!panelId) {
+                            return;
+                        }
+
+                        var panel = document.getElementById(panelId);
+
+                        if (!panel) {
+                            return;
+                        }
+
+                        if (!isMobile) {
+                            panel.hidden = true;
+                        } else {
+                            var expanded = trigger.getAttribute('aria-expanded') === 'true';
+                            panel.hidden = !expanded;
+                        }
+                    });
+                });
+            };
+
+            accordionContainers.forEach(function(container) {
+                var triggers = container.querySelectorAll('[data-tejlg-accordion-trigger]');
+
+                triggers.forEach(function(trigger) {
+                    trigger.addEventListener('click', function() {
+                        var panelId = trigger.getAttribute('aria-controls');
+
+                        if (!panelId) {
+                            return;
+                        }
+
+                        var panel = document.getElementById(panelId);
+
+                        if (!panel) {
+                            return;
+                        }
+
+                        var expanded = trigger.getAttribute('aria-expanded') === 'true';
+                        var nextState = !expanded;
+
+                        if (nextState) {
+                            collapseSiblings(trigger);
+                        }
+
+                        trigger.setAttribute('aria-expanded', nextState ? 'true' : 'false');
+                        panel.hidden = !nextState;
+
+                        if (nextState) {
+                            var focusTarget = panel.querySelector('[data-tejlg-accordion-link]');
+
+                            if (focusTarget && typeof focusTarget.focus === 'function') {
+                                focusTarget.focus({ preventScroll: true });
+                            }
+                        }
+                    });
+                });
             });
-        });
+
+            var mediaQuery = typeof window.matchMedia === 'function'
+                ? window.matchMedia('(max-width: 782px)')
+                : null;
+
+            if (mediaQuery) {
+                var handleChange = function(event) {
+                    syncPanels(!!event.matches);
+                };
+
+                if (typeof mediaQuery.addEventListener === 'function') {
+                    mediaQuery.addEventListener('change', handleChange);
+                } else if (typeof mediaQuery.addListener === 'function') {
+                    mediaQuery.addListener(handleChange);
+                }
+
+                syncPanels(mediaQuery.matches);
+            } else {
+                syncPanels(true);
+            }
+        }
     });
 })();
