@@ -565,6 +565,12 @@ class TEJLG_Export_History {
             $entry['summary_url'] = $job['summary_persistent_url'];
         }
 
+        if (isset($context['summary_filename']) && is_string($context['summary_filename']) && '' !== $context['summary_filename']) {
+            $entry['summary_filename'] = $context['summary_filename'];
+        } elseif (isset($job['summary_file_name']) && is_string($job['summary_file_name']) && '' !== $job['summary_file_name']) {
+            $entry['summary_filename'] = $job['summary_file_name'];
+        }
+
         $entry = apply_filters('tejlg_export_history_entry', $entry, $job, $context);
 
         return self::normalize_entry($entry);
@@ -630,6 +636,10 @@ class TEJLG_Export_History {
 
         if (isset($entry['summary_url']) && is_string($entry['summary_url'])) {
             $entry['summary_url'] = esc_url_raw($entry['summary_url']);
+        }
+
+        if (isset($entry['summary_filename']) && is_string($entry['summary_filename'])) {
+            $entry['summary_filename'] = sanitize_file_name($entry['summary_filename']);
         }
 
         if (isset($entry['status_message']) && is_string($entry['status_message'])) {

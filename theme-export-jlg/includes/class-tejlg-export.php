@@ -401,8 +401,11 @@ class TEJLG_Export {
 
         $persistence = self::persist_export_archive($job);
 
-        $persistent_path = isset($persistence['path']) ? (string) $persistence['path'] : '';
-        $persistent_url  = isset($persistence['url']) ? (string) $persistence['url'] : '';
+        $persistent_path   = isset($persistence['path']) ? (string) $persistence['path'] : '';
+        $persistent_url    = isset($persistence['url']) ? (string) $persistence['url'] : '';
+        $summary_path      = isset($persistence['summary_path']) ? (string) $persistence['summary_path'] : '';
+        $summary_url       = isset($persistence['summary_url']) ? (string) $persistence['summary_url'] : '';
+        $summary_filename  = isset($persistence['summary_filename']) ? (string) $persistence['summary_filename'] : '';
 
         if ('' === $persistent_path || '' === $persistent_url) {
             $failure_message = esc_html__(
@@ -457,6 +460,25 @@ class TEJLG_Export {
 
         if ('' !== $persistent_url) {
             $delete_context['download_url'] = $persistent_url;
+        }
+
+        if ('' !== $summary_path) {
+            $delete_context['summary_path'] = $summary_path;
+            $job['summary_persistent_path'] = $summary_path;
+        }
+
+        if ('' !== $summary_url) {
+            $delete_context['summary_url'] = $summary_url;
+            $job['summary_persistent_url'] = $summary_url;
+        }
+
+        if ('' !== $summary_filename) {
+            $delete_context['summary_filename'] = $summary_filename;
+            $job['summary_file_name'] = $summary_filename;
+        }
+
+        if ('' !== $summary_path || '' !== $summary_url || '' !== $summary_filename) {
+            self::persist_job($job);
         }
 
         self::delete_job($job_id, $delete_context);
@@ -1837,6 +1859,10 @@ class TEJLG_Export {
 
             if (isset($context['summary_url']) && is_string($context['summary_url']) && '' !== $context['summary_url']) {
                 $job['summary_persistent_url'] = $context['summary_url'];
+            }
+
+            if (isset($context['summary_filename']) && is_string($context['summary_filename']) && '' !== $context['summary_filename']) {
+                $job['summary_file_name'] = $context['summary_filename'];
             }
 
             TEJLG_Export_History::record_job($job, $context);
