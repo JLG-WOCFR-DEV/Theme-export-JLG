@@ -65,3 +65,5 @@ $import_tab_url = add_query_arg([
         </div>
     </div>
 </div>
+
+<?php include __DIR__ . '/quick-actions.php'; ?>

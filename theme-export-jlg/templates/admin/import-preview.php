@@ -376,3 +376,5 @@ $controls_help_id = 'tejlg-import-controls-help';
     <?php endif; ?>
     <p><button type="submit" name="tejlg_import_patterns_step2" class="button button-primary button-hero" data-pattern-submit="true"><?php esc_html_e('Importer la sélection', 'theme-export-jlg'); ?></button></p>
 </form>
+
+<?php include __DIR__ . '/quick-actions.php'; ?>

@@ -182,3 +182,5 @@ $back_url = add_query_arg([
         <p><button type="submit" name="tejlg_export_selected_patterns" class="button button-primary button-hero" data-pattern-submit="true"><?php esc_html_e('Exporter la sélection', 'theme-export-jlg'); ?></button></p>
     </form>
 <?php endif; ?>
+
+<?php include __DIR__ . '/quick-actions.php'; ?>
