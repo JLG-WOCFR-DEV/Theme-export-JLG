@@ -1241,6 +1241,7 @@ $quality_benchmarks = [
                     </p>
                     <p><button type="button" class="button button-secondary wp-ui-secondary" data-export-cancel hidden><?php esc_html_e("Annuler l'export", 'theme-export-jlg'); ?></button></p>
                     <p><a href="#" class="button button-secondary wp-ui-secondary" data-export-download hidden target="_blank" rel="noopener"><?php esc_html_e("Télécharger l'archive ZIP", 'theme-export-jlg'); ?></a></p>
+                    <p><a href="#" class="button button-secondary wp-ui-secondary" data-export-summary hidden target="_blank" rel="noopener"><?php esc_html_e('Télécharger le résumé JSON', 'theme-export-jlg'); ?></a></p>
                 </div>
             </form>
         </div>

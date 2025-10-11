@@ -949,6 +949,388 @@ class TEJLG_Export {
         ];
     }
 
+    private static function build_theme_export_summary_package(array $job) {
+        $job_id = isset($job['id']) ? (string) $job['id'] : '';
+
+        if ('' === $job_id) {
+            return null;
+        }
+
+        $theme = wp_get_theme();
+
+        $theme_data = [
+            'name'       => $theme instanceof WP_Theme ? (string) $theme->get('Name') : '',
+            'slug'       => $theme instanceof WP_Theme ? (string) $theme->get_stylesheet() : '',
+            'version'    => $theme instanceof WP_Theme ? (string) $theme->get('Version') : '',
+            'template'   => $theme instanceof WP_Theme ? (string) $theme->get_template() : '',
+            'is_child'   => false,
+            'parent'     => [
+                'name'    => '',
+                'slug'    => '',
+                'version' => '',
+            ],
+        ];
+
+        if ($theme instanceof WP_Theme) {
+            $parent_theme = $theme->parent();
+
+            if ($parent_theme instanceof WP_Theme) {
+                $theme_data['is_child']             = true;
+                $theme_data['parent']['name']       = (string) $parent_theme->get('Name');
+                $theme_data['parent']['slug']       = (string) $parent_theme->get_stylesheet();
+                $theme_data['parent']['version']    = (string) $parent_theme->get('Version');
+            }
+        }
+
+        $raw_exclusions = isset($job['exclusions']) ? (array) $job['exclusions'] : [];
+        $exclusions     = array_values(
+            array_filter(
+                array_map('strval', $raw_exclusions),
+                static function ($pattern) {
+                    return '' !== trim((string) $pattern);
+                }
+            )
+        );
+
+        $exclusions_string = '';
+
+        if (!empty($exclusions)) {
+            $exclusions_string = implode("\n", $exclusions);
+        }
+
+        $preview         = self::preview_theme_export_files($exclusions_string);
+        $included_count  = 0;
+        $excluded_count  = 0;
+        $included_sample = [];
+        $excluded_sample = [];
+        $warnings        = [];
+
+        if (is_wp_error($preview)) {
+            $warnings[] = $preview->get_error_message();
+        } elseif (is_array($preview)) {
+            $included_count  = isset($preview['includedCount']) ? (int) $preview['includedCount'] : 0;
+            $excluded_count  = isset($preview['excludedCount']) ? (int) $preview['excludedCount'] : 0;
+            $included_sample = self::limit_summary_sample(isset($preview['included']) ? (array) $preview['included'] : []);
+            $excluded_sample = self::limit_summary_sample(isset($preview['excluded']) ? (array) $preview['excluded'] : []);
+        }
+
+        if (0 === $included_count) {
+            $warnings[] = esc_html__("Aucun fichier n’a été inclus dans cette exportation. Vérifiez les motifs d’exclusion.", 'theme-export-jlg');
+        }
+
+        $zip_file_size = isset($job['zip_file_size']) ? (int) $job['zip_file_size'] : 0;
+
+        if ($zip_file_size <= 0) {
+            $zip_path = isset($job['zip_path']) ? (string) $job['zip_path'] : '';
+
+            if ('' !== $zip_path && file_exists($zip_path)) {
+                $zip_file_size = (int) filesize($zip_path);
+            }
+        }
+
+        $created_at   = isset($job['created_at']) ? (int) $job['created_at'] : time();
+        $completed_at = isset($job['completed_at']) ? (int) $job['completed_at'] : time();
+        $duration     = max(0, $completed_at - $created_at);
+
+        $payload = [
+            'format'         => 'theme-export-jlg/summary',
+            'format_version' => 1,
+            'generated_at'   => time(),
+            'job_id'         => $job_id,
+            'site'           => [
+                'url'              => home_url('/'),
+                'locale'           => get_locale(),
+                'wp_version'       => get_bloginfo('version'),
+                'php_version'      => PHP_VERSION,
+                'environment_type' => defined('WP_ENVIRONMENT_TYPE') ? WP_ENVIRONMENT_TYPE : '',
+                'is_multisite'     => is_multisite(),
+            ],
+            'initiator'      => [
+                'id'   => isset($job['created_by']) ? (int) $job['created_by'] : 0,
+                'name' => isset($job['created_by_name']) ? (string) $job['created_by_name'] : '',
+            ],
+            'trigger'        => isset($job['created_via']) ? (string) $job['created_via'] : '',
+            'timings'        => [
+                'queued_at'    => $created_at,
+                'completed_at' => $completed_at,
+                'duration'     => $duration,
+            ],
+            'theme'          => $theme_data,
+            'archive'        => [
+                'file_name'      => isset($job['zip_file_name']) ? (string) $job['zip_file_name'] : '',
+                'file_size'      => $zip_file_size,
+                'persistent_url' => isset($job['persistent_url']) ? (string) $job['persistent_url'] : '',
+            ],
+            'exclusions'     => [
+                'patterns' => $exclusions,
+            ],
+            'files'          => [
+                'total'           => $included_count + $excluded_count,
+                'included'        => $included_count,
+                'excluded'        => $excluded_count,
+                'included_sample' => $included_sample,
+                'excluded_sample' => $excluded_sample,
+            ],
+            'warnings'       => $warnings,
+        ];
+
+        /**
+         * Permet de modifier le contenu du résumé JSON généré après un export de thème.
+         *
+         * @param array<string,mixed> $payload Données du résumé.
+         * @param array<string,mixed> $job     Tâche d'export.
+         */
+        $payload = apply_filters('tejlg_export_summary_data', $payload, $job);
+
+        if (!is_array($payload)) {
+            return null;
+        }
+
+        $meta = [
+            'included_count' => $included_count,
+            'excluded_count' => $excluded_count,
+            'warnings'       => $warnings,
+        ];
+
+        return [
+            'payload' => $payload,
+            'meta'    => $meta,
+        ];
+    }
+
+    private static function limit_summary_sample($list, $limit = 50) {
+        $list  = is_array($list) ? array_values($list) : [];
+        $limit = (int) apply_filters('tejlg_export_summary_sample_limit', $limit, $list);
+
+        if ($limit <= 0) {
+            return [];
+        }
+
+        $sample = array_slice($list, 0, $limit);
+
+        return array_values(
+            array_map(
+                static function ($value) {
+                    return (string) $value;
+                },
+                $sample
+            )
+        );
+    }
+
+    private static function generate_summary_for_job(array &$job) {
+        $package = self::build_theme_export_summary_package($job);
+
+        if (null === $package) {
+            return;
+        }
+
+        $payload = isset($package['payload']) && is_array($package['payload'])
+            ? $package['payload']
+            : [];
+        $meta    = isset($package['meta']) && is_array($package['meta'])
+            ? $package['meta']
+            : [];
+
+        if (!empty($job['summary_temp_path']) && is_string($job['summary_temp_path']) && file_exists($job['summary_temp_path'])) {
+            self::delete_temp_file($job['summary_temp_path']);
+        }
+
+        $job['summary_payload']     = $payload;
+        $job['summary_meta']        = self::normalize_summary_meta($meta);
+        $job['summary_generated_at'] = isset($payload['generated_at']) ? (int) $payload['generated_at'] : time();
+
+        $summary_file = self::create_summary_temp_file($payload, $job);
+
+        if (is_array($summary_file) && !empty($summary_file['path'])) {
+            $job['summary_temp_path'] = (string) $summary_file['path'];
+            if (!empty($summary_file['filename'])) {
+                $job['summary_file_name'] = (string) $summary_file['filename'];
+            }
+        }
+    }
+
+    private static function create_summary_temp_file(array $payload, array $job) {
+        if (empty($payload)) {
+            return null;
+        }
+
+        $options = JSON_UNESCAPED_SLASHES;
+
+        if (defined('JSON_UNESCAPED_UNICODE')) {
+            $options |= JSON_UNESCAPED_UNICODE;
+        }
+
+        if (defined('JSON_PRETTY_PRINT')) {
+            $options |= JSON_PRETTY_PRINT;
+        }
+
+        $encoded = wp_json_encode($payload, $options);
+
+        if (false === $encoded || '' === $encoded) {
+            return null;
+        }
+
+        $temp_path = wp_tempnam('tejlg-theme-export-summary');
+
+        if (empty($temp_path)) {
+            return null;
+        }
+
+        $bytes = file_put_contents($temp_path, $encoded, LOCK_EX);
+
+        if (false === $bytes) {
+            self::delete_temp_file($temp_path);
+
+            return null;
+        }
+
+        $filename = self::generate_summary_filename($job, $payload);
+
+        return [
+            'path'     => $temp_path,
+            'filename' => $filename,
+        ];
+    }
+
+    private static function generate_summary_filename(array $job, array $payload = []) {
+        if (isset($job['summary_file_name']) && is_string($job['summary_file_name']) && '' !== $job['summary_file_name']) {
+            return sanitize_file_name((string) $job['summary_file_name']);
+        }
+
+        $candidate = '';
+        $zip_name  = isset($job['zip_file_name']) ? (string) $job['zip_file_name'] : '';
+
+        if ('' !== $zip_name) {
+            $candidate = preg_replace('/\.zip$/i', '', $zip_name);
+
+            if (is_string($candidate) && '' !== $candidate) {
+                $candidate .= '-summary.json';
+            }
+        }
+
+        if ('' === $candidate) {
+            $job_id = isset($job['id']) ? (string) $job['id'] : '';
+
+            if ('' !== $job_id) {
+                $candidate = sprintf('theme-export-%s-summary.json', sanitize_key($job_id));
+            }
+        }
+
+        if ('' === $candidate && isset($payload['generated_at'])) {
+            $candidate = sprintf('theme-export-summary-%s.json', gmdate('Ymd-His', (int) $payload['generated_at']));
+        }
+
+        if ('' === $candidate) {
+            $candidate = 'theme-export-summary.json';
+        }
+
+        return sanitize_file_name($candidate);
+    }
+
+    private static function persist_export_summary_for_job(array &$job, $target_directory, $base_url) {
+        $result = [
+            'path'     => '',
+            'url'      => '',
+            'filename' => '',
+        ];
+
+        $payload = isset($job['summary_payload']) && is_array($job['summary_payload'])
+            ? $job['summary_payload']
+            : [];
+
+        if (empty($payload)) {
+            return $result;
+        }
+
+        $target_directory = trailingslashit($target_directory);
+        $base_url         = trailingslashit($base_url);
+
+        $temp_path         = isset($job['summary_temp_path']) ? (string) $job['summary_temp_path'] : '';
+        $created_temp_file = false;
+
+        if ('' === $temp_path || !file_exists($temp_path)) {
+            $summary_file = self::create_summary_temp_file($payload, $job);
+
+            if (!is_array($summary_file) || empty($summary_file['path'])) {
+                return $result;
+            }
+
+            $temp_path = (string) $summary_file['path'];
+            $job['summary_temp_path'] = $temp_path;
+            $created_temp_file = true;
+
+            if (!empty($summary_file['filename'])) {
+                $job['summary_file_name'] = (string) $summary_file['filename'];
+            }
+        }
+
+        $filename = self::generate_summary_filename($job, $payload);
+        $filename = sanitize_file_name($filename);
+
+        if ('' === $filename) {
+            $filename = 'theme-export-summary.json';
+        }
+
+        $unique_filename = wp_unique_filename($target_directory, $filename);
+        $destination     = $target_directory . $unique_filename;
+
+        $copied = true;
+
+        if (self::normalize_path($temp_path) !== self::normalize_path($destination)) {
+            $copied = copy($temp_path, $destination);
+        }
+
+        if (!$copied || !file_exists($destination)) {
+            if ($created_temp_file && '' !== $temp_path && file_exists($temp_path)) {
+                self::delete_temp_file($temp_path);
+                unset($job['summary_temp_path']);
+            }
+
+            return $result;
+        }
+
+        $result['path']     = $destination;
+        $result['filename'] = $unique_filename;
+        $result['url']      = $base_url . rawurlencode($unique_filename);
+
+        $job['summary_persistent_path'] = $destination;
+        $job['summary_persistent_url']  = $result['url'];
+        $job['summary_file_name']       = $unique_filename;
+
+        if (self::normalize_path($temp_path) !== self::normalize_path($destination)) {
+            self::delete_temp_file($temp_path);
+            unset($job['summary_temp_path']);
+        }
+
+        return $result;
+    }
+
+    private static function normalize_summary_meta($meta) {
+        $meta = is_array($meta) ? $meta : [];
+
+        $warnings = isset($meta['warnings']) ? (array) $meta['warnings'] : [];
+        $warnings = array_values(
+            array_filter(
+                array_map(
+                    static function ($warning) {
+                        return is_string($warning) ? $warning : ''; 
+                    },
+                    $warnings
+                ),
+                static function ($warning) {
+                    return '' !== $warning;
+                }
+            )
+        );
+
+        return [
+            'included_count' => isset($meta['included_count']) ? max(0, (int) $meta['included_count']) : 0,
+            'excluded_count' => isset($meta['excluded_count']) ? max(0, (int) $meta['excluded_count']) : 0,
+            'warnings'       => $warnings,
+        ];
+    }
+
     private static function collect_theme_export_items($theme_dir_path, $normalized_theme_dir, $zip_root_directory, $exclusions) {
         try {
             $directory_iterator = new RecursiveDirectoryIterator(
@@ -1434,6 +1816,14 @@ class TEJLG_Export {
                 $job['persistent_url'] = $context['download_url'];
             }
 
+            if (isset($context['summary_path']) && is_string($context['summary_path']) && '' !== $context['summary_path']) {
+                $job['summary_persistent_path'] = $context['summary_path'];
+            }
+
+            if (isset($context['summary_url']) && is_string($context['summary_url']) && '' !== $context['summary_url']) {
+                $job['summary_persistent_url'] = $context['summary_url'];
+            }
+
             TEJLG_Export_History::record_job($job, $context);
         }
 
@@ -1445,6 +1835,20 @@ class TEJLG_Export {
 
             if ('' === $normalized_persi || $normalized_zip !== $normalized_persi) {
                 self::delete_temp_file($zip_path);
+            }
+        }
+
+        if (null !== $job && !empty($job['summary_temp_path'])) {
+            $summary_temp = (string) $job['summary_temp_path'];
+
+            if ('' !== $summary_temp && file_exists($summary_temp)) {
+                $persistent_summary = isset($job['summary_persistent_path']) ? (string) $job['summary_persistent_path'] : '';
+                $normalized_temp    = self::normalize_path($summary_temp);
+                $normalized_persist = '' !== $persistent_summary ? self::normalize_path($persistent_summary) : '';
+
+                if ('' === $normalized_persist || $normalized_temp !== $normalized_persist) {
+                    self::delete_temp_file($summary_temp);
+                }
             }
         }
 
@@ -1632,6 +2036,11 @@ class TEJLG_Export {
             self::delete_temp_file($job['zip_path']);
         }
 
+        if (!empty($job['summary_temp_path']) && file_exists((string) $job['summary_temp_path'])) {
+            self::delete_temp_file($job['summary_temp_path']);
+            unset($job['summary_temp_path']);
+        }
+
         self::clear_job_from_queue($job_id);
 
         $job_owner = isset($job['created_by']) ? (int) $job['created_by'] : 0;
@@ -1639,6 +2048,9 @@ class TEJLG_Export {
         if ($job_owner > 0) {
             self::clear_user_job_reference($job_id, $job_owner);
         }
+
+        unset($job['summary_payload']);
+        unset($job['summary_meta']);
 
         self::persist_job($job);
     }
@@ -1680,6 +2092,10 @@ class TEJLG_Export {
         $job['message']           = esc_html__('Export annulé.', 'theme-export-jlg');
         $job['updated_at']        = time();
         $job['completed_at']      = time();
+        $job['summary_payload']   = [];
+        $job['summary_meta']      = [];
+        $job['summary_temp_path'] = '';
+        $job['summary_file_name'] = '';
 
         self::persist_job($job);
 
@@ -1743,6 +2159,8 @@ class TEJLG_Export {
         $job['completed_at']      = time();
         $job['updated_at']        = time();
 
+        self::generate_summary_for_job($job);
+
         self::persist_job($job);
     }
 
@@ -1765,7 +2183,7 @@ class TEJLG_Export {
         $processed_items = isset($job['processed_items']) ? (int) $job['processed_items'] : 0;
         $total_items     = isset($job['total_items']) ? (int) $job['total_items'] : 0;
 
-        return [
+        $response = [
             'id'               => isset($job['id']) ? (string) $job['id'] : '',
             'status'           => isset($job['status']) ? (string) $job['status'] : 'queued',
             'progress'         => $progress,
@@ -1778,6 +2196,24 @@ class TEJLG_Export {
             'updated_at'       => isset($job['updated_at']) ? (int) $job['updated_at'] : 0,
             'failure_code'     => isset($job['failure_code']) ? (string) $job['failure_code'] : '',
         ];
+
+        if (isset($job['summary_meta']) && is_array($job['summary_meta'])) {
+            $response['summary_meta'] = self::normalize_summary_meta($job['summary_meta']);
+        }
+
+        if (isset($job['summary_generated_at'])) {
+            $response['summary_generated_at'] = (int) $job['summary_generated_at'];
+        }
+
+        if (isset($job['summary_file_name']) && is_string($job['summary_file_name'])) {
+            $response['summary_file_name'] = (string) $job['summary_file_name'];
+        }
+
+        if (isset($job['summary_persistent_url']) && is_string($job['summary_persistent_url'])) {
+            $response['summary_persistent_url'] = (string) $job['summary_persistent_url'];
+        }
+
+        return $response;
     }
 
     public static function ajax_start_theme_export() {
@@ -1837,6 +2273,18 @@ class TEJLG_Export {
 
         $job_status = isset($job['status']) ? (string) $job['status'] : '';
 
+        if (isset($job['summary_meta']) && is_array($job['summary_meta'])) {
+            $response['summary_meta'] = self::normalize_summary_meta($job['summary_meta']);
+        }
+
+        if (isset($job['summary_file_name']) && is_string($job['summary_file_name'])) {
+            $response['summary_file_name'] = (string) $job['summary_file_name'];
+        }
+
+        if (isset($job['summary_generated_at'])) {
+            $response['summary_generated_at'] = (int) $job['summary_generated_at'];
+        }
+
         if (isset($job['status']) && 'completed' === $job['status']) {
             $download_nonce = wp_create_nonce('tejlg_download_theme_export_' . $job_id);
             $response['download_url'] = add_query_arg(
@@ -1847,6 +2295,22 @@ class TEJLG_Export {
                 ],
                 admin_url('admin-ajax.php')
             );
+
+            $summary_path = isset($job['summary_temp_path']) ? (string) $job['summary_temp_path'] : '';
+
+            if ('' !== $summary_path && file_exists($summary_path)) {
+                $summary_nonce = wp_create_nonce('tejlg_download_theme_export_summary_' . $job_id);
+                $response['summary_download_url'] = add_query_arg(
+                    [
+                        'action'  => 'tejlg_download_theme_export_summary',
+                        'job_id'  => rawurlencode($job_id),
+                        '_wpnonce' => $summary_nonce,
+                    ],
+                    admin_url('admin-ajax.php')
+                );
+            } elseif (isset($job['summary_persistent_url']) && '' !== $job['summary_persistent_url']) {
+                $response['summary_download_url'] = (string) $job['summary_persistent_url'];
+            }
         }
 
         if (in_array($job_status, ['completed', 'failed', 'cancelled'], true)) {
@@ -1959,7 +2423,86 @@ class TEJLG_Export {
             $delete_context['download_url'] = $persistence['url'];
         }
 
+        if (!empty($persistence['summary_path'])) {
+            $delete_context['summary_path'] = $persistence['summary_path'];
+        }
+
+        if (!empty($persistence['summary_url'])) {
+            $delete_context['summary_url'] = $persistence['summary_url'];
+        }
+
         self::delete_job($job_id, $delete_context);
+        exit;
+    }
+
+    public static function ajax_download_theme_export_summary() {
+        if (!TEJLG_Capabilities::current_user_can('ajax')) {
+            wp_die(esc_html__('Accès refusé.', 'theme-export-jlg')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        }
+
+        $job_id = isset($_REQUEST['job_id']) ? sanitize_key(wp_unslash((string) $_REQUEST['job_id'])) : '';
+
+        if ('' === $job_id) {
+            wp_die(esc_html__('Identifiant de tâche manquant.', 'theme-export-jlg'));
+        }
+
+        check_ajax_referer('tejlg_download_theme_export_summary_' . $job_id);
+
+        $job = self::get_job($job_id);
+
+        if (null === $job || !isset($job['status']) || 'completed' !== $job['status']) {
+            wp_die(esc_html__("Ce résumé n'est pas disponible.", 'theme-export-jlg'));
+        }
+
+        $payload = isset($job['summary_payload']) && is_array($job['summary_payload'])
+            ? $job['summary_payload']
+            : [];
+
+        $summary_path = isset($job['summary_temp_path']) ? (string) $job['summary_temp_path'] : '';
+
+        if ('' === $summary_path || !file_exists($summary_path)) {
+            if (!empty($payload)) {
+                $summary_file = self::create_summary_temp_file($payload, $job);
+
+                if (is_array($summary_file) && !empty($summary_file['path'])) {
+                    $summary_path = (string) $summary_file['path'];
+                    $job['summary_temp_path'] = $summary_path;
+
+                    if (!empty($summary_file['filename'])) {
+                        $job['summary_file_name'] = (string) $summary_file['filename'];
+                    }
+
+                    self::persist_job($job);
+                }
+            }
+        }
+
+        if ('' === $summary_path || !file_exists($summary_path)) {
+            wp_die(esc_html__('Le résumé généré est introuvable.', 'theme-export-jlg'));
+        }
+
+        $filename = isset($job['summary_file_name']) && is_string($job['summary_file_name']) && '' !== $job['summary_file_name']
+            ? (string) $job['summary_file_name']
+            : self::generate_summary_filename($job, $payload);
+
+        if ('' === $filename) {
+            $filename = 'theme-export-summary.json';
+        }
+
+        nocache_headers();
+        self::clear_output_buffers();
+
+        $filesize = filesize($summary_path);
+
+        header('Content-Type: application/json');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        if ($filesize > 0) {
+            header('Content-Length: ' . (string) $filesize);
+        }
+
+        readfile($summary_path);
+        flush();
         exit;
     }
 
@@ -2085,42 +2628,50 @@ class TEJLG_Export {
         $filename = wp_unique_filename($target_directory, $filename);
         $destination = $target_directory . $filename;
 
-        if (self::normalize_path($zip_path) === self::normalize_path($destination)) {
-            return [
-                'path' => $destination,
-                'url'  => trailingslashit($base_url) . 'theme-export-jlg/' . rawurlencode($filename),
-            ];
+        $relative_base_url = trailingslashit($base_url) . 'theme-export-jlg/';
+
+        if (self::normalize_path($zip_path) !== self::normalize_path($destination)) {
+            if (!copy($zip_path, $destination)) {
+                self::report_persist_archive_failure(
+                    'copy_failed',
+                    $job,
+                    [
+                        'source'      => $zip_path,
+                        'destination' => $destination,
+                        'job_id'      => $job_id,
+                    ]
+                );
+
+                return [
+                    'path' => '',
+                    'url'  => '',
+                ];
+            }
+
+            $file_perms = apply_filters('tejlg_export_persisted_file_permissions', 0644, $destination, $job);
+
+            if (is_int($file_perms)) {
+                @chmod($destination, $file_perms); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+            }
         }
 
-        if (!copy($zip_path, $destination)) {
-            self::report_persist_archive_failure(
-                'copy_failed',
-                $job,
-                [
-                    'source'      => $zip_path,
-                    'destination' => $destination,
-                    'job_id'      => $job_id,
-                ]
-            );
-
-            return [
-                'path' => '',
-                'url'  => '',
-            ];
-        }
-
-        $file_perms = apply_filters('tejlg_export_persisted_file_permissions', 0644, $destination, $job);
-
-        if (is_int($file_perms)) {
-            @chmod($destination, $file_perms); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-        }
-
-        $url = trailingslashit($base_url) . 'theme-export-jlg/' . rawurlencode($filename);
-
-        return [
+        $result = [
             'path' => $destination,
-            'url'  => $url,
+            'url'  => $relative_base_url . rawurlencode($filename),
         ];
+
+        $summary_persistence = self::persist_export_summary_for_job($job, $target_directory, $relative_base_url);
+
+        if (!empty($summary_persistence['path'])) {
+            $result['summary_path'] = $summary_persistence['path'];
+            $result['summary_url']  = $summary_persistence['url'];
+
+            if (!empty($summary_persistence['filename'])) {
+                $result['summary_filename'] = $summary_persistence['filename'];
+            }
+        }
+
+        return $result;
     }
 
     /**
