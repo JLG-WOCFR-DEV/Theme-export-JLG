@@ -15,6 +15,17 @@ if (!class_exists('TEJLG_CLI_WPDie_Exception')) {
 class TEJLG_CLI {
 
     public function __invoke($args, $assoc_args) {
+        if (!empty($args)) {
+            $first = array_shift($args);
+            $first = is_string($first) ? strtolower($first) : '';
+
+            if ('schedule' === $first) {
+                $this->dispatch_schedule_subcommand($args, $assoc_args);
+
+                return;
+            }
+        }
+
         WP_CLI::log(__('Commandes disponibles :', 'theme-export-jlg'));
         WP_CLI::log('  wp theme-export-jlg theme [--exclusions=<motifs>] [--output=<chemin>]');
         WP_CLI::log('  wp theme-export-jlg patterns [--portable] [--output=<chemin>]');
@@ -22,8 +33,311 @@ class TEJLG_CLI {
         WP_CLI::log('  wp theme-export-jlg import patterns <chemin_json>');
         WP_CLI::log('  wp theme-export-jlg history [--per-page=<nombre>] [--page=<nombre>] [--result=<statut>] [--origin=<origine>] [--initiator=<identifiant>]');
         WP_CLI::log('  wp theme-export-jlg history report [--window=<jours>] [--result=<statut>] [--origin=<origine>] [--initiator=<identifiant>] [--format=<table|json>] [--limit=<nombre>]');
+        WP_CLI::log('  wp theme-export-jlg schedule set --frequency=<frequence> [--time=<HH:MM>] [--retention=<jours>] [--exclusions=<motifs>]');
+        WP_CLI::log('  wp theme-export-jlg schedule run');
+        WP_CLI::log('  wp theme-export-jlg schedule report [--format=<table|json>]');
         WP_CLI::log('  wp theme-export-jlg settings export [--output=<chemin>]');
         WP_CLI::log('  wp theme-export-jlg settings import <chemin_json>');
+    }
+
+    public function schedule($args, $assoc_args) {
+        $this->dispatch_schedule_subcommand($args, $assoc_args);
+    }
+
+    private function dispatch_schedule_subcommand($args, $assoc_args) {
+        if (empty($args)) {
+            $this->print_schedule_usage();
+
+            return;
+        }
+
+        $subcommand = array_shift($args);
+        $subcommand = is_string($subcommand) ? strtolower($subcommand) : '';
+
+        switch ($subcommand) {
+            case 'set':
+                if (!empty($args)) {
+                    WP_CLI::error(__('Trop d’arguments positionnels pour la commande « schedule set ».', 'theme-export-jlg'));
+                }
+
+                $this->schedule_set($assoc_args);
+                break;
+            case 'run':
+                if (!empty($args)) {
+                    WP_CLI::error(__('Trop d’arguments positionnels pour la commande « schedule run ».', 'theme-export-jlg'));
+                }
+
+                $this->schedule_run($assoc_args);
+                break;
+            case 'report':
+                if (!empty($args)) {
+                    WP_CLI::error(__('Trop d’arguments positionnels pour la commande « schedule report ».', 'theme-export-jlg'));
+                }
+
+                $this->schedule_report($assoc_args);
+                break;
+            default:
+                WP_CLI::error(__('Sous-commande de planification inconnue. Utilisez « set », « run » ou « report ».', 'theme-export-jlg'));
+        }
+    }
+
+    private function print_schedule_usage() {
+        WP_CLI::log(__('Sous-commandes de planification disponibles :', 'theme-export-jlg'));
+        WP_CLI::log('  wp theme-export-jlg schedule set --frequency=<frequence> [--time=<HH:MM>] [--retention=<jours>] [--exclusions=<motifs>]');
+        WP_CLI::log('  wp theme-export-jlg schedule run');
+        WP_CLI::log('  wp theme-export-jlg schedule report [--format=<table|json>]');
+    }
+
+    private function schedule_set($assoc_args) {
+        $current     = TEJLG_Export::get_schedule_settings();
+        $frequencies = TEJLG_Export::get_available_schedule_frequencies();
+        $frequency   = isset($current['frequency']) ? (string) $current['frequency'] : 'disabled';
+        $run_time    = isset($current['run_time']) ? (string) $current['run_time'] : '00:00';
+        $retention   = isset($current['retention_days']) ? (int) $current['retention_days'] : 0;
+        $exclusions  = isset($current['exclusions']) ? (string) $current['exclusions'] : '';
+
+        if (isset($assoc_args['frequency'])) {
+            $raw_frequency = sanitize_key((string) $assoc_args['frequency']);
+
+            if (!in_array($raw_frequency, array_keys($frequencies), true)) {
+                WP_CLI::error(sprintf(__('Fréquence inconnue « %s ».', 'theme-export-jlg'), $assoc_args['frequency']));
+            }
+
+            $frequency = $raw_frequency;
+        }
+
+        if (isset($assoc_args['time'])) {
+            $raw_time = is_string($assoc_args['time']) ? trim((string) $assoc_args['time']) : '';
+
+            if (!preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', $raw_time, $matches)) {
+                WP_CLI::error(__('Le format de l’option --time doit être HH:MM (ex. 22:30).', 'theme-export-jlg'));
+            }
+
+            $run_time = sprintf('%02d:%02d', (int) $matches[1], (int) $matches[2]);
+        }
+
+        if (array_key_exists('retention', $assoc_args)) {
+            $raw_retention = $assoc_args['retention'];
+
+            if ('' === $raw_retention) {
+                $retention = 0;
+            } elseif (!is_numeric($raw_retention)) {
+                WP_CLI::error(__('L’option --retention doit être un nombre de jours positif ou nul.', 'theme-export-jlg'));
+            } else {
+                $retention = (int) $raw_retention;
+
+                if ($retention < 0) {
+                    WP_CLI::error(__('L’option --retention ne peut pas être négative.', 'theme-export-jlg'));
+                }
+            }
+        }
+
+        if (array_key_exists('exclusions', $assoc_args)) {
+            $parsed      = $this->parse_exclusions(['exclusions' => $assoc_args['exclusions']]);
+            $exclusions  = TEJLG_Export::sanitize_exclusion_patterns_string($parsed);
+        }
+
+        $normalized = TEJLG_Export::update_schedule_settings([
+            'frequency'      => $frequency,
+            'run_time'       => $run_time,
+            'retention_days' => $retention,
+            'exclusions'     => $exclusions,
+        ]);
+
+        TEJLG_Export::reschedule_theme_export_event();
+        TEJLG_Export::ensure_cleanup_event_scheduled();
+        TEJLG_Export::cleanup_persisted_archives($normalized['retention_days']);
+
+        $next_run = TEJLG_Export::get_next_scheduled_export_timestamp();
+        $label    = isset($frequencies[$normalized['frequency']]) ? $frequencies[$normalized['frequency']] : $normalized['frequency'];
+        $time     = $normalized['run_time'];
+        $message  = sprintf(
+            __('Planification mise à jour (%1$s à %2$s, rétention %3$d jours).', 'theme-export-jlg'),
+            $label,
+            $time,
+            (int) $normalized['retention_days']
+        );
+
+        WP_CLI::success($message);
+
+        if ('disabled' === $normalized['frequency'] || false === $next_run) {
+            WP_CLI::log(__('Les exports planifiés sont désormais désactivés.', 'theme-export-jlg'));
+        } else {
+            WP_CLI::log(sprintf(
+                __('Prochaine exécution : %s.', 'theme-export-jlg'),
+                $this->format_schedule_timestamp((int) $next_run)
+            ));
+        }
+
+        $patterns = '' !== $normalized['exclusions'] ? preg_split('/[\r\n]+/', $normalized['exclusions']) : [];
+
+        if (is_array($patterns) && !empty($patterns)) {
+            $patterns = array_filter(array_map('trim', $patterns), static function ($pattern) {
+                return '' !== $pattern;
+            });
+        }
+
+        if (!empty($patterns)) {
+            WP_CLI::log(sprintf(__('Exclusions appliquées : %s', 'theme-export-jlg'), implode(', ', $patterns)));
+        } else {
+            WP_CLI::log(__('Aucune exclusion n’est configurée pour les exports planifiés.', 'theme-export-jlg'));
+        }
+    }
+
+    private function schedule_run($assoc_args) { // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable
+        $settings  = TEJLG_Export::get_schedule_settings();
+        $frequency = isset($settings['frequency']) ? (string) $settings['frequency'] : 'disabled';
+
+        if ('disabled' === $frequency) {
+            WP_CLI::warning(__('Les exports planifiés sont désactivés. Utilisez « schedule set --frequency=<valeur> » pour les activer.', 'theme-export-jlg'));
+
+            return;
+        }
+
+        if (!function_exists('wp_next_scheduled') || !function_exists('wp_schedule_event')) {
+            WP_CLI::error(__('Les fonctions de planification WordPress ne sont pas disponibles dans cet environnement.', 'theme-export-jlg'));
+        }
+
+        $existing_event = TEJLG_Export::get_next_scheduled_export_timestamp();
+
+        if (false !== $existing_event) {
+            WP_CLI::log(sprintf(
+                __('Un export est déjà planifié pour %s.', 'theme-export-jlg'),
+                $this->format_schedule_timestamp((int) $existing_event)
+            ));
+        } else {
+            WP_CLI::log(__('Aucun export planifié n’a été trouvé. Une nouvelle planification va être déclenchée.', 'theme-export-jlg'));
+        }
+
+        if (method_exists('TEJLG_Export', 'queue_scheduled_export')) {
+            $result = TEJLG_Export::queue_scheduled_export();
+
+            if (is_wp_error($result)) {
+                WP_CLI::error($this->normalize_cli_message($result->get_error_message()));
+            }
+
+            $job_id = '';
+
+            if (is_string($result)) {
+                $job_id = $result;
+            } elseif (is_array($result) && isset($result['job_id'])) {
+                $job_id = (string) $result['job_id'];
+            }
+
+            if ('' !== $job_id) {
+                WP_CLI::success(sprintf(__('Export planifié mis en file d’attente (tâche %s).', 'theme-export-jlg'), $job_id));
+            } else {
+                WP_CLI::success(__('Export planifié mis en file d’attente.', 'theme-export-jlg'));
+            }
+
+            return;
+        }
+
+        TEJLG_Export::maybe_schedule_theme_export_event();
+
+        $scheduled = TEJLG_Export::get_next_scheduled_export_timestamp();
+
+        if (false === $scheduled) {
+            WP_CLI::warning(__('Impossible de déterminer la prochaine exécution planifiée.', 'theme-export-jlg'));
+
+            return;
+        }
+
+        if (false !== $existing_event && (int) $existing_event === (int) $scheduled) {
+            WP_CLI::success(__('La tâche planifiée existante a été conservée.', 'theme-export-jlg'));
+
+            return;
+        }
+
+        WP_CLI::success(sprintf(
+            __('Export planifié programmé pour %s.', 'theme-export-jlg'),
+            $this->format_schedule_timestamp((int) $scheduled)
+        ));
+    }
+
+    private function schedule_report($assoc_args) {
+        $format = isset($assoc_args['format']) ? strtolower((string) $assoc_args['format']) : 'table';
+        $settings = TEJLG_Export::get_schedule_settings();
+        $next_run = TEJLG_Export::get_next_scheduled_export_timestamp();
+
+        $frequency = isset($settings['frequency']) ? (string) $settings['frequency'] : 'disabled';
+        $frequencies = TEJLG_Export::get_available_schedule_frequencies();
+        $frequency_label = isset($frequencies[$frequency]) ? $frequencies[$frequency] : $frequency;
+        $run_time = isset($settings['run_time']) ? (string) $settings['run_time'] : '';
+        $retention = isset($settings['retention_days']) ? (int) $settings['retention_days'] : 0;
+
+        $raw_exclusions = isset($settings['exclusions']) ? (string) $settings['exclusions'] : '';
+        $exclusions_list = '' !== $raw_exclusions ? preg_split('/[\r\n]+/', $raw_exclusions) : [];
+
+        if (!is_array($exclusions_list)) {
+            $exclusions_list = [];
+        }
+
+        $exclusions_list = array_values(array_filter(array_map('trim', $exclusions_list), static function ($pattern) {
+            return '' !== $pattern;
+        }));
+
+        $report = [
+            'frequency'          => $frequency,
+            'frequency_label'    => $frequency_label,
+            'run_time'           => $run_time,
+            'retention_days'     => $retention,
+            'exclusions'         => $exclusions_list,
+            'next_run_timestamp' => false !== $next_run ? (int) $next_run : null,
+            'next_run_label'     => false !== $next_run
+                ? $this->format_schedule_timestamp((int) $next_run)
+                : __('Aucune exécution planifiée', 'theme-export-jlg'),
+        ];
+
+        if ('json' === $format) {
+            WP_CLI::print_value($report, ['format' => 'json']);
+
+            return;
+        }
+
+        WP_CLI::log(__('Statut de la planification des exports :', 'theme-export-jlg'));
+        WP_CLI::log(sprintf(__('Fréquence : %s', 'theme-export-jlg'), $report['frequency_label']));
+
+        if ('disabled' === $frequency) {
+            WP_CLI::log(__('Les exports planifiés sont actuellement désactivés.', 'theme-export-jlg'));
+
+            return;
+        }
+
+        WP_CLI::log(sprintf(__('Heure cible : %s', 'theme-export-jlg'), $report['run_time']));
+        WP_CLI::log(sprintf(__('Rétention : %d jours', 'theme-export-jlg'), $report['retention_days']));
+
+        if (!empty($exclusions_list)) {
+            WP_CLI::log(sprintf(__('Exclusions : %s', 'theme-export-jlg'), implode(', ', $exclusions_list)));
+        } else {
+            WP_CLI::log(__('Exclusions : aucune', 'theme-export-jlg'));
+        }
+
+        if (false !== $next_run) {
+            WP_CLI::log(sprintf(__('Prochaine exécution : %s', 'theme-export-jlg'), $report['next_run_label']));
+        } else {
+            WP_CLI::log(__('Aucune exécution n’est programmée actuellement.', 'theme-export-jlg'));
+        }
+    }
+
+    private function format_schedule_timestamp($timestamp) {
+        if (!is_int($timestamp) || $timestamp <= 0) {
+            return __('indisponible', 'theme-export-jlg');
+        }
+
+        $date_format = get_option('date_format', 'Y-m-d');
+        $time_format = get_option('time_format', 'H:i');
+        $datetime    = trim($date_format . ' ' . $time_format);
+
+        if (function_exists('wp_date')) {
+            return wp_date($datetime, $timestamp);
+        }
+
+        if (function_exists('date_i18n')) {
+            return date_i18n($datetime, $timestamp);
+        }
+
+        return date($datetime, $timestamp);
     }
 
     public function theme($args, $assoc_args) {
