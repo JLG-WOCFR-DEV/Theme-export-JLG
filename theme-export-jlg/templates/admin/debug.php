@@ -6,6 +6,7 @@
 /** @var string $mbstring_status */
 /** @var string $cron_status */
 ?>
+<div id="tejlg-section-debug" class="tejlg-section-anchor" tabindex="-1"></div>
 <div class="tejlg-card components-card is-elevated">
     <div class="components-card__body">
         <form method="post" action="" class="metrics-settings-form" novalidate>

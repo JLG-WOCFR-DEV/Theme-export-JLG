@@ -98,6 +98,10 @@ $history_export_links = isset($history_export_links) && is_array($history_export
 $history_stats = is_array($history_stats) ? $history_stats : [];
 $notification_settings = is_array($notification_settings) ? $notification_settings : [];
 
+?>
+<div id="tejlg-section-export" class="tejlg-section-anchor" tabindex="-1"></div>
+<?php
+
 $history_export_capable = !empty($history_export_capable);
 $history_export_nonce = isset($history_export_nonce) ? (string) $history_export_nonce : '';
 $history_export_formats = isset($history_export_formats) && is_array($history_export_formats)
