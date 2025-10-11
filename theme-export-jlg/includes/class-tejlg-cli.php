@@ -235,6 +235,28 @@ class TEJLG_CLI {
                 $line .= ' | ' . sprintf(__('Téléchargement : %s', 'theme-export-jlg'), $download_url);
             }
 
+            $summary_url = isset($entry['summary_url']) ? (string) $entry['summary_url'] : '';
+
+            if ('' !== $summary_url) {
+                $summary_meta = isset($entry['summary_meta']) ? (array) $entry['summary_meta'] : [];
+                $summary_meta = TEJLG_Export_History::sanitize_summary_meta($summary_meta);
+
+                $summary_parts = [$summary_url];
+                $counts_label  = $this->format_summary_counts_label($summary_meta);
+
+                if ('' !== $counts_label) {
+                    $summary_parts[] = $counts_label;
+                }
+
+                $warnings_label = $this->format_summary_warnings_label($summary_meta['warnings']);
+
+                if ('' !== $warnings_label) {
+                    $summary_parts[] = $warnings_label;
+                }
+
+                $line .= ' | ' . sprintf(__('Résumé : %s', 'theme-export-jlg'), implode(' — ', $summary_parts));
+            }
+
             WP_CLI::log($line);
         }
     }
@@ -405,7 +427,11 @@ class TEJLG_CLI {
                 $user_label .= ' (' . implode(' · ', $user_parts) . ')';
             }
 
-            WP_CLI::log(sprintf(
+            $summary_url = isset($entry['summary_url']) ? (string) $entry['summary_url'] : '';
+            $summary_meta = isset($entry['summary_meta']) ? (array) $entry['summary_meta'] : [];
+            $summary_meta = TEJLG_Export_History::sanitize_summary_meta($summary_meta);
+
+            $line = sprintf(
                 '[%1$s] %2$s | %3$s | %4$s | %5$s | %6$s',
                 $job_id,
                 $date_label,
@@ -413,8 +439,71 @@ class TEJLG_CLI {
                 $size_label,
                 $duration_label,
                 $user_label
-            ));
+            );
+
+            if ('' !== $summary_url) {
+                $summary_parts = [$summary_url];
+                $counts_label  = $this->format_summary_counts_label($summary_meta);
+
+                if ('' !== $counts_label) {
+                    $summary_parts[] = $counts_label;
+                }
+
+                $warnings_label = $this->format_summary_warnings_label($summary_meta['warnings']);
+
+                if ('' !== $warnings_label) {
+                    $summary_parts[] = $warnings_label;
+                }
+
+                $line .= ' | ' . sprintf(__('Résumé : %s', 'theme-export-jlg'), implode(' — ', $summary_parts));
+            }
+
+            WP_CLI::log($line);
         }
+    }
+
+    private function format_summary_counts_label(array $summary_meta) {
+        $included = isset($summary_meta['included_count']) ? (int) $summary_meta['included_count'] : 0;
+        $excluded = isset($summary_meta['excluded_count']) ? (int) $summary_meta['excluded_count'] : 0;
+
+        $included_label = sprintf(
+            _n('%d fichier inclus', '%d fichiers inclus', $included, 'theme-export-jlg'),
+            $included
+        );
+
+        $excluded_label = sprintf(
+            _n('%d fichier exclu', '%d fichiers exclus', $excluded, 'theme-export-jlg'),
+            $excluded
+        );
+
+        return trim($included_label . ' · ' . $excluded_label, ' ·');
+    }
+
+    private function format_summary_warnings_label(array $warnings) {
+        if (empty($warnings)) {
+            return '';
+        }
+
+        $clean = array_filter(
+            array_map(
+                static function ($warning) {
+                    $warning = is_string($warning) ? $warning : (string) $warning;
+                    $warning = trim($warning);
+
+                    return $warning;
+                },
+                $warnings
+            ),
+            static function ($warning) {
+                return '' !== $warning;
+            }
+        );
+
+        if (empty($clean)) {
+            return '';
+        }
+
+        return sprintf(__('Avertissements : %s', 'theme-export-jlg'), implode(', ', $clean));
     }
 
     private function get_history_result_label($result) {

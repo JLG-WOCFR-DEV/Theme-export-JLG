@@ -187,6 +187,9 @@ $latest_export_exclusions = __('Aucun motif', 'theme-export-jlg');
 $current_exclusion_summary = __('Aucun motif', 'theme-export-jlg');
 $current_exclusion_count = 0;
 $latest_export_download_url = '';
+$latest_export_summary_url = '';
+$latest_export_summary_counts = '';
+$latest_export_summary_warnings = '';
 $latest_export_status_label_text = __('Aucun export', 'theme-export-jlg');
 $latest_export_status_variant = 'info';
 
@@ -240,6 +243,19 @@ if (is_array($latest_export)) {
         $latest_export_download_url = esc_url($latest_export['persistent_url']);
     } elseif (isset($latest_export['download_url']) && is_string($latest_export['download_url'])) {
         $latest_export_download_url = esc_url($latest_export['download_url']);
+    }
+
+    if (isset($latest_export['summary_url']) && is_string($latest_export['summary_url']) && '' !== $latest_export['summary_url']) {
+        $latest_export_summary_url = esc_url($latest_export['summary_url']);
+    }
+
+    $latest_summary_labels = $format_summary_labels(isset($latest_export['summary_meta']) ? $latest_export['summary_meta'] : []);
+    $latest_export_summary_counts = isset($latest_summary_labels['counts']) ? (string) $latest_summary_labels['counts'] : '';
+    $latest_export_summary_warnings = isset($latest_summary_labels['warnings']) ? (string) $latest_summary_labels['warnings'] : '';
+
+    if ('' === $latest_export_summary_url) {
+        $latest_export_summary_counts   = '';
+        $latest_export_summary_warnings = '';
     }
 }
 
@@ -505,6 +521,48 @@ $history_summary_inline = sprintf(
     $history_total_all_label
 );
 
+$normalize_summary_meta = static function ($meta) {
+    if (!is_array($meta)) {
+        $meta = [];
+    }
+
+    return TEJLG_Export_History::sanitize_summary_meta($meta);
+};
+
+$format_summary_labels = static function ($meta) use ($normalize_summary_meta) {
+    $normalized = $normalize_summary_meta($meta);
+    $included   = isset($normalized['included_count']) ? (int) $normalized['included_count'] : 0;
+    $excluded   = isset($normalized['excluded_count']) ? (int) $normalized['excluded_count'] : 0;
+
+    $included_label = sprintf(
+        _n('%d fichier inclus', '%d fichiers inclus', $included, 'theme-export-jlg'),
+        $included
+    );
+
+    $excluded_label = sprintf(
+        _n('%d fichier exclu', '%d fichiers exclus', $excluded, 'theme-export-jlg'),
+        $excluded
+    );
+
+    $counts_label = trim($included_label . ' · ' . $excluded_label, ' ·');
+
+    $warnings       = isset($normalized['warnings']) ? (array) $normalized['warnings'] : [];
+    $warnings_label = '';
+
+    if (!empty($warnings)) {
+        $warnings_label = sprintf(
+            __('Avertissements : %s', 'theme-export-jlg'),
+            implode(' · ', $warnings)
+        );
+    }
+
+    return [
+        'meta'     => $normalized,
+        'counts'   => $counts_label,
+        'warnings' => $warnings_label,
+    ];
+};
+
 $history_section_open = $history_filters_active;
 
 if ($is_simple_mode) {
@@ -750,9 +808,20 @@ $quality_benchmarks = [
                 );
                 ?>
             </span>
+            <?php if ('' !== $latest_export_summary_counts) : ?>
+                <span class="tejlg-export-banner__meta"><?php echo esc_html($latest_export_summary_counts); ?></span>
+            <?php endif; ?>
+            <?php if ('' !== $latest_export_summary_warnings) : ?>
+                <span class="tejlg-export-banner__meta tejlg-export-banner__meta--warning"><?php echo esc_html($latest_export_summary_warnings); ?></span>
+            <?php endif; ?>
             <?php if ('' !== $latest_export_download_url) : ?>
                 <a class="tejlg-export-banner__link" href="<?php echo esc_url($latest_export_download_url); ?>" target="_blank" rel="noopener noreferrer">
                     <?php esc_html_e('Télécharger la dernière archive', 'theme-export-jlg'); ?>
+                </a>
+            <?php endif; ?>
+            <?php if ('' !== $latest_export_summary_url) : ?>
+                <a class="tejlg-export-banner__link" href="<?php echo esc_url($latest_export_summary_url); ?>" target="_blank" rel="noopener noreferrer">
+                    <?php esc_html_e('Télécharger le résumé JSON', 'theme-export-jlg'); ?>
                 </a>
             <?php endif; ?>
         </div>
@@ -1770,6 +1839,15 @@ $quality_benchmarks = [
                                     : __('Aucune', 'theme-export-jlg');
 
                                 $download_url = isset($entry['persistent_url']) ? esc_url($entry['persistent_url']) : '';
+                                $summary_url = isset($entry['summary_url']) ? esc_url($entry['summary_url']) : '';
+                                $summary_labels = $format_summary_labels(isset($entry['summary_meta']) ? $entry['summary_meta'] : []);
+                                $summary_counts_label = isset($summary_labels['counts']) ? (string) $summary_labels['counts'] : '';
+                                $summary_warnings_label = isset($summary_labels['warnings']) ? (string) $summary_labels['warnings'] : '';
+
+                                if ('' === $summary_url) {
+                                    $summary_counts_label   = '';
+                                    $summary_warnings_label = '';
+                                }
 
                                 $origin_key = isset($entry['origin']) ? (string) $entry['origin'] : '';
                                 $origin_label = isset($history_origin_labels[$origin_key])
@@ -1814,8 +1892,23 @@ $quality_benchmarks = [
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <?php if ('' !== $download_url) : ?>
-                                            <a href="<?php echo esc_url($download_url); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Télécharger', 'theme-export-jlg'); ?></a>
+                                        <?php if ('' !== $download_url || '' !== $summary_url) : ?>
+                                            <div class="tejlg-history-actions">
+                                                <?php if ('' !== $download_url) : ?>
+                                                    <p><a href="<?php echo esc_url($download_url); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Télécharger', 'theme-export-jlg'); ?></a></p>
+                                                <?php endif; ?>
+                                                <?php if ('' !== $summary_url) : ?>
+                                                    <p>
+                                                        <a href="<?php echo esc_url($summary_url); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Télécharger le résumé JSON', 'theme-export-jlg'); ?></a>
+                                                        <?php if ('' !== $summary_counts_label) : ?>
+                                                            <span class="tejlg-history-summary__meta"><?php echo esc_html($summary_counts_label); ?></span>
+                                                        <?php endif; ?>
+                                                        <?php if ('' !== $summary_warnings_label) : ?>
+                                                            <span class="tejlg-history-summary__meta tejlg-history-summary__meta--warning"><?php echo esc_html($summary_warnings_label); ?></span>
+                                                        <?php endif; ?>
+                                                    </p>
+                                                <?php endif; ?>
+                                            </div>
                                         <?php else : ?>
                                             <span aria-hidden="true">—</span>
                                         <?php endif; ?>

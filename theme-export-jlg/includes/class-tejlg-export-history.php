@@ -647,7 +647,14 @@ class TEJLG_Export_History {
         return $entry;
     }
 
-    private static function sanitize_summary_meta($meta) {
+    /**
+     * Normalize summary metadata stored alongside an export entry.
+     *
+     * @param mixed $meta Raw summary metadata.
+     *
+     * @return array{included_count:int,excluded_count:int,warnings:array<int,string>} Normalized metadata.
+     */
+    public static function sanitize_summary_meta($meta) {
         $meta = is_array($meta) ? $meta : [];
 
         $warnings = isset($meta['warnings']) ? (array) $meta['warnings'] : [];
