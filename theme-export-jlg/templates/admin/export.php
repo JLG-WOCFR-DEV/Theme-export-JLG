@@ -1087,6 +1087,8 @@ $quality_benchmarks = [
     </div>
 </section>
 
+<?php include __DIR__ . '/quick-actions.php'; ?>
+
 <div class="tejlg-accessibility-tools" role="region" aria-labelledby="tejlg-accessibility-tools-title">
     <div class="tejlg-contrast-toggle">
         <span id="tejlg-accessibility-tools-title" class="tejlg-accessibility-tools__title"><?php esc_html_e('Lisibilité', 'theme-export-jlg'); ?></span>

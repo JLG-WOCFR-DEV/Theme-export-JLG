@@ -33,6 +33,8 @@
         </form>
     </div>
 </div>
+
+<?php include __DIR__ . '/quick-actions.php'; ?>
 <div class="tejlg-card components-card is-elevated">
     <div class="components-card__body">
         <form method="post" action="" class="debug-report-download-form">

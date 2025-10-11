@@ -23,6 +23,13 @@ class TEJLG_Admin {
 
     private const COMPACT_MODE_META_KEY = 'tejlg_admin_compact_mode';
 
+    /**
+     * Cached quick actions configuration shared across admin tabs.
+     *
+     * @var array<int,array<string,mixed>>|null
+     */
+    private $quick_actions;
+
     public function __construct() {
         $this->template_dir = TEJLG_PATH . 'templates/admin/';
 
@@ -308,6 +315,19 @@ class TEJLG_Admin {
             'debug'  => '#tejlg-section-debug',
         ];
 
+        $quick_actions = $this->prepare_quick_actions($active_tab);
+        $shared_context = [
+            'quick_actions' => $quick_actions,
+            'quick_actions_settings' => [
+                'current_tab' => $active_tab,
+                'page_slug'   => $this->page_slug,
+            ],
+        ];
+
+        $this->export_page->set_shared_context($shared_context);
+        $this->import_page->set_shared_context($shared_context);
+        $this->debug_page->set_shared_context($shared_context);
+
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
@@ -445,6 +465,213 @@ class TEJLG_Admin {
             ?>
         </div>
         <?php
+    }
+
+    /**
+     * Prepare the list of quick actions displayed in the floating radial menu.
+     *
+     * @param string $active_tab
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    private function prepare_quick_actions($active_tab) {
+        if (null !== $this->quick_actions) {
+            return $this->quick_actions;
+        }
+
+        $export_tab_url = add_query_arg([
+            'page' => $this->page_slug,
+            'tab'  => 'export',
+        ], admin_url('admin.php'));
+
+        $actions = [
+            [
+                'id'         => 'export-now',
+                'label'      => __('Exporter maintenant', 'theme-export-jlg'),
+                'url'        => $export_tab_url . '#tejlg-theme-export-form',
+                'aria_label' => __('Aller au formulaire principal d’export.', 'theme-export-jlg'),
+            ],
+        ];
+
+        $history_snapshot = TEJLG_Export_History::get_entries([
+            'per_page' => 1,
+            'paged'    => 1,
+            'orderby'  => 'timestamp',
+            'order'    => 'desc',
+        ]);
+
+        $latest_entry = null;
+
+        if (
+            isset($history_snapshot['entries'][0])
+            && is_array($history_snapshot['entries'][0])
+        ) {
+            $latest_entry = $history_snapshot['entries'][0];
+        }
+
+        $latest_archive_url = '';
+        $latest_archive_context = [
+            'timestamp'   => 0,
+            'size_bytes'  => 0,
+            'result'      => '',
+            'download_url'=> '',
+        ];
+
+        if ($latest_entry) {
+            if (!empty($latest_entry['persistent_url']) && is_string($latest_entry['persistent_url'])) {
+                $latest_archive_url = $latest_entry['persistent_url'];
+            } elseif (!empty($latest_entry['download_url']) && is_string($latest_entry['download_url'])) {
+                $latest_archive_url = $latest_entry['download_url'];
+            }
+
+            $latest_archive_context['timestamp'] = isset($latest_entry['timestamp'])
+                ? (int) $latest_entry['timestamp']
+                : 0;
+            $latest_archive_context['size_bytes'] = isset($latest_entry['zip_file_size'])
+                ? (int) $latest_entry['zip_file_size']
+                : 0;
+            $latest_archive_context['result'] = isset($latest_entry['result'])
+                ? sanitize_key((string) $latest_entry['result'])
+                : '';
+            $latest_archive_context['download_url'] = $latest_archive_url;
+        }
+
+        if ('' !== $latest_archive_url) {
+            $date_format = get_option('date_format', 'Y-m-d');
+            $time_format = get_option('time_format', 'H:i');
+            $datetime_label = '';
+
+            if ($latest_archive_context['timestamp'] > 0) {
+                if (function_exists('wp_date')) {
+                    $datetime_label = wp_date($date_format . ' ' . $time_format, $latest_archive_context['timestamp']);
+                } else {
+                    $datetime_label = date_i18n($date_format . ' ' . $time_format, $latest_archive_context['timestamp']);
+                }
+            }
+
+            $size_label = '';
+
+            if ($latest_archive_context['size_bytes'] > 0) {
+                $size_label = size_format($latest_archive_context['size_bytes'], 2);
+            }
+
+            if ('' !== $datetime_label || '' !== $size_label) {
+                $latest_archive_context['description'] = '' !== $datetime_label && '' !== $size_label
+                    ? sprintf(__('Généré le %1$s · %2$s', 'theme-export-jlg'), $datetime_label, $size_label)
+                    : ('' !== $datetime_label
+                        ? sprintf(__('Généré le %s', 'theme-export-jlg'), $datetime_label)
+                        : sprintf(__('Taille : %s', 'theme-export-jlg'), $size_label));
+            } else {
+                $latest_archive_context['description'] = '';
+            }
+
+            $actions[] = [
+                'id'          => 'latest-archive',
+                'label'       => __('Dernière archive', 'theme-export-jlg'),
+                'url'         => $latest_archive_url,
+                'target'      => '_blank',
+                'rel'         => 'noopener noreferrer',
+                'description' => isset($latest_archive_context['description']) ? $latest_archive_context['description'] : '',
+                'aria_label'  => isset($latest_archive_context['description']) && '' !== $latest_archive_context['description']
+                    ? sprintf(__('Télécharger la dernière archive (%s)', 'theme-export-jlg'), $latest_archive_context['description'])
+                    : __('Télécharger la dernière archive générée.', 'theme-export-jlg'),
+            ];
+        }
+
+        $debug_tab_url = add_query_arg([
+            'page' => $this->page_slug,
+            'tab'  => 'debug',
+        ], admin_url('admin.php'));
+
+        $actions[] = [
+            'id'         => 'debug-report',
+            'label'      => __('Rapport de débogage', 'theme-export-jlg'),
+            'url'        => $debug_tab_url . '#tejlg-section-debug',
+            'aria_label' => __('Ouvrir les outils de diagnostic et télécharger le rapport.', 'theme-export-jlg'),
+        ];
+
+        $import_tab_url = add_query_arg([
+            'page' => $this->page_slug,
+            'tab'  => 'import',
+        ], admin_url('admin.php'));
+
+        $actions[] = [
+            'id'         => 'open-import',
+            'label'      => __('Ouvrir l’onglet Import', 'theme-export-jlg'),
+            'url'        => $import_tab_url . '#tejlg-section-import',
+            'aria_label' => __('Aller directement aux formulaires d’import.', 'theme-export-jlg'),
+        ];
+
+        $filter_context = [
+            'current_tab'   => $active_tab,
+            'page_slug'     => $this->page_slug,
+            'latest_export' => $latest_entry,
+            'latest_context'=> $latest_archive_context,
+        ];
+
+        /**
+         * Allows third-party extensions to adjust the floating quick actions.
+         *
+         * @param array<int,array<string,mixed>> $actions
+         * @param array<string,mixed>            $context
+         */
+        $actions = apply_filters('tejlg_quick_actions', $actions, $filter_context);
+
+        if (!is_array($actions)) {
+            $this->quick_actions = [];
+
+            return $this->quick_actions;
+        }
+
+        $normalized = [];
+
+        foreach ($actions as $index => $action) {
+            if (!is_array($action)) {
+                continue;
+            }
+
+            $label = isset($action['label']) ? (string) $action['label'] : '';
+            $label = trim($label);
+
+            if ('' === $label) {
+                continue;
+            }
+
+            $type = isset($action['type']) ? (string) $action['type'] : 'link';
+            $type = in_array($type, ['link', 'button'], true) ? $type : 'link';
+
+            if ('link' === $type) {
+                $url = isset($action['url']) ? (string) $action['url'] : '';
+
+                if ('' === trim($url)) {
+                    continue;
+                }
+            }
+
+            $id = isset($action['id']) ? sanitize_key((string) $action['id']) : '';
+
+            if ('' === $id) {
+                $id = 'quick-action-' . $index;
+            }
+
+            $normalized[] = [
+                'id'          => $id,
+                'type'        => $type,
+                'label'       => $label,
+                'url'         => isset($action['url']) ? (string) $action['url'] : '',
+                'target'      => isset($action['target']) ? (string) $action['target'] : '',
+                'rel'         => isset($action['rel']) ? (string) $action['rel'] : '',
+                'description' => isset($action['description']) ? (string) $action['description'] : '',
+                'aria_label'  => isset($action['aria_label']) ? (string) $action['aria_label'] : '',
+                'attributes'  => isset($action['attributes']) && is_array($action['attributes'])
+                    ? $action['attributes']
+                    : [],
+            ];
+        }
+
+        $this->quick_actions = $normalized;
+
+        return $this->quick_actions;
     }
 
     private function get_accessible_tabs() {
