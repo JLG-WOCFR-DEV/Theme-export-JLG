@@ -150,6 +150,8 @@ class TEJLG_Admin {
                             'failed'          => esc_html__("Échec de l'export : %1$s", 'theme-export-jlg'),
                             'failedWithId'    => esc_html__("Échec de l'export (ID %2$s) : %1$s", 'theme-export-jlg'),
                             'downloadLabel'   => esc_html__("Télécharger l'archive ZIP", 'theme-export-jlg'),
+                            'summaryLabel'    => esc_html__('Télécharger le résumé JSON', 'theme-export-jlg'),
+                            'summaryHint'     => esc_html__('%1$d fichier(s) inclus · %2$d exclu(s)', 'theme-export-jlg'),
                             'unknownError'    => esc_html__('Une erreur inattendue est survenue.', 'theme-export-jlg'),
                             'statusLabel'     => esc_html__('Statut de la tâche : %1$s', 'theme-export-jlg'),
                             'cancelled'       => esc_html__('Export annulé.', 'theme-export-jlg'),

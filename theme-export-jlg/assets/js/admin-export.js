@@ -337,6 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const messageEl = exportForm.querySelector('[data-export-message]');
             const progressBar = exportForm.querySelector('[data-export-progress-bar]');
             const downloadLink = exportForm.querySelector('[data-export-download]');
+            const summaryLink = exportForm.querySelector('[data-export-summary]');
             const cancelButton = exportForm.querySelector('[data-export-cancel]');
             const spinner = exportForm.querySelector('[data-export-spinner]');
             const strings = typeof exportAsync.strings === 'object' ? exportAsync.strings : {};
@@ -623,6 +624,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     failureCode: failureCode,
                     updatedAt: updatedAt,
                     downloadUrl: typeof normalizedExtra.downloadUrl === 'string' ? normalizedExtra.downloadUrl : '',
+                    summaryUrl: typeof normalizedExtra.summaryUrl === 'string' ? normalizedExtra.summaryUrl : '',
+                    summaryMeta: (normalizedExtra.summaryMeta && typeof normalizedExtra.summaryMeta === 'object')
+                        ? normalizedExtra.summaryMeta
+                        : null,
+                    summaryFileName: typeof normalizedExtra.summaryFileName === 'string'
+                        ? normalizedExtra.summaryFileName
+                        : '',
                 };
 
                 writeStoredJobSnapshot(snapshot);
@@ -893,10 +901,44 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                jobHintState.defaultMessage = jobMetaLabels.supportHint || jobHintState.defaultMessage || '';
+                let summaryHint = '';
 
-                if (jobHintState.defaultMessage) {
-                    setJobHint(jobHintState.defaultMessage, 0);
+                const metaForSummary = (normalizedExtra.summaryMeta && typeof normalizedExtra.summaryMeta === 'object')
+                    ? normalizedExtra.summaryMeta
+                    : (normalizedJob && typeof normalizedJob.summary_meta === 'object'
+                        ? normalizedJob.summary_meta
+                        : null);
+
+                if (metaForSummary) {
+                    const includedCount = typeof metaForSummary.included_count === 'number'
+                        ? metaForSummary.included_count
+                        : 0;
+                    const excludedCount = typeof metaForSummary.excluded_count === 'number'
+                        ? metaForSummary.excluded_count
+                        : 0;
+                    if (strings.summaryHint) {
+                        summaryHint = formatString(strings.summaryHint, {
+                            '1': includedCount,
+                            '2': excludedCount,
+                        });
+                    } else {
+                        summaryHint = includedCount + ' / ' + excludedCount;
+                    }
+
+                    if (Array.isArray(metaForSummary.warnings) && metaForSummary.warnings.length) {
+                        summaryHint += ' — ' + metaForSummary.warnings.join(' · ');
+                    }
+                }
+
+                const supportHint = jobMetaLabels.supportHint || '';
+                const combinedHint = summaryHint && supportHint
+                    ? summaryHint + ' — ' + supportHint
+                    : (summaryHint || supportHint);
+
+                jobHintState.defaultMessage = combinedHint || '';
+
+                if (combinedHint) {
+                    setJobHint(combinedHint, 0);
                 } else {
                     setJobHint('', 0);
                 }
@@ -1304,6 +1346,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
 
+            const clearSummaryLink = function() {
+                if (!summaryLink) {
+                    return;
+                }
+
+                summaryLink.hidden = true;
+                summaryLink.removeAttribute('href');
+                summaryLink.removeAttribute('download');
+            };
+
             const resetFeedback = function() {
                 if (!feedback) {
                     return;
@@ -1331,6 +1383,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     downloadLink.hidden = true;
                     downloadLink.removeAttribute('href');
                 }
+
+                clearSummaryLink();
 
                 if (cancelButton) {
                     cancelButton.hidden = true;
@@ -1465,6 +1519,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         downloadLink.href = extraData.downloadUrl;
                         downloadLink.textContent = strings.downloadLabel || downloadLink.textContent;
                     }
+
+                    if (summaryLink && typeof extraData.summaryUrl === 'string' && extraData.summaryUrl.length) {
+                        summaryLink.hidden = false;
+                        summaryLink.href = extraData.summaryUrl;
+                        summaryLink.textContent = strings.summaryLabel || summaryLink.textContent;
+                        if (typeof extraData.summaryFileName === 'string' && extraData.summaryFileName.length) {
+                            summaryLink.setAttribute('download', extraData.summaryFileName);
+                        } else {
+                            summaryLink.removeAttribute('download');
+                        }
+                    } else {
+                        clearSummaryLink();
+                    }
                 } else if (job.status === 'failed') {
                     feedback.classList.add('notice-error');
 
@@ -1531,6 +1598,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     downloadLink.removeAttribute('href');
                 }
 
+                if (summaryLink && job.status !== 'completed') {
+                    clearSummaryLink();
+                }
+
                 if (cancelButton) {
                     if (shouldShowCancel && currentJobId) {
                         cancelButton.hidden = false;
@@ -1543,6 +1614,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const metadata = {
                     downloadUrl: typeof extraData.downloadUrl === 'string' ? extraData.downloadUrl : '',
+                    summaryUrl: typeof extraData.summaryUrl === 'string' ? extraData.summaryUrl : '',
+                    summaryMeta: (extraData.summaryMeta && typeof extraData.summaryMeta === 'object')
+                        ? extraData.summaryMeta
+                        : null,
+                    summaryFileName: typeof extraData.summaryFileName === 'string' ? extraData.summaryFileName : '',
                     status: normalizedStatus,
                     failureCode: failureCode,
                     message: finalMessage,
@@ -1612,6 +1688,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     downloadLink.hidden = true;
                     downloadLink.removeAttribute('href');
                 }
+
+                clearSummaryLink();
+
                 const metadata = {
                     status: 'failed',
                     failureCode: lastKnownJob && typeof lastKnownJob.failure_code === 'string' ? lastKnownJob.failure_code : '',
@@ -1672,6 +1751,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     const job = payload.data.job;
                     const extra = {
                         downloadUrl: payload.data.download_url || '',
+                        summaryUrl: payload.data.summary_download_url || payload.data.summary_url || '',
+                        summaryMeta: (payload.data.summary_meta && typeof payload.data.summary_meta === 'object')
+                            ? payload.data.summary_meta
+                            : null,
+                        summaryFileName: typeof payload.data.summary_file_name === 'string'
+                            ? payload.data.summary_file_name
+                            : '',
                         jobId: jobId,
                     };
                     updateFeedback(job, extra);
@@ -1788,7 +1874,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 resetBackoffTracking();
 
                 if (job) {
-                    updateFeedback(job, { downloadUrl: '', jobId: persistedJobId });
+                    updateFeedback(job, {
+                        downloadUrl: snapshot.downloadUrl || '',
+                        summaryUrl: snapshot.summaryUrl || (job.summary_persistent_url || ''),
+                        summaryMeta: snapshot.summaryMeta || (job.summary_meta || null),
+                        summaryFileName: snapshot.summaryFileName || (job.summary_file_name || ''),
+                        jobId: persistedJobId,
+                    });
                     lastJobSignature = computeJobSignature(job);
                 }
 
@@ -1807,6 +1899,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         status: normalizedStatus,
                         message: '',
                         updatedAt: Math.round(Date.now() / 1000),
+                        downloadUrl: typeof snapshot.downloadUrl === 'string' ? snapshot.downloadUrl : '',
+                        summaryUrl: typeof snapshot.summaryUrl === 'string' ? snapshot.summaryUrl : '',
+                        summaryMeta: (snapshot.summaryMeta && typeof snapshot.summaryMeta === 'object')
+                            ? snapshot.summaryMeta
+                            : null,
+                        summaryFileName: typeof snapshot.summaryFileName === 'string'
+                            ? snapshot.summaryFileName
+                            : '',
                     };
                     updateJobMetaDisplay(persistedJobId, null, metadata);
                     persistJobSnapshot(persistedJobId, null, metadata);
@@ -2040,6 +2140,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         downloadLink.hidden = true;
                         downloadLink.removeAttribute('href');
                     }
+
+                    clearSummaryLink();
 
                     const formData = new FormData();
                     formData.append('action', exportAsync.actions.cancel);

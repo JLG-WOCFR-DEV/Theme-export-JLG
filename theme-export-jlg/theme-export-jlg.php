@@ -80,6 +80,7 @@ function tejlg_deactivate_plugin() {
 add_action('wp_ajax_tejlg_start_theme_export', ['TEJLG_Export', 'ajax_start_theme_export']);
 add_action('wp_ajax_tejlg_theme_export_status', ['TEJLG_Export', 'ajax_get_theme_export_status']);
 add_action('wp_ajax_tejlg_download_theme_export', ['TEJLG_Export', 'ajax_download_theme_export']);
+add_action('wp_ajax_tejlg_download_theme_export_summary', ['TEJLG_Export', 'ajax_download_theme_export_summary']);
 add_action('wp_ajax_tejlg_cancel_theme_export', ['TEJLG_Export', 'ajax_cancel_theme_export']);
 add_action('wp_ajax_tejlg_preview_exclusion_patterns', ['TEJLG_Admin_Export_Page', 'ajax_preview_exclusion_patterns']);
 add_action('admin_init', ['TEJLG_Export', 'cleanup_stale_jobs']);

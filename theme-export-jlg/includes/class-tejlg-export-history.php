@@ -555,6 +555,16 @@ class TEJLG_Export_History {
             $entry['persistent_url'] = $context['download_url'];
         }
 
+        if (!empty($job['summary_meta']) && is_array($job['summary_meta'])) {
+            $entry['summary_meta'] = self::sanitize_summary_meta($job['summary_meta']);
+        }
+
+        if (isset($context['summary_url']) && is_string($context['summary_url'])) {
+            $entry['summary_url'] = $context['summary_url'];
+        } elseif (isset($job['summary_persistent_url']) && is_string($job['summary_persistent_url'])) {
+            $entry['summary_url'] = $job['summary_persistent_url'];
+        }
+
         $entry = apply_filters('tejlg_export_history_entry', $entry, $job, $context);
 
         return self::normalize_entry($entry);
@@ -614,6 +624,14 @@ class TEJLG_Export_History {
             $entry['persistent_url'] = esc_url_raw($entry['persistent_url']);
         }
 
+        if (isset($entry['summary_meta']) && is_array($entry['summary_meta'])) {
+            $entry['summary_meta'] = self::sanitize_summary_meta($entry['summary_meta']);
+        }
+
+        if (isset($entry['summary_url']) && is_string($entry['summary_url'])) {
+            $entry['summary_url'] = esc_url_raw($entry['summary_url']);
+        }
+
         if (isset($entry['status_message']) && is_string($entry['status_message'])) {
             $entry['status_message'] = sanitize_textarea_field($entry['status_message']);
         } else {
@@ -627,6 +645,33 @@ class TEJLG_Export_History {
         }
 
         return $entry;
+    }
+
+    /**
+     * Normalize summary metadata stored alongside an export entry.
+     *
+     * @param mixed $meta Raw summary metadata.
+     *
+     * @return array{included_count:int,excluded_count:int,warnings:array<int,string>} Normalized metadata.
+     */
+    public static function sanitize_summary_meta($meta) {
+        $meta = is_array($meta) ? $meta : [];
+
+        $warnings = isset($meta['warnings']) ? (array) $meta['warnings'] : [];
+        $warnings = array_values(
+            array_filter(
+                array_map('sanitize_text_field', $warnings),
+                static function ($warning) {
+                    return '' !== $warning;
+                }
+            )
+        );
+
+        return [
+            'included_count' => isset($meta['included_count']) ? max(0, (int) $meta['included_count']) : 0,
+            'excluded_count' => isset($meta['excluded_count']) ? max(0, (int) $meta['excluded_count']) : 0,
+            'warnings'       => $warnings,
+        ];
     }
 
     private static function get_raw_entries() {

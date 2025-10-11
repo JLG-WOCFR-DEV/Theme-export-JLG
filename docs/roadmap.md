@@ -6,12 +6,12 @@ Cette feuille de route décline les axes identifiés dans le `readme.md` en lots
 - **Statut (nov. 2024)** : ✅ livré côté persistance et UI. Les entrées conservent désormais durée, taille, origine, initiateur et URL persistante, avec filtres CLI/UI. Le rapport agrégé (`wp theme-export-jlg history report`) expose les statistiques clés et le nouveau hook `tejlg_export_history_report_ready` fournit un payload normalisé pour alimenter webhooks et alertes personnalisées.【F:theme-export-jlg/includes/class-tejlg-export-history.php†L6-L340】【F:theme-export-jlg/includes/class-tejlg-cli.php†L44-L285】【F:theme-export-jlg/includes/class-tejlg-export-notifications.php†L7-L205】 Reste à partager des recettes clé-en-main (Slack, e-mail enrichi) bâties sur ces extensions.
 - **Objectif produit** : transformer l’historique en source de vérité pour préparer les futures notifications et tableaux de bord.
 - **Actions techniques à poursuivre** :
-  - Publier des exemples d’intégration (Slack, e-mail enrichi, webhook générique) exploitant `tejlg_export_history_report_ready`.
+  - ✅ Publier des exemples d’intégration (Slack, e-mail enrichi, webhook générique) exploitant `tejlg_export_history_report_ready` — voir [`docs/history-report-integrations.md`](./history-report-integrations.md).
   - Documenter un modèle de rapport hebdomadaire (JSON + CSV) à partir des données retournées par `generate_report()`.
 - **Livrables** :
   - ✅ Guide de personnalisation des notifications (filtres, formats d’e-mail, webhooks) illustré par des snippets concrets — voir [`docs/notifications-guide.md`](./notifications-guide.md).
   - ✅ Export JSON/CSV du journal depuis l’interface avec documentation dédiée — voir [`docs/audit-log-export.md`](./audit-log-export.md).
-  - Exemple de rapport hebdomadaire généré à partir des métadonnées existantes.
+  - ✅ Exemple de rapport hebdomadaire généré à partir des métadonnées existantes.
 - **Indicateurs de succès** :
   - Les intégrateurs peuvent brancher un webhook en moins de 10 minutes grâce à la documentation.
   - Les exports en erreur déclenchent systématiquement une notification contextualisée.
