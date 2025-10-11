@@ -262,6 +262,58 @@ class Test_Export_Theme extends WP_UnitTestCase {
         TEJLG_Export_History::clear_history();
     }
 
+    public function test_run_scheduled_theme_export_records_summary_url_in_history() {
+        TEJLG_Export_History::clear_history();
+
+        $original_settings = TEJLG_Export::get_schedule_settings();
+        $modified_settings = $original_settings;
+        $modified_settings['frequency'] = 'daily';
+
+        TEJLG_Export::update_schedule_settings($modified_settings);
+
+        $sent_emails = [];
+        $mail_filter = static function ($args) use (&$sent_emails) {
+            $sent_emails[] = $args;
+
+            return $args;
+        };
+
+        add_filter('wp_mail', $mail_filter, 10, 1);
+
+        try {
+            TEJLG_Export::run_scheduled_theme_export();
+
+            $history = TEJLG_Export_History::get_entries(['per_page' => 1]);
+
+            $this->assertNotEmpty($history['entries'], 'A successful scheduled export should be recorded in the history.');
+
+            $entry = $history['entries'][0];
+
+            $this->assertSame('completed', $entry['status'], 'The recorded entry should indicate a successful export.');
+            $this->assertArrayHasKey('summary_url', $entry, 'The history entry should expose the persisted summary URL.');
+            $this->assertNotEmpty($entry['summary_url'], 'The persisted summary URL should not be empty.');
+
+            if (!empty($entry['job_id'])) {
+                $this->assertNull(
+                    TEJLG_Export::get_job($entry['job_id']),
+                    'Completed scheduled jobs should be removed after persistence.'
+                );
+            }
+        } finally {
+            remove_filter('wp_mail', $mail_filter, 10);
+
+            $uploads    = wp_upload_dir();
+            $export_dir = isset($uploads['basedir']) ? trailingslashit((string) $uploads['basedir']) . 'theme-export-jlg' : '';
+
+            if ('' !== $export_dir && is_dir($export_dir)) {
+                $this->remove_theme_directory($export_dir);
+            }
+
+            TEJLG_Export::update_schedule_settings($original_settings);
+            TEJLG_Export_History::clear_history();
+        }
+    }
+
     public function test_export_theme_includes_parent_theme_files() {
         $theme_root     = trailingslashit(get_theme_root());
         $parent_slug    = sanitize_title('tejlg-parent-' . wp_generate_password(6, false));
