@@ -4,6 +4,7 @@ require_once TEJLG_PATH . 'includes/class-tejlg-admin-page.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin-export-page.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin-import-page.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin-debug-page.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-admin-profiles-page.php';
 
 class TEJLG_Admin {
     /**
@@ -18,6 +19,7 @@ class TEJLG_Admin {
     private $export_page;
     private $import_page;
     private $debug_page;
+    private $profiles_page;
 
     private $template_dir;
 
@@ -26,15 +28,18 @@ class TEJLG_Admin {
     public function __construct() {
         $this->template_dir = TEJLG_PATH . 'templates/admin/';
 
-        $this->export_page = new TEJLG_Admin_Export_Page($this->template_dir, $this->page_slug);
-        $this->import_page = new TEJLG_Admin_Import_Page($this->template_dir, $this->page_slug);
-        $this->debug_page  = new TEJLG_Admin_Debug_Page($this->template_dir, $this->page_slug);
+        $this->export_page   = new TEJLG_Admin_Export_Page($this->template_dir, $this->page_slug);
+        $this->import_page   = new TEJLG_Admin_Import_Page($this->template_dir, $this->page_slug);
+        $this->debug_page    = new TEJLG_Admin_Debug_Page($this->template_dir, $this->page_slug);
+        $this->profiles_page = new TEJLG_Admin_Profiles_Page($this->template_dir, $this->page_slug);
 
         add_action('admin_menu', [ $this, 'add_menu_page' ]);
         add_action('admin_enqueue_scripts', [ $this, 'enqueue_assets' ]);
         add_action('admin_init', [ $this, 'handle_form_requests' ]);
         add_action('wp_ajax_tejlg_toggle_compact_mode', [ $this, 'handle_toggle_compact_mode' ]);
         add_filter('admin_body_class', [ $this, 'filter_admin_body_class' ]);
+        add_action('admin_post_tejlg_profiles_export', [ $this, 'handle_profiles_export_action' ]);
+        add_action('admin_post_tejlg_profiles_import', [ $this, 'handle_profiles_import_action' ]);
     }
 
     public function add_menu_page() {
@@ -284,6 +289,10 @@ class TEJLG_Admin {
         if (TEJLG_Capabilities::current_user_can('imports')) {
             $this->import_page->handle_request();
         }
+
+        if (TEJLG_Capabilities::current_user_can('settings')) {
+            $this->profiles_page->handle_request();
+        }
     }
 
     public function render_admin_page() {
@@ -303,9 +312,10 @@ class TEJLG_Admin {
         $active_tab    = isset($tabs[$requested_tab]) ? $requested_tab : key($tabs);
 
         $summary_targets = [
-            'export' => '#tejlg-section-export',
-            'import' => '#tejlg-section-import',
-            'debug'  => '#tejlg-section-debug',
+            'export'   => '#tejlg-section-export',
+            'import'   => '#tejlg-section-import',
+            'profiles' => '#tejlg-section-profiles',
+            'debug'    => '#tejlg-section-debug',
         ];
 
         ?>
@@ -459,6 +469,11 @@ class TEJLG_Admin {
                 'cap'      => 'imports',
                 'callback' => [ $this->import_page, 'render' ],
             ],
+            'profiles' => [
+                'label'    => __('Profils', 'theme-export-jlg'),
+                'cap'      => 'settings',
+                'callback' => [ $this->profiles_page, 'render' ],
+            ],
             'migration_guide' => [
                 'label'    => __('Guide de Migration', 'theme-export-jlg'),
                 'cap'      => 'menu',
@@ -489,6 +504,98 @@ class TEJLG_Admin {
         }
 
         return $accessible;
+    }
+
+    public function handle_profiles_export_action() {
+        if (!TEJLG_Capabilities::current_user_can('settings')) {
+            wp_die(
+                esc_html__("Vous n'avez pas les autorisations nécessaires pour exporter un profil.", 'theme-export-jlg'),
+                esc_html__('Accès refusé', 'theme-export-jlg'),
+                [
+                    'response' => 403,
+                ]
+            );
+        }
+
+        check_admin_referer('tejlg_profiles_export_action', 'tejlg_profiles_export_nonce');
+
+        $result = $this->profiles_page->handle_request();
+
+        if (is_wp_error($result) || !is_array($result) || !isset($result['type']) || 'export' !== $result['type']) {
+            if (!is_wp_error($result)) {
+                add_settings_error(
+                    'tejlg_profiles_messages',
+                    'profiles_export_unexpected',
+                    esc_html__("Erreur : l'export du profil n'a pas pu être initialisé.", 'theme-export-jlg'),
+                    'error'
+                );
+            }
+
+            $this->persist_profiles_messages();
+            $this->redirect_to_profiles_tab('false');
+        }
+
+        $filename = isset($result['filename']) ? (string) $result['filename'] : 'theme-export-profiles.json';
+        $payload  = isset($result['json']) ? (string) $result['json'] : '';
+
+        if (function_exists('nocache_headers')) {
+            nocache_headers();
+        }
+
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('X-Content-Type-Options: nosniff');
+
+        echo $payload;
+        exit;
+    }
+
+    public function handle_profiles_import_action() {
+        if (!TEJLG_Capabilities::current_user_can('settings')) {
+            wp_die(
+                esc_html__("Vous n'avez pas les autorisations nécessaires pour importer un profil.", 'theme-export-jlg'),
+                esc_html__('Accès refusé', 'theme-export-jlg'),
+                [
+                    'response' => 403,
+                ]
+            );
+        }
+
+        check_admin_referer('tejlg_profiles_import_action', 'tejlg_profiles_import_nonce');
+
+        $result = $this->profiles_page->handle_request();
+
+        $this->persist_profiles_messages();
+
+        $status = 'false';
+
+        if (is_array($result) && isset($result['status']) && 'success' === $result['status']) {
+            $status = 'true';
+        }
+
+        $this->redirect_to_profiles_tab($status);
+    }
+
+    private function persist_profiles_messages() {
+        $errors = get_settings_errors('tejlg_profiles_messages');
+        set_transient('settings_errors', $errors, 30);
+    }
+
+    private function redirect_to_profiles_tab($updated) {
+        $redirect_url = add_query_arg(
+            [
+                'page'             => $this->page_slug,
+                'tab'              => 'profiles',
+                'settings-updated' => $updated,
+            ],
+            admin_url('admin.php')
+        );
+
+        $fallback_url = admin_url('admin.php?page=' . $this->page_slug . '&tab=profiles');
+        $redirect_url = wp_validate_redirect($redirect_url, $fallback_url);
+
+        wp_safe_redirect($redirect_url);
+        exit;
     }
 
     public function filter_admin_body_class($classes) {
