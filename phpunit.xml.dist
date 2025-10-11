@@ -5,6 +5,7 @@
             <file>tests/test-export-process.php</file>
             <file>tests/test-export-sanitization.php</file>
             <file>tests/test-export-persist-archive.php</file>
+            <file>tests/test-export-notifications.php</file>
         </testsuite>
     </testsuites>
 </phpunit>

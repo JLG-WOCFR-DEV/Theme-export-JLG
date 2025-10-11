@@ -588,17 +588,32 @@ class TEJLG_Export {
          */
         $recipient = apply_filters('tejlg_scheduled_export_notification_recipient', $recipient, $type, $context);
 
-        if (!is_string($recipient)) {
+        if (false === $recipient) {
             return false;
         }
 
-        $recipient = trim($recipient);
+        $emails = [];
 
-        if ('' === $recipient || !is_email($recipient)) {
+        if (is_array($recipient)) {
+            foreach ($recipient as $chunk) {
+                if (!is_scalar($chunk)) {
+                    continue;
+                }
+
+                $emails = array_merge($emails, TEJLG_Export_Notifications::sanitize_recipient_list((string) $chunk));
+            }
+        } else {
+            $candidate = is_string($recipient) ? $recipient : '';
+            $emails    = TEJLG_Export_Notifications::sanitize_recipient_list($candidate);
+        }
+
+        if (empty($emails)) {
             return false;
         }
 
-        return $recipient;
+        $emails = array_values(array_unique($emails));
+
+        return implode(', ', $emails);
     }
 
     /**
