@@ -98,6 +98,48 @@ $history_export_links = isset($history_export_links) && is_array($history_export
 $history_stats = is_array($history_stats) ? $history_stats : [];
 $notification_settings = is_array($notification_settings) ? $notification_settings : [];
 
+$normalize_summary_meta = static function ($meta) {
+    if (!is_array($meta)) {
+        $meta = [];
+    }
+
+    return TEJLG_Export_History::sanitize_summary_meta($meta);
+};
+
+$format_summary_labels = static function ($meta) use ($normalize_summary_meta) {
+    $normalized = $normalize_summary_meta($meta);
+    $included   = isset($normalized['included_count']) ? (int) $normalized['included_count'] : 0;
+    $excluded   = isset($normalized['excluded_count']) ? (int) $normalized['excluded_count'] : 0;
+
+    $included_label = sprintf(
+        _n('%d fichier inclus', '%d fichiers inclus', $included, 'theme-export-jlg'),
+        $included
+    );
+
+    $excluded_label = sprintf(
+        _n('%d fichier exclu', '%d fichiers exclus', $excluded, 'theme-export-jlg'),
+        $excluded
+    );
+
+    $counts_label = trim($included_label . ' · ' . $excluded_label, ' ·');
+
+    $warnings       = isset($normalized['warnings']) ? (array) $normalized['warnings'] : [];
+    $warnings_label = '';
+
+    if (!empty($warnings)) {
+        $warnings_label = sprintf(
+            __('Avertissements : %s', 'theme-export-jlg'),
+            implode(' · ', $warnings)
+        );
+    }
+
+    return [
+        'meta'     => $normalized,
+        'counts'   => $counts_label,
+        'warnings' => $warnings_label,
+    ];
+};
+
 $history_export_capable = !empty($history_export_capable);
 $history_export_nonce = isset($history_export_nonce) ? (string) $history_export_nonce : '';
 $history_export_formats = isset($history_export_formats) && is_array($history_export_formats)
@@ -520,48 +562,6 @@ $history_summary_inline = sprintf(
     $history_total_filtered_label,
     $history_total_all_label
 );
-
-$normalize_summary_meta = static function ($meta) {
-    if (!is_array($meta)) {
-        $meta = [];
-    }
-
-    return TEJLG_Export_History::sanitize_summary_meta($meta);
-};
-
-$format_summary_labels = static function ($meta) use ($normalize_summary_meta) {
-    $normalized = $normalize_summary_meta($meta);
-    $included   = isset($normalized['included_count']) ? (int) $normalized['included_count'] : 0;
-    $excluded   = isset($normalized['excluded_count']) ? (int) $normalized['excluded_count'] : 0;
-
-    $included_label = sprintf(
-        _n('%d fichier inclus', '%d fichiers inclus', $included, 'theme-export-jlg'),
-        $included
-    );
-
-    $excluded_label = sprintf(
-        _n('%d fichier exclu', '%d fichiers exclus', $excluded, 'theme-export-jlg'),
-        $excluded
-    );
-
-    $counts_label = trim($included_label . ' · ' . $excluded_label, ' ·');
-
-    $warnings       = isset($normalized['warnings']) ? (array) $normalized['warnings'] : [];
-    $warnings_label = '';
-
-    if (!empty($warnings)) {
-        $warnings_label = sprintf(
-            __('Avertissements : %s', 'theme-export-jlg'),
-            implode(' · ', $warnings)
-        );
-    }
-
-    return [
-        'meta'     => $normalized,
-        'counts'   => $counts_label,
-        'warnings' => $warnings_label,
-    ];
-};
 
 $history_section_open = $history_filters_active;
 
