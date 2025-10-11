@@ -11,6 +11,34 @@ class TEJLG_Export_Notifications {
      */
     public static function init() {
         add_action('tejlg_export_history_recorded', [__CLASS__, 'maybe_dispatch_history_notification'], 10, 3);
+        add_filter('tejlg_scheduled_export_notification_recipient', [__CLASS__, 'filter_scheduled_notification_recipient'], 10, 3);
+    }
+
+    /**
+     * Filters scheduled export recipients based on the saved notification settings.
+     *
+     * @param string|false $recipient Default recipient provided by the caller.
+     * @param string       $type      Notification type (success|error).
+     * @param array        $context   Notification context.
+     *
+     * @return string|false
+     */
+    public static function filter_scheduled_notification_recipient($recipient, $type, $context) {
+        if (!is_array($context)) {
+            $context = [];
+        }
+
+        $scheduled_recipient = self::get_scheduled_recipients($type, $context);
+
+        if (false === $scheduled_recipient) {
+            return false;
+        }
+
+        if (is_string($scheduled_recipient) && '' !== $scheduled_recipient) {
+            return $scheduled_recipient;
+        }
+
+        return $recipient;
     }
 
     /**
@@ -26,6 +54,54 @@ class TEJLG_Export_Notifications {
         }
 
         return self::normalize_settings($stored);
+    }
+
+    /**
+     * Returns sanitized scheduled export recipients for a notification type.
+     *
+     * @param string $type
+     * @param array  $context
+     *
+     * @return string|false
+     */
+    public static function get_scheduled_recipients($type, array $context) {
+        unset($context); // Unused but reserved for filters/hooks in the future.
+
+        $type = sanitize_key((string) $type);
+
+        $map = [
+            'success' => TEJLG_Export_History::RESULT_SUCCESS,
+            'error'   => TEJLG_Export_History::RESULT_ERROR,
+        ];
+
+        if (!isset($map[$type])) {
+            return false;
+        }
+
+        $settings = self::get_settings();
+
+        if (empty($settings['enabled_results']) || !is_array($settings['enabled_results'])) {
+            return false;
+        }
+
+        if (!in_array($map[$type], $settings['enabled_results'], true)) {
+            return false;
+        }
+
+        $raw_recipients = isset($settings['recipients']) ? (string) $settings['recipients'] : '';
+        $emails         = self::sanitize_recipient_list($raw_recipients);
+
+        if (empty($emails)) {
+            $admin_email = get_option('admin_email');
+            $fallback    = is_string($admin_email) ? $admin_email : '';
+            $emails      = self::sanitize_recipient_list($fallback);
+        }
+
+        if (empty($emails)) {
+            return false;
+        }
+
+        return implode(', ', $emails);
     }
 
     /**
