@@ -72,7 +72,13 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
     }
 
     private function handle_history_download_request() {
-        if (!isset($_GET[self::HISTORY_DOWNLOAD_REQUEST_FLAG])) {
+        $request = isset($_GET) && is_array($_GET) ? $_GET : [];
+
+        if (function_exists('wp_unslash')) {
+            $request = wp_unslash($request);
+        }
+
+        if (!isset($request[self::HISTORY_DOWNLOAD_REQUEST_FLAG])) {
             return false;
         }
 
@@ -88,8 +94,8 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         check_admin_referer(self::HISTORY_DOWNLOAD_NONCE_ACTION, self::HISTORY_DOWNLOAD_NONCE_FIELD);
 
-        $format = isset($_GET[self::HISTORY_DOWNLOAD_FORMAT_PARAM])
-            ? sanitize_key((string) $_GET[self::HISTORY_DOWNLOAD_FORMAT_PARAM])
+        $format = isset($request[self::HISTORY_DOWNLOAD_FORMAT_PARAM])
+            ? sanitize_key((string) $request[self::HISTORY_DOWNLOAD_FORMAT_PARAM])
             : 'json';
         $format = in_array($format, ['json', 'csv'], true) ? $format : 'json';
 
@@ -105,8 +111,8 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
         $limit = $default_limit;
 
-        if (isset($_GET[self::HISTORY_DOWNLOAD_LIMIT_PARAM]) && '' !== $_GET[self::HISTORY_DOWNLOAD_LIMIT_PARAM]) {
-            $raw_limit = $_GET[self::HISTORY_DOWNLOAD_LIMIT_PARAM];
+        if (isset($request[self::HISTORY_DOWNLOAD_LIMIT_PARAM]) && '' !== $request[self::HISTORY_DOWNLOAD_LIMIT_PARAM]) {
+            $raw_limit = $request[self::HISTORY_DOWNLOAD_LIMIT_PARAM];
 
             if (is_numeric($raw_limit)) {
                 $limit = (int) $raw_limit;
@@ -119,34 +125,34 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             $limit = $max_limit;
         }
 
-        $result_filter = isset($_GET[self::HISTORY_DOWNLOAD_RESULT_PARAM])
-            ? sanitize_key((string) $_GET[self::HISTORY_DOWNLOAD_RESULT_PARAM])
+        $result_filter = isset($request[self::HISTORY_DOWNLOAD_RESULT_PARAM])
+            ? sanitize_key((string) $request[self::HISTORY_DOWNLOAD_RESULT_PARAM])
             : '';
-        $origin_filter = isset($_GET[self::HISTORY_DOWNLOAD_ORIGIN_PARAM])
-            ? sanitize_key((string) $_GET[self::HISTORY_DOWNLOAD_ORIGIN_PARAM])
+        $origin_filter = isset($request[self::HISTORY_DOWNLOAD_ORIGIN_PARAM])
+            ? sanitize_key((string) $request[self::HISTORY_DOWNLOAD_ORIGIN_PARAM])
             : '';
-        $initiator_filter = isset($_GET[self::HISTORY_DOWNLOAD_INITIATOR_PARAM])
-            ? sanitize_text_field((string) $_GET[self::HISTORY_DOWNLOAD_INITIATOR_PARAM])
+        $initiator_filter = isset($request[self::HISTORY_DOWNLOAD_INITIATOR_PARAM])
+            ? sanitize_text_field((string) $request[self::HISTORY_DOWNLOAD_INITIATOR_PARAM])
             : '';
 
-        $orderby = isset($_GET[self::HISTORY_DOWNLOAD_ORDERBY_PARAM])
-            ? sanitize_key((string) $_GET[self::HISTORY_DOWNLOAD_ORDERBY_PARAM])
+        $orderby = isset($request[self::HISTORY_DOWNLOAD_ORDERBY_PARAM])
+            ? sanitize_key((string) $request[self::HISTORY_DOWNLOAD_ORDERBY_PARAM])
             : 'timestamp';
         $allowed_history_orderby = ['timestamp', 'duration', 'zip_file_size'];
         if (!in_array($orderby, $allowed_history_orderby, true)) {
             $orderby = 'timestamp';
         }
 
-        $order = isset($_GET[self::HISTORY_DOWNLOAD_ORDER_PARAM])
-            ? strtolower((string) $_GET[self::HISTORY_DOWNLOAD_ORDER_PARAM])
+        $order = isset($request[self::HISTORY_DOWNLOAD_ORDER_PARAM])
+            ? strtolower((string) $request[self::HISTORY_DOWNLOAD_ORDER_PARAM])
             : 'desc';
         $order = 'asc' === $order ? 'asc' : 'desc';
 
-        $raw_start = isset($_GET[self::HISTORY_DOWNLOAD_START_PARAM])
-            ? sanitize_text_field((string) $_GET[self::HISTORY_DOWNLOAD_START_PARAM])
+        $raw_start = isset($request[self::HISTORY_DOWNLOAD_START_PARAM])
+            ? sanitize_text_field((string) $request[self::HISTORY_DOWNLOAD_START_PARAM])
             : '';
-        $raw_end = isset($_GET[self::HISTORY_DOWNLOAD_END_PARAM])
-            ? sanitize_text_field((string) $_GET[self::HISTORY_DOWNLOAD_END_PARAM])
+        $raw_end = isset($request[self::HISTORY_DOWNLOAD_END_PARAM])
+            ? sanitize_text_field((string) $request[self::HISTORY_DOWNLOAD_END_PARAM])
             : '';
 
         $start_timestamp = $this->parse_history_date_input($raw_start, false);
@@ -190,8 +196,8 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $suffix   = gmdate('Ymd-His', $generated_at);
         $filename = sprintf('theme-export-history-%s.%s', $suffix, $format);
 
-        if (isset($_GET[self::HISTORY_DOWNLOAD_FILENAME_PARAM])) {
-            $requested_filename = (string) $_GET[self::HISTORY_DOWNLOAD_FILENAME_PARAM];
+        if (isset($request[self::HISTORY_DOWNLOAD_FILENAME_PARAM])) {
+            $requested_filename = (string) $request[self::HISTORY_DOWNLOAD_FILENAME_PARAM];
 
             if ('' !== $requested_filename) {
                 if (function_exists('sanitize_file_name')) {
