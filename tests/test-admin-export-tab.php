@@ -1,12 +1,38 @@
 <?php
 
-use RuntimeException;
+if (!defined('TEJLG_PATH')) {
+    define('TEJLG_PATH', dirname(__DIR__) . '/theme-export-jlg/');
+}
 
-require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin.php';
-require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export.php';
-require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-import.php';
-require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-admin-debug-page.php';
-require_once dirname(__DIR__) . '/theme-export-jlg/includes/class-tejlg-export-notifications.php';
+if (!defined('TEJLG_URL')) {
+    define('TEJLG_URL', 'https://example.com/wp-content/plugins/theme-export-jlg/');
+}
+
+if (!defined('TEJLG_VERSION')) {
+    define('TEJLG_VERSION', 'test');
+}
+
+require_once TEJLG_PATH . 'includes/class-tejlg-capabilities.php';
+
+if (!class_exists('TEJLG_Admin')) {
+    require_once TEJLG_PATH . 'includes/class-tejlg-admin.php';
+}
+
+if (!class_exists('TEJLG_Export')) {
+    require_once TEJLG_PATH . 'includes/class-tejlg-export.php';
+}
+
+if (!class_exists('TEJLG_Import')) {
+    require_once TEJLG_PATH . 'includes/class-tejlg-import.php';
+}
+
+if (!class_exists('TEJLG_Admin_Debug_Page')) {
+    require_once TEJLG_PATH . 'includes/class-tejlg-admin-debug-page.php';
+}
+
+if (!class_exists('TEJLG_Export_Notifications')) {
+    require_once TEJLG_PATH . 'includes/class-tejlg-export-notifications.php';
+}
 
 /**
  * @group admin
@@ -52,6 +78,85 @@ class Test_Admin_Export_Tab extends WP_UnitTestCase {
             $output,
             'Pattern selection page should not be rendered when action is invalid.'
         );
+    }
+
+    public function test_history_download_request_streams_json_payload() {
+        $template_dir = dirname(__DIR__) . '/theme-export-jlg/templates/admin/';
+        $export_page  = new TEJLG_Admin_Export_Page($template_dir, 'theme-export-jlg');
+
+        TEJLG_Export_History::clear_history();
+
+        $previous_caps     = isset($GLOBALS['current_user_caps']) ? $GLOBALS['current_user_caps'] : [];
+        $previous_request  = isset($_REQUEST) && is_array($_REQUEST) ? $_REQUEST : [];
+        $previous_get      = $_GET;
+
+        $GLOBALS['current_user_caps'] = [TEJLG_Capabilities::MANAGE_EXPORTS];
+
+        $job_context = [
+            'origin'     => 'web',
+            'user_id'    => 1,
+            'user_name'  => 'Admin',
+            'user_login' => 'admin',
+        ];
+
+        $job = [
+            'id'             => 'download-job',
+            'status'         => 'completed',
+            'zip_file_name'  => 'theme-export.zip',
+            'zip_file_size'  => 2048,
+            'completed_at'   => time(),
+            'created_by'     => 1,
+            'created_by_name'=> 'Admin',
+        ];
+
+        TEJLG_Export_History::record_job($job, $job_context);
+
+        $nonce = wp_create_nonce(TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_NONCE_ACTION);
+
+        $_GET[TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_REQUEST_FLAG] = '1';
+        $_GET[TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_NONCE_FIELD]  = $nonce;
+        $_GET[TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_FORMAT_PARAM] = 'json';
+        $_GET[TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_LIMIT_PARAM]  = '1';
+
+        $_REQUEST = array_merge($previous_request, $_GET);
+
+        $method = new ReflectionMethod(TEJLG_Admin_Export_Page::class, 'handle_history_download_request');
+        $method->setAccessible(true);
+
+        ob_start();
+        $handled = $method->invoke($export_page);
+        $output  = ob_get_clean();
+
+        $this->assertTrue($handled, 'Download handler should report success for valid requests.');
+        $this->assertNotSame('', $output, 'Handler should stream a response payload.');
+
+        $payload = json_decode($output, true);
+
+        $this->assertIsArray($payload, 'Streamed payload should be valid JSON.');
+        $this->assertSame('theme-export-history/v1', $payload['format']);
+        $this->assertArrayHasKey('entries', $payload);
+        $this->assertCount(1, $payload['entries'], 'History export should honour the requested limit.');
+
+        unset(
+            $_GET[TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_REQUEST_FLAG],
+            $_GET[TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_NONCE_FIELD],
+            $_GET[TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_FORMAT_PARAM],
+            $_GET[TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_LIMIT_PARAM]
+        );
+
+        foreach ([
+            TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_REQUEST_FLAG,
+            TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_NONCE_FIELD,
+            TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_FORMAT_PARAM,
+            TEJLG_Admin_Export_Page::HISTORY_DOWNLOAD_LIMIT_PARAM,
+        ] as $key) {
+            unset($_REQUEST[$key]);
+        }
+
+        $_GET = $previous_get;
+        $_REQUEST = $previous_request;
+        $GLOBALS['current_user_caps'] = $previous_caps;
+        TEJLG_Export_History::clear_history();
     }
 
     public function test_export_progress_has_accessible_label() {

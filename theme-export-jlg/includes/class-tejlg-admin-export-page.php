@@ -20,6 +20,21 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
     const EXCLUSION_PATTERNS_OPTION = 'tejlg_export_exclusion_patterns';
     const PORTABLE_MODE_OPTION      = 'tejlg_export_portable_mode';
     const HISTORY_EXPORT_DEFAULT_LIMIT = 200;
+    const HISTORY_EXPORT_MAX_LIMIT = 5000;
+
+    const HISTORY_DOWNLOAD_REQUEST_FLAG   = 'tejlg_history_download';
+    const HISTORY_DOWNLOAD_NONCE_ACTION   = 'tejlg_history_download';
+    const HISTORY_DOWNLOAD_NONCE_FIELD    = 'tejlg_history_download_nonce';
+    const HISTORY_DOWNLOAD_FORMAT_PARAM   = 'history_download_format';
+    const HISTORY_DOWNLOAD_LIMIT_PARAM    = 'history_download_limit';
+    const HISTORY_DOWNLOAD_START_PARAM    = 'history_download_start';
+    const HISTORY_DOWNLOAD_END_PARAM      = 'history_download_end';
+    const HISTORY_DOWNLOAD_RESULT_PARAM   = 'history_download_result';
+    const HISTORY_DOWNLOAD_ORIGIN_PARAM   = 'history_download_origin';
+    const HISTORY_DOWNLOAD_INITIATOR_PARAM = 'history_download_initiator';
+    const HISTORY_DOWNLOAD_ORDERBY_PARAM  = 'history_download_orderby';
+    const HISTORY_DOWNLOAD_ORDER_PARAM    = 'history_download_order';
+    const HISTORY_DOWNLOAD_FILENAME_PARAM = 'history_download_filename';
 
     private $page_slug;
 
@@ -54,6 +69,169 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         $this->handle_global_styles_export_request();
         $this->handle_selected_patterns_export_request();
         $this->handle_child_theme_request();
+    }
+
+    private function handle_history_download_request() {
+        if (!isset($_GET[self::HISTORY_DOWNLOAD_REQUEST_FLAG])) {
+            return false;
+        }
+
+        if (!TEJLG_Capabilities::current_user_can('exports')) {
+            wp_die(
+                esc_html__("Vous n'avez pas les autorisations nécessaires pour exporter le journal.", 'theme-export-jlg'),
+                esc_html__('Accès refusé', 'theme-export-jlg'),
+                [
+                    'response' => 403,
+                ]
+            );
+        }
+
+        check_admin_referer(self::HISTORY_DOWNLOAD_NONCE_ACTION, self::HISTORY_DOWNLOAD_NONCE_FIELD);
+
+        $format = isset($_GET[self::HISTORY_DOWNLOAD_FORMAT_PARAM])
+            ? sanitize_key((string) $_GET[self::HISTORY_DOWNLOAD_FORMAT_PARAM])
+            : 'json';
+        $format = in_array($format, ['json', 'csv'], true) ? $format : 'json';
+
+        $default_limit = (int) apply_filters('tejlg_history_download_default_limit', self::HISTORY_EXPORT_DEFAULT_LIMIT);
+        $default_limit = $default_limit >= 0 ? $default_limit : self::HISTORY_EXPORT_DEFAULT_LIMIT;
+
+        $max_limit = (int) apply_filters('tejlg_history_download_max_limit', self::HISTORY_EXPORT_MAX_LIMIT);
+        $max_limit = $max_limit >= 0 ? $max_limit : self::HISTORY_EXPORT_MAX_LIMIT;
+
+        if ($max_limit > 0 && $default_limit > $max_limit) {
+            $default_limit = $max_limit;
+        }
+
+        $limit = $default_limit;
+
+        if (isset($_GET[self::HISTORY_DOWNLOAD_LIMIT_PARAM]) && '' !== $_GET[self::HISTORY_DOWNLOAD_LIMIT_PARAM]) {
+            $raw_limit = $_GET[self::HISTORY_DOWNLOAD_LIMIT_PARAM];
+
+            if (is_numeric($raw_limit)) {
+                $limit = (int) $raw_limit;
+            }
+        }
+
+        $limit = max(0, $limit);
+
+        if ($max_limit > 0 && $limit > $max_limit) {
+            $limit = $max_limit;
+        }
+
+        $result_filter = isset($_GET[self::HISTORY_DOWNLOAD_RESULT_PARAM])
+            ? sanitize_key((string) $_GET[self::HISTORY_DOWNLOAD_RESULT_PARAM])
+            : '';
+        $origin_filter = isset($_GET[self::HISTORY_DOWNLOAD_ORIGIN_PARAM])
+            ? sanitize_key((string) $_GET[self::HISTORY_DOWNLOAD_ORIGIN_PARAM])
+            : '';
+        $initiator_filter = isset($_GET[self::HISTORY_DOWNLOAD_INITIATOR_PARAM])
+            ? sanitize_text_field((string) $_GET[self::HISTORY_DOWNLOAD_INITIATOR_PARAM])
+            : '';
+
+        $orderby = isset($_GET[self::HISTORY_DOWNLOAD_ORDERBY_PARAM])
+            ? sanitize_key((string) $_GET[self::HISTORY_DOWNLOAD_ORDERBY_PARAM])
+            : 'timestamp';
+        $allowed_history_orderby = ['timestamp', 'duration', 'zip_file_size'];
+        if (!in_array($orderby, $allowed_history_orderby, true)) {
+            $orderby = 'timestamp';
+        }
+
+        $order = isset($_GET[self::HISTORY_DOWNLOAD_ORDER_PARAM])
+            ? strtolower((string) $_GET[self::HISTORY_DOWNLOAD_ORDER_PARAM])
+            : 'desc';
+        $order = 'asc' === $order ? 'asc' : 'desc';
+
+        $raw_start = isset($_GET[self::HISTORY_DOWNLOAD_START_PARAM])
+            ? sanitize_text_field((string) $_GET[self::HISTORY_DOWNLOAD_START_PARAM])
+            : '';
+        $raw_end = isset($_GET[self::HISTORY_DOWNLOAD_END_PARAM])
+            ? sanitize_text_field((string) $_GET[self::HISTORY_DOWNLOAD_END_PARAM])
+            : '';
+
+        $start_timestamp = $this->parse_history_date_input($raw_start, false);
+        $end_timestamp   = $this->parse_history_date_input($raw_end, true);
+
+        $start_date = $start_timestamp > 0 ? $this->format_history_date_input($start_timestamp) : '';
+        $end_date   = $end_timestamp > 0 ? $this->format_history_date_input($end_timestamp) : '';
+
+        $history_request = [
+            'result'          => $result_filter,
+            'origin'          => $origin_filter,
+            'initiator'       => $initiator_filter,
+            'orderby'         => $orderby,
+            'order'           => $order,
+            'start_date'      => $start_date,
+            'end_date'        => $end_date,
+            'start_timestamp' => $start_timestamp,
+            'end_timestamp'   => $end_timestamp,
+            'limit'           => $limit,
+        ];
+
+        $export_data = TEJLG_Export_History::get_entries_for_export($history_request);
+        $entries     = isset($export_data['entries']) ? (array) $export_data['entries'] : [];
+        $query       = isset($export_data['query'])
+            ? (array) $export_data['query']
+            : TEJLG_Export_History::normalize_query_args($history_request);
+
+        $generated_at = time();
+        $site_url = function_exists('get_site_url') ? get_site_url() : (function_exists('site_url') ? site_url() : '');
+
+        $timezone_string = function_exists('wp_timezone_string') ? wp_timezone_string() : get_option('timezone_string');
+
+        if (!is_string($timezone_string) || '' === $timezone_string) {
+            $offset         = (float) get_option('gmt_offset', 0);
+            $offset_hours   = (int) $offset;
+            $offset_minutes = (int) round(abs($offset - $offset_hours) * 60);
+            $offset_sign    = $offset < 0 ? '-' : '+';
+            $timezone_string = sprintf('%s%02d:%02d', $offset_sign, abs($offset_hours), abs($offset_minutes));
+        }
+
+        $suffix   = gmdate('Ymd-His', $generated_at);
+        $filename = sprintf('theme-export-history-%s.%s', $suffix, $format);
+
+        if (isset($_GET[self::HISTORY_DOWNLOAD_FILENAME_PARAM])) {
+            $requested_filename = (string) $_GET[self::HISTORY_DOWNLOAD_FILENAME_PARAM];
+
+            if ('' !== $requested_filename) {
+                if (function_exists('sanitize_file_name')) {
+                    $requested_filename = sanitize_file_name($requested_filename);
+                } else {
+                    $requested_filename = preg_replace('/[^A-Za-z0-9._-]/', '', $requested_filename);
+                }
+
+                if ('' !== $requested_filename) {
+                    $filename = $requested_filename;
+
+                    if ('csv' === $format && !preg_match('/\.csv$/i', $filename)) {
+                        $filename .= '.csv';
+                    } elseif ('json' === $format && !preg_match('/\.json$/i', $filename)) {
+                        $filename .= '.json';
+                    }
+                }
+            }
+        }
+
+        $context = [
+            'filters' => [
+                'result'          => $query['result'],
+                'origin'          => $query['origin'],
+                'initiator'       => $query['initiator'],
+                'start_date'      => $query['start_date'],
+                'end_date'        => $query['end_date'],
+                'start_timestamp' => $query['start_timestamp'],
+                'end_timestamp'   => $query['end_timestamp'],
+                'limit'           => $query['limit'],
+            ],
+        ];
+
+        if ('csv' === $format) {
+            $this->stream_history_csv_with_context($entries, $context, $filename, $generated_at, $site_url, $timezone_string);
+        } else {
+            $this->stream_history_json_with_context($entries, $context, $filename, $generated_at, $site_url, $timezone_string);
+        }
+
+        return true;
     }
 
     private function handle_schedule_settings_submission() {
@@ -569,6 +747,35 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             ),
         ];
 
+        $history_export_capable = TEJLG_Capabilities::current_user_can('exports');
+
+        $history_download_default_limit = (int) apply_filters('tejlg_history_download_default_limit', self::HISTORY_EXPORT_DEFAULT_LIMIT);
+        $history_download_default_limit = $history_download_default_limit >= 0 ? $history_download_default_limit : self::HISTORY_EXPORT_DEFAULT_LIMIT;
+
+        $history_download_max_limit = (int) apply_filters('tejlg_history_download_max_limit', self::HISTORY_EXPORT_MAX_LIMIT);
+        $history_download_max_limit = $history_download_max_limit >= 0 ? $history_download_max_limit : self::HISTORY_EXPORT_MAX_LIMIT;
+
+        if ($history_download_max_limit > 0 && $history_download_default_limit > $history_download_max_limit) {
+            $history_download_default_limit = $history_download_max_limit;
+        }
+
+        $history_export_formats = apply_filters(
+            'tejlg_history_download_formats',
+            [
+                'json' => __('JSON', 'theme-export-jlg'),
+                'csv'  => __('CSV', 'theme-export-jlg'),
+            ]
+        );
+
+        $history_export_values = [
+            'format' => 'json',
+            'start'  => '',
+            'end'    => '',
+            'limit'  => $history_download_default_limit,
+            'result' => '',
+            'origin' => '',
+        ];
+
         $this->render_template('export.php', [
             'page_slug'                 => $this->page_slug,
             'child_theme_value'         => $child_theme_value,
@@ -602,6 +809,12 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             'notification_settings'     => $notification_settings,
             'interface_mode'            => $this->get_interface_mode(),
             'history_export_links'      => $history_export_links,
+            'history_export_capable'    => $history_export_capable,
+            'history_export_nonce'      => wp_create_nonce(self::HISTORY_DOWNLOAD_NONCE_ACTION),
+            'history_export_formats'    => $history_export_formats,
+            'history_export_values'     => $history_export_values,
+            'history_export_max_limit'  => $history_download_max_limit,
+            'history_export_default_limit' => $history_download_default_limit,
         ]);
     }
 
