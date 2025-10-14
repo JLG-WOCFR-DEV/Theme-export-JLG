@@ -108,7 +108,30 @@ html.no-js [data-accordion-panel][hidden] {
 }
 
 html.no-js [data-step-next],
-html.no-js [data-step-prev] {
+html.no-js [data-step-prev],
+html.no-js [data-assistant-next],
+html.no-js [data-assistant-prev] {
+    display: none;
+}
+
+.tejlg-assistant {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.tejlg-assistant__progress {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.tejlg-assistant__hint {
+    margin: 0;
+    padding: 1rem 1.25rem;
+}
+
+.tejlg-assistant__hint[hidden] {
     display: none;
 }
 

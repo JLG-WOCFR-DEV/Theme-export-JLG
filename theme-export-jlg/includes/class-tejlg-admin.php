@@ -111,6 +111,7 @@ class TEJLG_Admin {
 
         if ('export' === $active_tab || $is_import_preview) {
             wp_enqueue_script('tejlg-admin-export', TEJLG_URL . 'assets/js/admin-export.js', ['tejlg-admin-base'], TEJLG_VERSION, true);
+            wp_enqueue_script('tejlg-admin-assistant', TEJLG_URL . 'assets/js/admin-assistant.js', ['tejlg-admin-export'], TEJLG_VERSION, true);
 
             $saved_exclusions = get_option(TEJLG_Admin_Export_Page::EXCLUSION_PATTERNS_OPTION, '');
 
@@ -244,6 +245,56 @@ class TEJLG_Admin {
                             'inactive' => esc_html__('Le dernier suivi est indisponible. Relancez l’export pour obtenir un nouveau statut.', 'theme-export-jlg'),
                         ],
                     ],
+                ]
+            );
+
+            $assistant_hints = [
+                'theme-export' => [
+                    'selection'    => esc_html__('Vérifiez les informations du thème actif avant de poursuivre.', 'theme-export-jlg'),
+                    'confirmation' => esc_html__('Testez vos motifs d’exclusion pour éviter toute mauvaise surprise dans l’archive.', 'theme-export-jlg'),
+                    'summary'      => esc_html__('Relisez le résumé puis lancez l’export lorsque tout est prêt.', 'theme-export-jlg'),
+                ],
+                'import-preview' => [
+                    'selection'    => esc_html__('Filtrez la liste et cochez uniquement les compositions à importer.', 'theme-export-jlg'),
+                    'confirmation' => esc_html__('Contrôlez votre sélection et consultez les avertissements éventuels.', 'theme-export-jlg'),
+                    'summary'      => esc_html__('Téléchargez le résumé pour archivage puis lancez l’import.', 'theme-export-jlg'),
+                ],
+            ];
+
+            $assistant_strings = [
+                'selectionEmpty'        => esc_html__('Aucune composition sélectionnée.', 'theme-export-jlg'),
+                'selectionCountSingular'=> esc_html__('%s composition sélectionnée.', 'theme-export-jlg'),
+                'selectionCountPlural'  => esc_html__('%s compositions sélectionnées.', 'theme-export-jlg'),
+                'filtersEmpty'          => esc_html__('Aucun filtre actif.', 'theme-export-jlg'),
+                'warningsEmpty'         => esc_html__('Aucun avertissement.', 'theme-export-jlg'),
+                'previewLimit'          => esc_html__('Aperçu des %1$d premières compositions.', 'theme-export-jlg'),
+                'filterSearch'          => esc_html__('Recherche « %s »', 'theme-export-jlg'),
+                'filterCategory'        => esc_html__('Catégorie « %s »', 'theme-export-jlg'),
+                'filterDate'            => esc_html__('Période « %s »', 'theme-export-jlg'),
+                'filterSort'            => esc_html__('Tri : %s', 'theme-export-jlg'),
+                'downloadFileName'      => esc_html__('assistant-summary-%date%.json', 'theme-export-jlg'),
+                'untitled'              => esc_html__('Sans titre', 'theme-export-jlg'),
+                'locale'                => get_user_locale(),
+            ];
+
+            $assistant_configs = [
+                'theme-export' => [
+                    'downloadFileName' => esc_html__('theme-export-summary-%date%.json', 'theme-export-jlg'),
+                ],
+                'import-preview' => [
+                    'downloadFileName' => esc_html__('patterns-import-summary-%date%.json', 'theme-export-jlg'),
+                ],
+            ];
+
+            wp_localize_script(
+                'tejlg-admin-assistant',
+                'tejlgAssistantSettings',
+                [
+                    'storagePrefix' => 'tejlg:assistant:',
+                    'locale'        => get_user_locale(),
+                    'hints'         => $assistant_hints,
+                    'strings'       => $assistant_strings,
+                    'assistants'    => $assistant_configs,
                 ]
             );
         }

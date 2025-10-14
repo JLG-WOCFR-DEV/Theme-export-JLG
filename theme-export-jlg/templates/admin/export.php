@@ -1117,37 +1117,70 @@ $quality_benchmarks = [
                 method="post"
                 action="<?php echo esc_url($export_tab_url); ?>"
                 data-export-form
-                data-step-form
+                data-assistant-form
             >
                 <?php wp_nonce_field('tejlg_theme_export_action', 'tejlg_theme_export_nonce'); ?>
-                <noscript>
-                    <div class="notice notice-warning tejlg-nojs-notice">
-                        <p><?php esc_html_e('JavaScript est désactivé : toutes les étapes sont affichées en continu. Complétez les champs puis validez l’export avec le bouton final.', 'theme-export-jlg'); ?></p>
-                    </div>
-                </noscript>
-                <ol class="tejlg-stepper" data-stepper>
-                    <li class="tejlg-stepper__step" data-stepper-item>
-                        <span class="tejlg-stepper__index" aria-hidden="true">1</span>
-                        <span class="tejlg-stepper__label"><?php esc_html_e('Périmètre', 'theme-export-jlg'); ?></span>
-                    </li>
-                    <li class="tejlg-stepper__step" data-stepper-item>
-                        <span class="tejlg-stepper__index" aria-hidden="true">2</span>
-                        <span class="tejlg-stepper__label"><?php esc_html_e('Filtres', 'theme-export-jlg'); ?></span>
-                    </li>
-                    <li class="tejlg-stepper__step" data-stepper-item>
-                        <span class="tejlg-stepper__index" aria-hidden="true">3</span>
-                        <span class="tejlg-stepper__label"><?php esc_html_e('Validation', 'theme-export-jlg'); ?></span>
-                    </li>
-                </ol>
-                <div class="tejlg-steps" data-steps>
-                    <section class="tejlg-step is-active" data-step="0" aria-labelledby="tejlg-export-step-intro">
-                        <h4 id="tejlg-export-step-intro" class="tejlg-step__title" tabindex="-1"><?php esc_html_e('Vérification du thème actif', 'theme-export-jlg'); ?></h4>
-                        <p class="description"><?php esc_html_e('Passez en revue les informations clés du thème avant de générer l’archive.', 'theme-export-jlg'); ?></p>
-                        <dl class="tejlg-step__details">
-                            <div>
-                                <dt><?php esc_html_e('Nom', 'theme-export-jlg'); ?></dt>
-                                <dd><?php echo esc_html($current_theme->get('Name')); ?></dd>
-                            </div>
+                <div
+                    class="tejlg-assistant"
+                    data-assistant
+                    data-assistant-id="theme-export"
+                    data-assistant-storage-key="theme-export"
+                >
+                    <noscript>
+                        <div class="notice notice-warning tejlg-nojs-notice">
+                            <p><?php esc_html_e('JavaScript est désactivé : toutes les étapes sont affichées en continu. Complétez les champs puis validez l’export avec le bouton final.', 'theme-export-jlg'); ?></p>
+                        </div>
+                    </noscript>
+                    <header class="tejlg-assistant__progress">
+                        <ol class="tejlg-stepper" data-assistant-stepper>
+                            <li
+                                class="tejlg-stepper__step"
+                                data-assistant-stepper-item
+                                data-assistant-step-target="selection"
+                            >
+                                <span class="tejlg-stepper__index" aria-hidden="true">1</span>
+                                <span class="tejlg-stepper__label"><?php esc_html_e('Sélection', 'theme-export-jlg'); ?></span>
+                            </li>
+                            <li
+                                class="tejlg-stepper__step"
+                                data-assistant-stepper-item
+                                data-assistant-step-target="confirmation"
+                            >
+                                <span class="tejlg-stepper__index" aria-hidden="true">2</span>
+                                <span class="tejlg-stepper__label"><?php esc_html_e('Confirmation', 'theme-export-jlg'); ?></span>
+                            </li>
+                            <li
+                                class="tejlg-stepper__step"
+                                data-assistant-stepper-item
+                                data-assistant-step-target="summary"
+                            >
+                                <span class="tejlg-stepper__index" aria-hidden="true">3</span>
+                                <span class="tejlg-stepper__label"><?php esc_html_e('Résumé', 'theme-export-jlg'); ?></span>
+                            </li>
+                        </ol>
+                    </header>
+                    <div
+                        class="tejlg-assistant__hint notice notice-info"
+                        data-assistant-hint
+                        hidden
+                        role="status"
+                        aria-live="polite"
+                    ></div>
+                    <div class="tejlg-steps" data-assistant-panels>
+                        <section
+                            class="tejlg-step is-active"
+                            data-step="0"
+                            data-assistant-step="selection"
+                            data-assistant-hint-key="selection"
+                            aria-labelledby="tejlg-export-step-intro"
+                        >
+                            <h4 id="tejlg-export-step-intro" class="tejlg-step__title" tabindex="-1"><?php esc_html_e('Vérification du thème actif', 'theme-export-jlg'); ?></h4>
+                            <p class="description"><?php esc_html_e('Passez en revue les informations clés du thème avant de générer l’archive.', 'theme-export-jlg'); ?></p>
+                            <dl class="tejlg-step__details">
+                                <div>
+                                    <dt><?php esc_html_e('Nom', 'theme-export-jlg'); ?></dt>
+                                    <dd><?php echo esc_html($current_theme->get('Name')); ?></dd>
+                                </div>
                             <div>
                                 <dt><?php esc_html_e('Version', 'theme-export-jlg'); ?></dt>
                                 <dd><?php echo esc_html($current_theme->get('Version')); ?></dd>
@@ -1157,26 +1190,33 @@ $quality_benchmarks = [
                                 <dd><?php echo esc_html($current_theme->get_stylesheet()); ?></dd>
                             </div>
                         </dl>
-                        <div class="tejlg-step__actions">
-                            <button type="button" class="button button-primary wp-ui-primary" data-step-next><?php esc_html_e('Définir les filtres', 'theme-export-jlg'); ?></button>
-                        </div>
-                    </section>
-                    <section class="tejlg-step" data-step="1" aria-labelledby="tejlg-export-step-filters">
-                        <h4 id="tejlg-export-step-filters" class="tejlg-step__title" tabindex="-1"><?php esc_html_e('Motifs d’exclusion (optionnel)', 'theme-export-jlg'); ?></h4>
-                        <p class="description"><?php esc_html_e('Affinez l’export en excluant certains fichiers. Vous pourrez tester vos motifs avant la confirmation.', 'theme-export-jlg'); ?></p>
-                        <label for="tejlg_exclusion_patterns" class="tejlg-step__field-label"><?php esc_html_e('Motifs à exclure', 'theme-export-jlg'); ?></label>
-                        <textarea
-                            name="tejlg_exclusion_patterns"
-                            id="tejlg_exclusion_patterns"
-                            class="large-text code"
-                            rows="4"
-                            placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"
-                            aria-describedby="tejlg_exclusion_patterns_description"
-                        ><?php echo esc_textarea($exclusion_patterns_value); ?></textarea>
-                        <span id="tejlg_exclusion_patterns_description" class="description"><?php esc_html_e('Indiquez un motif par ligne ou séparez-les par des virgules (joker * accepté).', 'theme-export-jlg'); ?></span>
-                        <div class="tejlg-pattern-test" data-pattern-test>
-                            <div class="tejlg-pattern-test__actions">
-                                <button
+                            <div class="tejlg-step__actions">
+                                <button type="button" class="button button-primary wp-ui-primary" data-assistant-next><?php esc_html_e('Définir les filtres', 'theme-export-jlg'); ?></button>
+                            </div>
+                        </section>
+                        <section
+                            class="tejlg-step"
+                            data-step="1"
+                            data-assistant-step="confirmation"
+                            data-assistant-hint-key="confirmation"
+                            aria-labelledby="tejlg-export-step-filters"
+                        >
+                            <h4 id="tejlg-export-step-filters" class="tejlg-step__title" tabindex="-1"><?php esc_html_e('Motifs d’exclusion (optionnel)', 'theme-export-jlg'); ?></h4>
+                            <p class="description"><?php esc_html_e('Affinez l’export en excluant certains fichiers. Vous pourrez tester vos motifs avant la confirmation.', 'theme-export-jlg'); ?></p>
+                            <label for="tejlg_exclusion_patterns" class="tejlg-step__field-label"><?php esc_html_e('Motifs à exclure', 'theme-export-jlg'); ?></label>
+                            <textarea
+                                name="tejlg_exclusion_patterns"
+                                id="tejlg_exclusion_patterns"
+                                class="large-text code"
+                                rows="4"
+                                placeholder="<?php echo esc_attr__('Ex. : assets/*.scss', 'theme-export-jlg'); ?>"
+                                aria-describedby="tejlg_exclusion_patterns_description"
+                                data-assistant-exclusion-source
+                            ><?php echo esc_textarea($exclusion_patterns_value); ?></textarea>
+                            <span id="tejlg_exclusion_patterns_description" class="description"><?php esc_html_e('Indiquez un motif par ligne ou séparez-les par des virgules (joker * accepté).', 'theme-export-jlg'); ?></span>
+                            <div class="tejlg-pattern-test" data-pattern-test>
+                                <div class="tejlg-pattern-test__actions">
+                                    <button
                                     type="button"
                                     class="button button-secondary wp-ui-secondary"
                                     data-pattern-test-trigger
@@ -1226,37 +1266,44 @@ $quality_benchmarks = [
                                         <ul data-pattern-test-excluded></ul>
                                     </div>
                                 </div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="tejlg-step__actions">
-                            <button type="button" class="button button-secondary wp-ui-secondary" data-step-prev><?php esc_html_e('Retour', 'theme-export-jlg'); ?></button>
-                            <button type="button" class="button button-primary wp-ui-primary" data-step-next><?php esc_html_e('Passer à la validation', 'theme-export-jlg'); ?></button>
-                        </div>
-                    </section>
-                    <section class="tejlg-step" data-step="2" aria-labelledby="tejlg-export-step-review">
-                        <h4 id="tejlg-export-step-review" class="tejlg-step__title" tabindex="-1"><?php esc_html_e('Résumé et lancement', 'theme-export-jlg'); ?></h4>
-                        <p class="description"><?php esc_html_e('Relisez les paramètres et lancez l’export. Vous pourrez suivre la progression en direct.', 'theme-export-jlg'); ?></p>
-                        <ul class="tejlg-step-summary">
-                            <li>
-                                <strong><?php esc_html_e('Thème', 'theme-export-jlg'); ?> :</strong>
-                                <span><?php echo esc_html($current_theme->get('Name')); ?></span>
-                            </li>
-                            <li>
-                                <strong><?php esc_html_e('Motifs d’exclusion', 'theme-export-jlg'); ?> :</strong>
-                                <span
-                                    data-step-summary-exclusions
-                                    data-step-summary-empty="<?php echo esc_attr__('Aucun motif', 'theme-export-jlg'); ?>"
-                                ><?php echo esc_html($current_exclusion_summary); ?></span>
-                            </li>
-                        </ul>
-                        <div class="tejlg-step__actions">
-                            <button type="button" class="button button-secondary wp-ui-secondary" data-step-prev><?php esc_html_e('Retour', 'theme-export-jlg'); ?></button>
-                            <div class="tejlg-step__cta">
-                                <button type="submit" class="button button-primary wp-ui-primary" data-export-start><?php esc_html_e("Lancer l'export du thème", 'theme-export-jlg'); ?></button>
-                                <span class="spinner" aria-hidden="true" data-export-spinner></span>
+                            <div class="tejlg-step__actions">
+                                <button type="button" class="button button-secondary wp-ui-secondary" data-assistant-prev><?php esc_html_e('Retour', 'theme-export-jlg'); ?></button>
+                                <button type="button" class="button button-primary wp-ui-primary" data-assistant-next><?php esc_html_e('Passer à la validation', 'theme-export-jlg'); ?></button>
                             </div>
-                        </div>
-                    </section>
+                        </section>
+                        <section
+                            class="tejlg-step"
+                            data-step="2"
+                            data-assistant-step="summary"
+                            data-assistant-hint-key="summary"
+                            aria-labelledby="tejlg-export-step-review"
+                        >
+                            <h4 id="tejlg-export-step-review" class="tejlg-step__title" tabindex="-1"><?php esc_html_e('Résumé et lancement', 'theme-export-jlg'); ?></h4>
+                            <p class="description"><?php esc_html_e('Relisez les paramètres et lancez l’export. Vous pourrez suivre la progression en direct.', 'theme-export-jlg'); ?></p>
+                            <ul class="tejlg-step-summary">
+                                <li>
+                                    <strong><?php esc_html_e('Thème', 'theme-export-jlg'); ?> :</strong>
+                                    <span><?php echo esc_html($current_theme->get('Name')); ?></span>
+                                </li>
+                                <li>
+                                    <strong><?php esc_html_e('Motifs d’exclusion', 'theme-export-jlg'); ?> :</strong>
+                                    <span
+                                        data-assistant-exclusion-summary
+                                        data-assistant-summary-empty="<?php echo esc_attr__('Aucun motif', 'theme-export-jlg'); ?>"
+                                    ><?php echo esc_html($current_exclusion_summary); ?></span>
+                                </li>
+                            </ul>
+                            <div class="tejlg-step__actions">
+                                <button type="button" class="button button-secondary wp-ui-secondary" data-assistant-prev><?php esc_html_e('Retour', 'theme-export-jlg'); ?></button>
+                                <div class="tejlg-step__cta">
+                                    <button type="submit" class="button button-primary wp-ui-primary" data-export-start><?php esc_html_e("Lancer l'export du thème", 'theme-export-jlg'); ?></button>
+                                    <span class="spinner" aria-hidden="true" data-export-spinner></span>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
                 </div>
                 <div
                     class="tejlg-theme-export-feedback notice notice-info"
