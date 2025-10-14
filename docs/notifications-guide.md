@@ -171,4 +171,8 @@ add_filter(
 );
 ```
 
+## Stockage persistant sécurisé
+
+Le dossier `theme-export-jlg/` créé dans le répertoire d’uploads public est désormais durci automatiquement : lorsqu’il est généré, le plugin ajoute des fichiers `index.html`, `.htaccess` et `web.config` qui empêchent l’indexation ou le téléchargement direct des archives. Ces fichiers de garde sont conservés même lorsque les exports expirés sont nettoyés, garantissant un stockage protégé en permanence.
+
 Ces quelques extraits couvrent les cas les plus fréquents (e-mail enrichi, webhook Slack, observabilité). Ils servent également de base pour alimenter des scénarios plus avancés décrits dans la feuille de route (rapports hebdomadaires, notifications multi-canaux).

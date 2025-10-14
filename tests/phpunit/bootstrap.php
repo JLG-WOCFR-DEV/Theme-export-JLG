@@ -261,6 +261,61 @@ if (!function_exists('trailingslashit')) {
     }
 }
 
+if (!function_exists('wp_mkdir_p')) {
+    function wp_mkdir_p($dir) {
+        if ('' === $dir) {
+            return false;
+        }
+
+        if (is_dir($dir)) {
+            return true;
+        }
+
+        return mkdir($dir, 0777, true);
+    }
+}
+
+if (!function_exists('wp_upload_dir')) {
+    function wp_upload_dir() {
+        if (isset($GLOBALS['_wp_upload_dir_override']) && is_callable($GLOBALS['_wp_upload_dir_override'])) {
+            return (array) call_user_func($GLOBALS['_wp_upload_dir_override']);
+        }
+
+        $base = sys_get_temp_dir() . '/tejlg-tests-uploads';
+        wp_mkdir_p($base);
+
+        return [
+            'basedir' => $base,
+            'baseurl' => 'https://example.com/wp-content/uploads',
+        ];
+    }
+}
+
+if (!function_exists('wp_unique_filename')) {
+    function wp_unique_filename($dir, $filename) {
+        $dir      = trailingslashit($dir);
+        $filename = (string) $filename;
+
+        if ('' === $filename) {
+            $filename = 'file';
+        }
+
+        $info = pathinfo($filename);
+        $ext  = isset($info['extension']) && '' !== $info['extension'] ? '.' . $info['extension'] : '';
+        $name = isset($info['filename']) ? $info['filename'] : basename($filename, $ext);
+
+        $candidate = $name;
+        $number    = 1;
+
+        while (file_exists($dir . $candidate . $ext)) {
+            $candidate = $name . '-' . $number;
+            $number++;
+        }
+
+        return $candidate . $ext;
+    }
+}
+
 if (!function_exists('admin_url')) {
     function admin_url($path = '') {
         return 'http://example.com/wp-admin/' . ltrim((string) $path, '/');
