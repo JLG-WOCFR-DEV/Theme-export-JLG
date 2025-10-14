@@ -1939,8 +1939,14 @@ class TEJLG_Export {
             return;
         }
 
+        $guard_files = array_keys(self::get_persistence_guard_files());
+
         foreach ($iterator as $fileinfo) {
             if ($fileinfo->isDot() || !$fileinfo->isFile()) {
+                continue;
+            }
+
+            if (in_array($fileinfo->getFilename(), $guard_files, true)) {
                 continue;
             }
 
@@ -2658,6 +2664,8 @@ class TEJLG_Export {
             ];
         }
 
+        self::ensure_persistence_guard_files($target_directory);
+
         $target_directory = trailingslashit($target_directory);
 
         $filename = $zip_file_name;
@@ -2713,6 +2721,46 @@ class TEJLG_Export {
         }
 
         return $result;
+    }
+
+    /**
+     * Ensure protective files are present in the persistent export directory.
+     *
+     * @param string $directory Absolute path to the persistence directory.
+     */
+    private static function ensure_persistence_guard_files($directory) {
+        $directory = trailingslashit($directory);
+
+        if (!is_dir($directory)) {
+            return;
+        }
+
+        foreach (self::get_persistence_guard_files() as $filename => $contents) {
+            if ('' === $filename) {
+                continue;
+            }
+
+            $path = $directory . $filename;
+
+            if (file_exists($path)) {
+                continue;
+            }
+
+            file_put_contents($path, $contents);
+        }
+    }
+
+    /**
+     * Returns the list of guard files that harden the persistence directory.
+     *
+     * @return array<string,string>
+     */
+    private static function get_persistence_guard_files() {
+        return [
+            'index.html' => "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><title>Forbidden</title></head><body><h1>Access Denied</h1></body></html>\n",
+            '.htaccess'  => "# Prevent directory browsing and direct access\nOptions -Indexes\n<Files *>\n    Require all denied\n</Files>\n",
+            'web.config' => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration>\n    <system.webServer>\n        <security>\n            <requestFiltering>\n                <fileExtensions>\n                    <add fileExtension=\".\" allowed=\"false\" />\n                </fileExtensions>\n            </requestFiltering>\n        </security>\n        <directoryBrowse enabled=\"false\" />\n    </system.webServer>\n</configuration>\n",
+        ];
     }
 
     /**
