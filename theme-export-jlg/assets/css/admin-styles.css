@@ -1702,7 +1702,8 @@ textarea.has-pattern-error {
 
 .pattern-selection-term {
     background: color-mix(in srgb, var(--tejlg-accent-color) 25%, var(--tejlg-accent-color-soft));
-    color: var(--tejlg-accent-color-darker);
+    background-color: var(--tejlg-accent-color-soft);
+    color: var(--tejlg-pattern-term-text-color, var(--tejlg-accent-color-darker));
     border-radius: 999px;
     padding: 2px 10px;
     font-size: 11px;

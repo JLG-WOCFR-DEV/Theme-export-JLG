@@ -62,6 +62,27 @@ add_filter(
 );
 ```
 
+## Surcharger le gabarit HTML
+
+Le corps HTML par défaut s’appuie désormais sur un template PHP (`templates/emails/export-notification.php`). Vous pouvez le remplacer en filtrant `tejlg_export_notifications_template` pour pointer vers votre propre fichier — il reçoit le payload `$event`, l’entrée d’historique et les paragraphes déjà normalisés.
+
+```php
+add_filter(
+    'tejlg_export_notifications_template',
+    static function ($template, array $event) {
+        if ('success' !== $event['result']) {
+            return $template;
+        }
+
+        return get_stylesheet_directory() . '/emails/theme-export-success.php';
+    },
+    10,
+    2
+);
+```
+
+Le template est libre de construire une mise en page complète (table HTML responsive, boutons d’action, etc.), mais pensez à conserver les recommandations RGAA : contrastes suffisants, hiérarchie de titres, liens explicites et zones tactiles de 44×44 px minimum.【F:theme-export-jlg/templates/emails/export-notification.php†L1-L240】
+
 ## Déclencher une notification Slack via webhook
 
 Le nouveau hook `tejlg_export_notifications_dispatched` est déclenché après chaque traitement (e-mail envoyé, ignoré ou en échec). Il reçoit le payload `$event` et un booléen `$sent`. On peut donc publier un message Slack en parallèle, ou remplacer complètement l’e-mail en filtrant `tejlg_export_notifications_should_send_mail`.
@@ -126,6 +147,50 @@ add_action(
     6
 );
 ```
+
+## Activer un connecteur S3 ou SFTP
+
+Deux filtres (`tejlg_export_remote_connector_s3_settings` et `tejlg_export_remote_connector_sftp_settings`) permettent de déclarer des destinations distantes. Le pipeline s’exécute juste après la génération du payload `$event` et consigne le résultat (succès/erreur) dans l’historique pour audit et observabilité.
+
+```php
+add_filter(
+    'tejlg_export_remote_connector_s3_settings',
+    static function ($settings, array $event) {
+        if ('success' !== $event['result']) {
+            return $settings;
+        }
+
+        return [
+            'bucket'     => 'backups-jlg',
+            'region'     => 'eu-west-3',
+            'access_key' => getenv('AWS_ACCESS_KEY_ID'),
+            'secret_key' => getenv('AWS_SECRET_ACCESS_KEY'),
+            'prefix'     => 'theme-exports/' . gmdate('Y/m'),
+            'acl'        => 'private',
+        ];
+    },
+    10,
+    2
+);
+
+add_filter(
+    'tejlg_export_remote_connector_sftp_settings',
+    static function () {
+        return [
+            'host'        => 'sftp.example.com',
+            'port'        => 22,
+            'username'    => 'deploy',
+            'private_key' => WP_CONTENT_DIR . '/keys/backup_id_rsa',
+            'public_key'  => WP_CONTENT_DIR . '/keys/backup_id_rsa.pub',
+            'remote_path' => '/backups/themes/',
+        ];
+    }
+);
+```
+
+Surveillez l’action `tejlg_export_remote_connectors_processed` pour journaliser les erreurs et ajustez les entêtes (`x-amz-acl`, `x-amz-storage-class`, permissions SFTP) selon vos politiques de sécurité.【F:theme-export-jlg/includes/class-tejlg-export-connectors.php†L1-L356】
+
+Pour valider l’intégration bout en bout, reportez-vous à la [matrice de tests des connecteurs distants](remote-connectors-test-matrix.md) qui priorise les scénarios S3 et SFTP (nominal, erreur, charge) et détaille les attendus par environnement.
 
 ## Exploiter les échecs de persistance
 
