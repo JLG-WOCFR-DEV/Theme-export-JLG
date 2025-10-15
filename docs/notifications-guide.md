@@ -190,6 +190,8 @@ add_filter(
 
 Surveillez l’action `tejlg_export_remote_connectors_processed` pour journaliser les erreurs et ajustez les entêtes (`x-amz-acl`, `x-amz-storage-class`, permissions SFTP) selon vos politiques de sécurité.【F:theme-export-jlg/includes/class-tejlg-export-connectors.php†L1-L356】
 
+Pour valider l’intégration bout en bout, reportez-vous à la [matrice de tests des connecteurs distants](remote-connectors-test-matrix.md) qui priorise les scénarios S3 et SFTP (nominal, erreur, charge) et détaille les attendus par environnement.
+
 ## Exploiter les échecs de persistance
 
 Lorsque la copie du ZIP persistant échoue (dossier inaccessible, collision de nom, etc.), le plugin déclenche désormais l’action `tejlg_export_persist_archive_failed`. On peut l’utiliser pour créer un journal ou avertir une équipe d’astreinte.

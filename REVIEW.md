@@ -35,7 +35,8 @@
 
 - ✅ Pipeline de connecteurs distants (S3 et SFTP) piloté par le payload `$event`, avec historisation des résultats dans les entrées d’export pour suivre la redondance hors site.【F:theme-export-jlg/includes/class-tejlg-export-connectors.php†L1-L356】【F:theme-export-jlg/includes/class-tejlg-export-history.php†L640-L748】
 - ✅ Nouveau gabarit HTML extensible pour les e-mails, surchargeable via filtre et template dédié, garantissant un rendu accessible compatible RGAA.【F:theme-export-jlg/includes/class-tejlg-export-notifications.php†L360-L520】【F:theme-export-jlg/templates/emails/export-notification.php†L1-L240】
+- ✅ Publication d’une matrice de tests pour cadencer les validations S3/SFTP, couvrir les scénarios d’erreur et alimenter le capacity planning des environnements support.【F:docs/remote-connectors-test-matrix.md†L1-L86】
 
 ## Recommandations
 
-- Documenter une matrice de tests des connecteurs distants (performances, limites d’upload) pour orienter le dimensionnement des environnements support.
+- Aucune pour le moment.
