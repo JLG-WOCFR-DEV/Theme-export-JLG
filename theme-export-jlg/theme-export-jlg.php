@@ -28,6 +28,7 @@ require_once TEJLG_PATH . 'includes/class-tejlg-capabilities.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export-history.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export-notifications.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-export-connectors.php';
 require_once TEJLG_PATH . 'includes/class-wp-background-process.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-zip-writer.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-export-process.php';
@@ -48,6 +49,7 @@ function tejlg_run_plugin() {
     TEJLG_Capabilities::init();
     TEJLG_Site_Health::init();
     TEJLG_Export_Notifications::init();
+    TEJLG_Export_Connectors::init();
     new TEJLG_Admin();
 }
 

@@ -577,7 +577,7 @@ class TEJLG_Export_Notifications {
          */
         $text_body = apply_filters('tejlg_export_notifications_body', $text_body, $entry, $job, $context, $result_label, $event);
 
-        $html_body = self::build_body_html($html_paragraphs);
+        $html_body = self::render_html_body($html_paragraphs, $text_paragraphs, $event, $entry, $job, $context);
 
         return [
             'text' => (string) $text_body,
@@ -608,6 +608,72 @@ class TEJLG_Export_Notifications {
         }
 
         return implode("\n", $html_parts);
+    }
+
+    /**
+     * Renders the HTML body either via the customizable template or a fallback.
+     *
+     * @param string[]              $paragraphs
+     * @param string[]              $text_paragraphs
+     * @param array<string,mixed>   $event
+     * @param array<string,mixed>   $entry
+     * @param array<string,mixed>   $job
+     * @param array<string,mixed>   $context
+     *
+     * @return string
+     */
+    private static function render_html_body($paragraphs, $text_paragraphs, $event, $entry, $job, $context) {
+        $default_template = defined('TEJLG_PATH')
+            ? TEJLG_PATH . 'templates/emails/export-notification.php'
+            : dirname(__FILE__, 2) . '/templates/emails/export-notification.php';
+
+        /**
+         * Filters the template used to render the HTML notification body.
+         *
+         * @param string               $template Path to the template file.
+         * @param array<string,mixed>  $event    Normalized event payload.
+         * @param array<string,mixed>  $entry    History entry data.
+         * @param array<string,mixed>  $job      Export job payload.
+         * @param array<string,mixed>  $context  Additional context provided when recording the entry.
+         * @param string[]             $paragraphs HTML paragraphs built by the core formatter.
+         * @param string[]             $text_paragraphs Plain-text paragraphs for reference.
+         */
+        $template = apply_filters('tejlg_export_notifications_template', $default_template, $event, $entry, $job, $context, $paragraphs, $text_paragraphs);
+
+        $html = '';
+
+        if (is_string($template) && '' !== $template && file_exists($template) && is_readable($template)) {
+            ob_start();
+
+            $event_data          = $event;
+            $entry_data          = $entry;
+            $job_data            = $job;
+            $context_data        = $context;
+            $html_paragraphs     = $paragraphs;
+            $text_body_paragraphs = $text_paragraphs;
+
+            /** @psalm-suppress UnresolvableInclude */
+            include $template;
+
+            $html = trim((string) ob_get_clean());
+        }
+
+        if ('' === $html) {
+            $html = self::build_body_html($paragraphs);
+        }
+
+        /**
+         * Filters the final HTML body after template rendering.
+         *
+         * @param string               $html     Final HTML body.
+         * @param array<string,mixed>  $event    Normalized event payload.
+         * @param array<string,mixed>  $entry    History entry data.
+         * @param array<string,mixed>  $job      Export job payload.
+         * @param array<string,mixed>  $context  Additional context provided when recording the entry.
+         * @param string[]             $paragraphs HTML paragraphs built by the core formatter.
+         * @param string[]             $text_paragraphs Plain-text paragraphs for reference.
+         */
+        return apply_filters('tejlg_export_notifications_html_body', $html, $event, $entry, $job, $context, $paragraphs, $text_paragraphs);
     }
 
     /**
@@ -717,6 +783,36 @@ class TEJLG_Export_Notifications {
             $persistent_url = esc_url_raw((string) $entry['persistent_url']);
         }
 
+        $persistent_path = '';
+
+        if (!empty($entry['persistent_path'])) {
+            $persistent_path = wp_normalize_path((string) $entry['persistent_path']);
+        } elseif (!empty($context['persistent_path'])) {
+            $persistent_path = wp_normalize_path((string) $context['persistent_path']);
+        } elseif (!empty($job['persistent_path'])) {
+            $persistent_path = wp_normalize_path((string) $job['persistent_path']);
+        }
+
+        $summary_url = '';
+
+        if (!empty($entry['summary_url'])) {
+            $summary_url = esc_url_raw((string) $entry['summary_url']);
+        } elseif (!empty($context['summary_url'])) {
+            $summary_url = esc_url_raw((string) $context['summary_url']);
+        } elseif (!empty($job['summary_persistent_url'])) {
+            $summary_url = esc_url_raw((string) $job['summary_persistent_url']);
+        }
+
+        $summary_filename = '';
+
+        if (!empty($entry['summary_filename'])) {
+            $summary_filename = sanitize_file_name((string) $entry['summary_filename']);
+        } elseif (!empty($context['summary_filename'])) {
+            $summary_filename = sanitize_file_name((string) $context['summary_filename']);
+        } elseif (!empty($job['summary_file_name'])) {
+            $summary_filename = sanitize_file_name((string) $job['summary_file_name']);
+        }
+
         $job_id = '';
 
         if (!empty($entry['job_id'])) {
@@ -749,7 +845,10 @@ class TEJLG_Export_Notifications {
             'exclusions'    => $exclusions,
             'status_message'=> $status_message,
             'persistent_url'=> $persistent_url,
+            'persistent_path'=> $persistent_path,
             'job_id'        => $job_id,
+            'summary_url'   => $summary_url,
+            'summary_filename' => $summary_filename,
             'site'          => [
                 'name' => $blogname,
                 'url'  => home_url(),
