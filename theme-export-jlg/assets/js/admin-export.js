@@ -80,6 +80,28 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             syncPresetButtons(state);
+
+            try {
+                const eventDetail = { enabled: !!state };
+                let contrastEvent = null;
+
+                if (typeof window.CustomEvent === 'function') {
+                    contrastEvent = new window.CustomEvent('tejlg:contrast-mode-change', {
+                        detail: eventDetail,
+                    });
+                } else if (document.createEvent) {
+                    contrastEvent = document.createEvent('CustomEvent');
+                    if (contrastEvent && typeof contrastEvent.initCustomEvent === 'function') {
+                        contrastEvent.initCustomEvent('tejlg:contrast-mode-change', true, true, eventDetail);
+                    }
+                }
+
+                if (contrastEvent) {
+                    document.dispatchEvent(contrastEvent);
+                }
+            } catch (error) {
+                // Ignore custom event dispatch errors to keep initialization resilient.
+            }
         };
 
         const persistState = function(state) {
@@ -135,6 +157,461 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (error) {
                 // Ignore preference observer errors to avoid breaking other scripts.
             }
+        }
+    })();
+
+    (function enforcePatternTermContrast() {
+        const termSelector = '.pattern-selection-term';
+        const minContrastRatio = 4.5;
+
+        const createColor = function(r, g, b, a) {
+            return {
+                r: Math.min(255, Math.max(0, Math.round(r))),
+                g: Math.min(255, Math.max(0, Math.round(g))),
+                b: Math.min(255, Math.max(0, Math.round(b))),
+                a: typeof a === 'number' ? Math.min(1, Math.max(0, a)) : 1,
+            };
+        };
+
+        const parseColor = function(value) {
+            if (typeof value !== 'string') {
+                return null;
+            }
+
+            const trimmed = value.trim().toLowerCase();
+
+            if (!trimmed) {
+                return null;
+            }
+
+            if (trimmed === 'transparent') {
+                return createColor(0, 0, 0, 0);
+            }
+
+            if (trimmed.charAt(0) === '#') {
+                const hex = trimmed.slice(1);
+
+                if (hex.length === 3 || hex.length === 4) {
+                    const r = parseInt(hex.charAt(0) + hex.charAt(0), 16);
+                    const g = parseInt(hex.charAt(1) + hex.charAt(1), 16);
+                    const b = parseInt(hex.charAt(2) + hex.charAt(2), 16);
+                    const a = hex.length === 4
+                        ? parseInt(hex.charAt(3) + hex.charAt(3), 16) / 255
+                        : 1;
+
+                    return createColor(r, g, b, a);
+                }
+
+                if (hex.length === 6 || hex.length === 8) {
+                    const r = parseInt(hex.slice(0, 2), 16);
+                    const g = parseInt(hex.slice(2, 4), 16);
+                    const b = parseInt(hex.slice(4, 6), 16);
+                    const a = hex.length === 8
+                        ? parseInt(hex.slice(6, 8), 16) / 255
+                        : 1;
+
+                    return createColor(r, g, b, a);
+                }
+            }
+
+            const rgbMatch = trimmed.match(/^rgba?\(([^)]+)\)$/);
+
+            if (rgbMatch) {
+                const parts = rgbMatch[1].split(',');
+
+                if (parts.length >= 3) {
+                    const parseChannel = function(token) {
+                        const component = token.trim();
+
+                        if (!component) {
+                            return null;
+                        }
+
+                        if (component.charAt(component.length - 1) === '%') {
+                            const numeric = parseFloat(component.slice(0, -1));
+                            if (!Number.isFinite(numeric)) {
+                                return null;
+                            }
+                            return Math.min(255, Math.max(0, (numeric / 100) * 255));
+                        }
+
+                        const numeric = parseFloat(component);
+                        if (!Number.isFinite(numeric)) {
+                            return null;
+                        }
+
+                        return Math.min(255, Math.max(0, numeric));
+                    };
+
+                    const red = parseChannel(parts[0]);
+                    const green = parseChannel(parts[1]);
+                    const blue = parseChannel(parts[2]);
+
+                    if ([red, green, blue].indexOf(null) !== -1) {
+                        return null;
+                    }
+
+                    let alpha = 1;
+
+                    if (parts.length >= 4) {
+                        const alphaToken = parts[3].trim();
+                        if (alphaToken.charAt(alphaToken.length - 1) === '%') {
+                            const numeric = parseFloat(alphaToken.slice(0, -1));
+                            alpha = Number.isFinite(numeric) ? Math.min(1, Math.max(0, numeric / 100)) : 1;
+                        } else {
+                            const numeric = parseFloat(alphaToken);
+                            alpha = Number.isFinite(numeric) ? Math.min(1, Math.max(0, numeric)) : 1;
+                        }
+                    }
+
+                    return createColor(red, green, blue, alpha);
+                }
+            }
+
+            return null;
+        };
+
+        const srgbToLinear = function(channel) {
+            const normalized = channel / 255;
+            if (normalized <= 0.04045) {
+                return normalized / 12.92;
+            }
+            return Math.pow((normalized + 0.055) / 1.055, 2.4);
+        };
+
+        const computeRelativeLuminance = function(color) {
+            if (!color) {
+                return 0;
+            }
+
+            const r = srgbToLinear(color.r);
+            const g = srgbToLinear(color.g);
+            const b = srgbToLinear(color.b);
+
+            return (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
+        };
+
+        const compositeColors = function(foreground, background) {
+            const alpha = foreground.a + background.a * (1 - foreground.a);
+
+            if (alpha <= 0) {
+                return createColor(0, 0, 0, 0);
+            }
+
+            return createColor(
+                ((foreground.r * foreground.a) + (background.r * background.a * (1 - foreground.a))) / alpha,
+                ((foreground.g * foreground.a) + (background.g * background.a * (1 - foreground.a))) / alpha,
+                ((foreground.b * foreground.a) + (background.b * background.a * (1 - foreground.a))) / alpha,
+                alpha
+            );
+        };
+
+        const computeContrastRatio = function(foreground, background) {
+            if (!foreground || !background) {
+                return 1;
+            }
+
+            let fg = foreground;
+            let bg = background;
+
+            if (fg.a < 1) {
+                fg = compositeColors(fg, bg);
+            }
+
+            if (bg.a < 1) {
+                const fallback = createColor(255, 255, 255, 1);
+                bg = compositeColors(bg, fallback);
+            }
+
+            const l1 = computeRelativeLuminance(fg);
+            const l2 = computeRelativeLuminance(bg);
+
+            const lightest = Math.max(l1, l2);
+            const darkest = Math.min(l1, l2);
+
+            return (lightest + 0.05) / (darkest + 0.05);
+        };
+
+        const toCssString = function(color) {
+            return 'rgb(' + color.r + ', ' + color.g + ', ' + color.b + ')';
+        };
+
+        const resolveBackgroundColor = function(element) {
+            let current = element;
+
+            while (current && current.nodeType === 1) {
+                const style = window.getComputedStyle(current);
+                const background = parseColor(style.backgroundColor);
+
+                if (background && background.a > 0) {
+                    if (background.a >= 1) {
+                        return background;
+                    }
+
+                    const parent = current.parentElement;
+                    const parentBackground = parent ? resolveBackgroundColor(parent) : createColor(255, 255, 255, 1);
+                    return compositeColors(background, parentBackground);
+                }
+
+                current = current.parentElement;
+            }
+
+            return createColor(255, 255, 255, 1);
+        };
+
+        const candidateColors = [
+            createColor(17, 17, 17, 1),
+            createColor(0, 0, 0, 1),
+            createColor(255, 255, 255, 1),
+        ];
+
+        const adjustBadge = function(badge) {
+            if (!badge || badge.nodeType !== 1) {
+                return;
+            }
+
+            const computedStyle = window.getComputedStyle(badge);
+            const storedDefault = badge.dataset.tejlgDefaultTextColor;
+            const originalColorValue = storedDefault || computedStyle.color;
+
+            if (!storedDefault) {
+                badge.dataset.tejlgDefaultTextColor = originalColorValue;
+            }
+
+            const originalColor = parseColor(originalColorValue);
+            let backgroundColor = parseColor(computedStyle.backgroundColor);
+
+            if (!backgroundColor || backgroundColor.a === 0) {
+                backgroundColor = resolveBackgroundColor(badge.parentElement || badge);
+            }
+
+            const options = [];
+
+            if (originalColor) {
+                options.push({
+                    color: originalColor,
+                    cssValue: originalColorValue,
+                    ratio: computeContrastRatio(originalColor, backgroundColor),
+                });
+            }
+
+            for (let i = 0; i < candidateColors.length; i += 1) {
+                const color = candidateColors[i];
+                options.push({
+                    color: color,
+                    cssValue: toCssString(color),
+                    ratio: computeContrastRatio(color, backgroundColor),
+                });
+            }
+
+            if (!options.length) {
+                return;
+            }
+
+            let bestOption = options[0];
+
+            for (let i = 1; i < options.length; i += 1) {
+                const option = options[i];
+
+                if (option.ratio > bestOption.ratio) {
+                    bestOption = option;
+                }
+            }
+
+            if (!bestOption || !bestOption.color) {
+                return;
+            }
+
+            if (bestOption.ratio >= minContrastRatio) {
+                if (bestOption.cssValue === originalColorValue) {
+                    badge.style.removeProperty('--tejlg-pattern-term-text-color');
+                } else {
+                    badge.style.setProperty('--tejlg-pattern-term-text-color', bestOption.cssValue);
+                }
+                return;
+            }
+
+            badge.style.setProperty('--tejlg-pattern-term-text-color', bestOption.cssValue);
+        };
+
+        const adjustAllBadges = function(root) {
+            const scope = root || document;
+            const badges = scope.querySelectorAll ? scope.querySelectorAll(termSelector) : [];
+
+            for (let i = 0; i < badges.length; i += 1) {
+                adjustBadge(badges[i]);
+            }
+        };
+
+        adjustAllBadges(document);
+
+        const observeContainer = function(container) {
+            if (typeof window.MutationObserver !== 'function') {
+                return;
+            }
+
+            const observer = new window.MutationObserver(function(mutations) {
+                for (let i = 0; i < mutations.length; i += 1) {
+                    const mutation = mutations[i];
+
+                    if (mutation.type !== 'childList') {
+                        continue;
+                    }
+
+                    for (let j = 0; j < mutation.addedNodes.length; j += 1) {
+                        const node = mutation.addedNodes[j];
+
+                        if (!node || node.nodeType !== 1) {
+                            continue;
+                        }
+
+                        if (node.matches && node.matches(termSelector)) {
+                            adjustBadge(node);
+                        } else {
+                            adjustAllBadges(node);
+                        }
+                    }
+                }
+            });
+
+            observer.observe(container, { childList: true, subtree: true });
+        };
+
+        const termContainers = document.querySelectorAll('.pattern-selection-terms');
+        for (let i = 0; i < termContainers.length; i += 1) {
+            observeContainer(termContainers[i]);
+        }
+
+        const scheduleRefresh = function() {
+            if (typeof window.requestAnimationFrame === 'function') {
+                window.requestAnimationFrame(function() {
+                    adjustAllBadges(document);
+                });
+            } else {
+                window.setTimeout(function() {
+                    adjustAllBadges(document);
+                }, 0);
+            }
+        };
+
+        document.addEventListener('tejlg:contrast-mode-change', scheduleRefresh);
+
+        if (typeof window.matchMedia === 'function') {
+            try {
+                const darkSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+                const handleSchemeChange = function() {
+                    scheduleRefresh();
+                };
+
+                if (typeof darkSchemeQuery.addEventListener === 'function') {
+                    darkSchemeQuery.addEventListener('change', handleSchemeChange);
+                } else if (typeof darkSchemeQuery.addListener === 'function') {
+                    darkSchemeQuery.addListener(handleSchemeChange);
+                }
+            } catch (error) {
+                // Ignore media query observer errors to keep execution robust.
+            }
+        }
+
+        const shouldReactToAttributeChange = function(mutation) {
+            if (!mutation || mutation.type !== 'attributes') {
+                return false;
+            }
+
+            const attributeName = mutation.attributeName || '';
+
+            if (attributeName === 'data-admin-color') {
+                return true;
+            }
+
+            const getAttributeValue = function(target, name) {
+                if (!target || typeof target.getAttribute !== 'function') {
+                    return '';
+                }
+
+                const value = target.getAttribute(name);
+                return typeof value === 'string' ? value : '';
+            };
+
+            if (attributeName === 'class') {
+                const newValue = getAttributeValue(mutation.target, 'class');
+                const oldValue = typeof mutation.oldValue === 'string' ? mutation.oldValue : '';
+
+                if (newValue === oldValue) {
+                    return false;
+                }
+
+                const tokens = ['admin-color-', 'tejlg-contrast-enabled'];
+
+                for (let i = 0; i < tokens.length; i += 1) {
+                    const token = tokens[i];
+                    if (newValue.indexOf(token) !== -1 || oldValue.indexOf(token) !== -1) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            if (attributeName === 'style') {
+                const newValue = getAttributeValue(mutation.target, 'style');
+                const oldValue = typeof mutation.oldValue === 'string' ? mutation.oldValue : '';
+
+                if (newValue === oldValue) {
+                    return false;
+                }
+
+                const relevantTokens = [
+                    '--tejlg-accent-color',
+                    '--tejlg-accent-color-soft',
+                    '--tejlg-accent-color-darker',
+                    '--wp-admin-theme-color',
+                    '--wp-admin-theme-color-darker',
+                ];
+
+                for (let i = 0; i < relevantTokens.length; i += 1) {
+                    const token = relevantTokens[i];
+                    if (newValue.indexOf(token) !== -1 || oldValue.indexOf(token) !== -1) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        };
+
+        const observePaletteChanges = function(target) {
+            if (!target || typeof window.MutationObserver !== 'function') {
+                return;
+            }
+
+            try {
+                const observer = new window.MutationObserver(function(mutations) {
+                    for (let i = 0; i < mutations.length; i += 1) {
+                        const mutation = mutations[i];
+
+                        if (shouldReactToAttributeChange(mutation)) {
+                            scheduleRefresh();
+                            break;
+                        }
+                    }
+                });
+
+                observer.observe(target, {
+                    attributes: true,
+                    attributeFilter: ['data-admin-color', 'class', 'style'],
+                    attributeOldValue: true,
+                });
+            } catch (error) {
+                // Ignore observer failures to avoid impacting other scripts.
+            }
+        };
+
+        observePaletteChanges(document.documentElement);
+
+        if (document.body && document.body !== document.documentElement) {
+            observePaletteChanges(document.body);
         }
     })();
 

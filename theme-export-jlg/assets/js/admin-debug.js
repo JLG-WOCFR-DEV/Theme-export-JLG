@@ -301,7 +301,11 @@
                 }
             };
 
-            const stopMonitoring = function() {
+            const pauseMonitoring = function() {
+                if (!monitoringActive) {
+                    return;
+                }
+
                 monitoringActive = false;
 
                 if (animationFrameId !== null) {
@@ -313,14 +317,29 @@
                     performanceObserverInstance.disconnect();
                     performanceObserverInstance = null;
                 }
+            };
 
-                fpsElement.textContent = stoppedText;
-                latencyElement.textContent = stoppedText;
+            const resumeMonitoring = function() {
+                if (monitoringActive) {
+                    return;
+                }
+
+                monitoringActive = true;
+                lastFrameTime = undefined;
+
+                updateDisplay();
+                setupPerformanceObserver();
+
+                if (animationFrameId === null) {
+                    scheduleNextFrame();
+                }
             };
 
             const handleVisibilityChange = function() {
                 if (document.hidden) {
-                    stopMonitoring();
+                    pauseMonitoring();
+                } else {
+                    resumeMonitoring();
                 }
             };
 
