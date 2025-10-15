@@ -29,6 +29,7 @@
 
 - ✅ Le moniteur FPS/latence s’interrompt désormais proprement en arrière-plan puis reprend automatiquement dès que l’onglet redevient visible, grâce à une bascule `pause/resume` qui réinitialise la boucle `requestAnimationFrame` sans perdre les mesures affichées.【F:theme-export-jlg/assets/js/admin-debug.js†L180-L347】
 - ✅ Les badges de catégories ajustent dynamiquement la couleur de texte via un contrôle du ratio de contraste RGAA, avec un fallback CSS en cas d’absence de support `color-mix`, une réévaluation lorsqu’un thème à fort contraste est activé et une surveillance des changements de palette (`data-admin-color`, classes `admin-color-*`) pour maintenir le ratio après un switch à chaud.【F:theme-export-jlg/assets/js/admin-export.js†L1-L230】【F:theme-export-jlg/assets/js/admin-export.js†L240-L580】【F:theme-export-jlg/assets/css/admin-styles.css†L1700-L1724】
+- ✅ Le mode contraste se synchronise entre onglets grâce à un écouteur `storage` qui applique les changements déclenchés dans une autre fenêtre et rétablit la préférence par défaut lorsqu’elle est supprimée, évitant les incohérences d’interface pour les agents support multi-sessions.【F:theme-export-jlg/assets/js/admin-export.js†L40-L150】
 
 ## Recommandations
 

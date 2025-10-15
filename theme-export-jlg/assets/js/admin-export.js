@@ -114,6 +114,41 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         };
 
+        const handleStorageChange = function(event) {
+            if (!event || (typeof event.key === 'string' && event.key !== storageKey)) {
+                return;
+            }
+
+            if (event.storageArea && event.storageArea !== window.localStorage) {
+                return;
+            }
+
+            let nextState;
+
+            if (event.newValue === '1' || event.newValue === '0') {
+                storedPreference = event.newValue;
+                hasStoredPreference = true;
+                nextState = event.newValue === '1';
+            } else if (event.newValue === null) {
+                storedPreference = null;
+                hasStoredPreference = false;
+                nextState = prefersHighContrast;
+            } else {
+                return;
+            }
+
+            if (typeof nextState === 'boolean' && nextState !== enabled) {
+                enabled = nextState;
+                applyState(enabled);
+            }
+        };
+
+        try {
+            window.addEventListener('storage', handleStorageChange);
+        } catch (error) {
+            // Ignore storage listener registration failures (e.g., older browsers).
+        }
+
         applyState(enabled);
 
         if (toggle) {
