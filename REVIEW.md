@@ -31,7 +31,11 @@
 - ✅ Les badges de catégories ajustent dynamiquement la couleur de texte via un contrôle du ratio de contraste RGAA, avec un fallback CSS en cas d’absence de support `color-mix`, une réévaluation lorsqu’un thème à fort contraste est activé et une surveillance des changements de palette (`data-admin-color`, classes `admin-color-*`) pour maintenir le ratio après un switch à chaud.【F:theme-export-jlg/assets/js/admin-export.js†L1-L230】【F:theme-export-jlg/assets/js/admin-export.js†L240-L580】【F:theme-export-jlg/assets/css/admin-styles.css†L1700-L1724】
 - ✅ Le mode contraste se synchronise entre onglets grâce à un écouteur `storage` qui applique les changements déclenchés dans une autre fenêtre et rétablit la préférence par défaut lorsqu’elle est supprimée, évitant les incohérences d’interface pour les agents support multi-sessions.【F:theme-export-jlg/assets/js/admin-export.js†L40-L150】
 
+## Mises à jour (mars 2025)
+
+- ✅ Pipeline de connecteurs distants (S3 et SFTP) piloté par le payload `$event`, avec historisation des résultats dans les entrées d’export pour suivre la redondance hors site.【F:theme-export-jlg/includes/class-tejlg-export-connectors.php†L1-L356】【F:theme-export-jlg/includes/class-tejlg-export-history.php†L640-L748】
+- ✅ Nouveau gabarit HTML extensible pour les e-mails, surchargeable via filtre et template dédié, garantissant un rendu accessible compatible RGAA.【F:theme-export-jlg/includes/class-tejlg-export-notifications.php†L360-L520】【F:theme-export-jlg/templates/emails/export-notification.php†L1-L240】
+
 ## Recommandations
 
-- Proposer un connecteur optionnel (S3, SFTP) pour rapprocher la redondance des exports de ce que proposent BlogVault ou ManageWP, en capitalisant sur le nouveau payload `$event` pour tracer les envois.
-- Ajouter un gabarit d’e-mail HTML personnalisable (via template PHP ou bloc) afin d’aligner le rendu sur les notifications transactionnelles des suites pro.
+- Documenter une matrice de tests des connecteurs distants (performances, limites d’upload) pour orienter le dimensionnement des environnements support.

@@ -654,6 +654,10 @@ class TEJLG_Export_History {
             $entry['context'] = '';
         }
 
+        if (isset($entry['remote_connectors'])) {
+            $entry['remote_connectors'] = self::sanitize_remote_connector_logs($entry['remote_connectors']);
+        }
+
         return $entry;
     }
 
@@ -682,6 +686,133 @@ class TEJLG_Export_History {
             'excluded_count' => isset($meta['excluded_count']) ? max(0, (int) $meta['excluded_count']) : 0,
             'warnings'       => $warnings,
         ];
+    }
+
+    /**
+     * Attaches remote connector logs to the entry matching the provided job ID.
+     *
+     * @param string $job_id
+     * @param array  $results
+     *
+     * @return bool
+     */
+    public static function attach_remote_connector_results($job_id, array $results) {
+        $job_id = (string) $job_id;
+
+        if ('' === $job_id) {
+            return false;
+        }
+
+        $logs = self::sanitize_remote_connector_logs($results);
+
+        $entries = self::get_raw_entries();
+        $updated = false;
+
+        foreach ($entries as $index => $entry) {
+            if (!is_array($entry) || !isset($entry['job_id'])) {
+                continue;
+            }
+
+            if ((string) $entry['job_id'] !== $job_id) {
+                continue;
+            }
+
+            $entries[$index]['remote_connectors'] = $logs;
+            $updated = true;
+            break;
+        }
+
+        if (!$updated) {
+            return false;
+        }
+
+        self::save_entries($entries);
+
+        return true;
+    }
+
+    /**
+     * Sanitizes remote connector logs stored alongside an entry.
+     *
+     * @param mixed $logs
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public static function sanitize_remote_connector_logs($logs) {
+        if (!is_array($logs)) {
+            return [];
+        }
+
+        $sanitized = [];
+
+        foreach ($logs as $log) {
+            if (!is_array($log)) {
+                continue;
+            }
+
+            $id = isset($log['id']) ? sanitize_key((string) $log['id']) : '';
+
+            if ('' === $id) {
+                continue;
+            }
+
+            $type    = isset($log['type']) ? sanitize_key((string) $log['type']) : '';
+            $status  = isset($log['status']) ? sanitize_key((string) $log['status']) : 'success';
+            $message = isset($log['message']) ? sanitize_text_field((string) $log['message']) : '';
+            $location = isset($log['location']) ? sanitize_text_field((string) $log['location']) : '';
+            $duration = isset($log['duration']) ? (float) $log['duration'] : 0.0;
+            $timestamp = isset($log['timestamp']) ? max(0, (int) $log['timestamp']) : time();
+            $meta = isset($log['meta']) ? self::sanitize_remote_connector_meta($log['meta']) : [];
+
+            $sanitized[] = [
+                'id'        => $id,
+                'type'      => $type,
+                'status'    => $status,
+                'message'   => $message,
+                'location'  => $location,
+                'duration'  => $duration,
+                'timestamp' => $timestamp,
+                'meta'      => $meta,
+            ];
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Recursively sanitizes connector metadata.
+     *
+     * @param mixed $meta
+     *
+     * @return mixed
+     */
+    private static function sanitize_remote_connector_meta($meta) {
+        if (is_array($meta)) {
+            $sanitized = [];
+
+            foreach ($meta as $key => $value) {
+                $normalized_key = is_string($key) ? sanitize_key($key) : (string) $key;
+                $sanitized[$normalized_key] = self::sanitize_remote_connector_meta($value);
+            }
+
+            return $sanitized;
+        }
+
+        if (is_scalar($meta)) {
+            if (is_string($meta)) {
+                return sanitize_text_field($meta);
+            }
+
+            if (is_bool($meta)) {
+                return $meta;
+            }
+
+            if (is_int($meta) || is_float($meta)) {
+                return $meta + 0;
+            }
+        }
+
+        return '';
     }
 
     private static function get_raw_entries() {

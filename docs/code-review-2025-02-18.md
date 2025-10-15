@@ -4,6 +4,7 @@
 - Le socle d'interface continue de respecter les bonnes pratiques d'accessibilité : les formulaires d'import exposent des zones de dépôt focusables avec rôle explicite, étiquettes associées et raccourcis clavier Enter/Espace pour lancer la boîte de dialogue de fichiers.【F:theme-export-jlg/templates/admin/import.php†L19-L47】【F:theme-export-jlg/assets/js/admin-import.js†L7-L123】
 - La sélection des compositions et le panneau d'actions rapides gèrent correctement l'annonce vocale, la navigation clavier et le piégeage du focus, ce qui va dans le sens des critères RGAA 7.1, 7.3 et 12.10.【F:theme-export-jlg/templates/admin/export-pattern-selection.php†L26-L158】【F:theme-export-jlg/assets/js/admin-export.js†L4568-L4828】
 - L'outillage de débogage expose des métriques en direct mais le module JavaScript arrête définitivement le suivi après un passage de l'onglet en arrière-plan.
+- Les exports disposent désormais d'un pipeline optionnel vers S3/SFTP et d'un gabarit HTML accessible pour les notifications, ce qui rapproche l'extension des offres pro sur la redondance et la communication multi-canal.【F:theme-export-jlg/includes/class-tejlg-export-connectors.php†L1-L356】【F:theme-export-jlg/templates/emails/export-notification.php†L1-L240】
 
 ## Points de vigilance / bugs
 1. **Badge FPS/latence figé après masquage de l'onglet** *(corrigé)*
@@ -24,3 +25,7 @@
 - ✅ Implémentation d'un couple `pauseMonitoring()`/`resumeMonitoring()` qui suspend la collecte lorsque l'onglet passe en arrière-plan puis réarme `requestAnimationFrame` et le `PerformanceObserver` dès que l'onglet redevient visible, supprimant le besoin de recharger l'écran de debug.【F:theme-export-jlg/assets/js/admin-debug.js†L180-L347】
 - ✅ Ajout d'un contrôle automatique du contraste des badges de catégories, avec suivi des insertions dynamiques, relance lors des changements de mode contraste/schéma de couleurs et observation des bascules de palette WordPress (`data-admin-color`, classes `admin-color-*`) pour garantir le respect du seuil 4,5 :1 même sans rechargement.【F:theme-export-jlg/assets/js/admin-export.js†L1-L360】【F:theme-export-jlg/assets/js/admin-export.js†L360-L580】【F:theme-export-jlg/assets/css/admin-styles.css†L1700-L1724】
 - ✅ Synchronisation du mode contraste entre onglets : un écouteur `storage` relaie immédiatement les bascules déclenchées depuis une autre fenêtre et restaure le comportement par défaut lorsque la préférence est effacée, assurant une expérience cohérente multi-sessions.【F:theme-export-jlg/assets/js/admin-export.js†L40-L150】
+
+## Mise à jour (mars 2025)
+- ✅ Connecteurs distants S3/SFTP configurables via filtres avec journalisation automatique des envois pour audit et support.【F:theme-export-jlg/includes/class-tejlg-export-connectors.php†L1-L356】【F:theme-export-jlg/includes/class-tejlg-export-history.php†L640-L748】
+- ✅ Nouveau template HTML responsive pour les e-mails d'export, surchargeable et conforme aux recommandations RGAA (structure, contrastes, hiérarchie d'information).【F:theme-export-jlg/includes/class-tejlg-export-notifications.php†L360-L520】【F:theme-export-jlg/templates/emails/export-notification.php†L1-L240】
