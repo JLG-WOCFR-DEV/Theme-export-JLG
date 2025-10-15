@@ -2244,6 +2244,31 @@ class TEJLG_Export {
             'failure_code'     => isset($job['failure_code']) ? (string) $job['failure_code'] : '',
         ];
 
+        if (!empty($response['zip_file_size'])) {
+            $response['zip_file_size_label'] = size_format((int) $response['zip_file_size'], 2);
+        } else {
+            $response['zip_file_size_label'] = '';
+        }
+
+        if (isset($job['completed_at'])) {
+            $response['completed_at'] = (int) $job['completed_at'];
+        }
+
+        if (isset($job['exclusions']) && is_array($job['exclusions'])) {
+            $normalized_exclusions = array_filter(
+                array_map(
+                    static function ($value) {
+                        return is_scalar($value) ? sanitize_text_field((string) $value) : '';
+                    },
+                    $job['exclusions']
+                )
+            );
+
+            $response['exclusions'] = array_values($normalized_exclusions);
+        } else {
+            $response['exclusions'] = [];
+        }
+
         if (isset($job['summary_meta']) && is_array($job['summary_meta'])) {
             $response['summary_meta'] = self::normalize_summary_meta($job['summary_meta']);
         }

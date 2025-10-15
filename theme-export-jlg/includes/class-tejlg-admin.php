@@ -201,6 +201,22 @@ class TEJLG_Admin {
                             'jobStatusUnknown' => esc_html__('Statut inconnu', 'theme-export-jlg'),
                             'jobTimestampFallback' => esc_html__('Date inconnue', 'theme-export-jlg'),
                         ],
+                        'banner'         => [
+                            'statusText'    => esc_html__('Statut : %s', 'theme-export-jlg'),
+                            'sizeText'      => esc_html__('Taille : %s', 'theme-export-jlg'),
+                            'sizeUnknown'   => esc_html__('Inconnue', 'theme-export-jlg'),
+                            'exclusionsText' => esc_html__('Motifs : %s', 'theme-export-jlg'),
+                            'noExclusion'   => esc_html__('Aucun motif', 'theme-export-jlg'),
+                            'summaryCounts' => esc_html__('%1$d fichier(s) inclus · %2$d exclu(s)', 'theme-export-jlg'),
+                            'summaryWarnings' => esc_html__('Avertissements : %s', 'theme-export-jlg'),
+                            'statusLabels'  => [
+                                'completed' => esc_html__('Succès', 'theme-export-jlg'),
+                                'failed'    => esc_html__('Échec', 'theme-export-jlg'),
+                                'cancelled' => esc_html__('Annulé', 'theme-export-jlg'),
+                                'processing'=> esc_html__('En cours', 'theme-export-jlg'),
+                                'queued'    => esc_html__('En attente', 'theme-export-jlg'),
+                            ],
+                        ],
                         'previousJob' => TEJLG_Export::get_current_user_job_snapshot(),
                         'defaults'    => [
                             'exclusions' => $saved_exclusions,

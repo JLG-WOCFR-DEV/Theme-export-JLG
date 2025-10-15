@@ -786,15 +786,23 @@ $quality_benchmarks = [
 </div>
 <div class="tejlg-export-banner" role="region" aria-labelledby="tejlg-export-banner-title">
     <h2 id="tejlg-export-banner-title" class="tejlg-export-banner__title"><?php esc_html_e('Centre de contrôle', 'theme-export-jlg'); ?></h2>
-    <div class="tejlg-export-banner__grid">
-        <div class="tejlg-export-banner__item" data-status-variant="<?php echo esc_attr($latest_export_status_variant); ?>">
+    <div class="tejlg-export-banner__grid" data-export-banner>
+        <div
+            class="tejlg-export-banner__item"
+            data-status-variant="<?php echo esc_attr($latest_export_status_variant); ?>"
+            data-banner-latest
+        >
             <span class="tejlg-export-banner__label"><?php esc_html_e('Dernier export', 'theme-export-jlg'); ?></span>
-            <span class="tejlg-status-badge tejlg-status-badge--<?php echo esc_attr($latest_export_status_variant); ?>">
+            <span
+                class="tejlg-status-badge tejlg-status-badge--<?php echo esc_attr($latest_export_status_variant); ?>"
+                data-banner-latest-status-badge
+            >
                 <span class="tejlg-status-badge__icon" aria-hidden="true"></span>
-                <span class="tejlg-status-badge__text"><?php echo esc_html($latest_export_status_label_text); ?></span>
+                <span class="tejlg-status-badge__text" data-banner-latest-status-label><?php echo esc_html($latest_export_status_label_text); ?></span>
             </span>
-            <span class="tejlg-export-banner__meta"><?php echo esc_html($latest_export_date); ?></span>
-            <span class="tejlg-export-banner__meta">
+            <span class="tejlg-export-banner__meta" data-banner-latest-status><?php echo esc_html($latest_export_status); ?></span>
+            <span class="tejlg-export-banner__meta" data-banner-latest-date><?php echo esc_html($latest_export_date); ?></span>
+            <span class="tejlg-export-banner__meta" data-banner-latest-size>
                 <?php
                 printf(
                     /* translators: %s: archive size label */
@@ -803,7 +811,7 @@ $quality_benchmarks = [
                 );
                 ?>
             </span>
-            <span class="tejlg-export-banner__meta">
+            <span class="tejlg-export-banner__meta" data-banner-latest-exclusions>
                 <?php
                 printf(
                     /* translators: %s: exclusion patterns list */
@@ -812,22 +820,42 @@ $quality_benchmarks = [
                 );
                 ?>
             </span>
-            <?php if ('' !== $latest_export_summary_counts) : ?>
-                <span class="tejlg-export-banner__meta"><?php echo esc_html($latest_export_summary_counts); ?></span>
-            <?php endif; ?>
-            <?php if ('' !== $latest_export_summary_warnings) : ?>
-                <span class="tejlg-export-banner__meta tejlg-export-banner__meta--warning"><?php echo esc_html($latest_export_summary_warnings); ?></span>
-            <?php endif; ?>
-            <?php if ('' !== $latest_export_download_url) : ?>
-                <a class="tejlg-export-banner__link" href="<?php echo esc_url($latest_export_download_url); ?>" target="_blank" rel="noopener noreferrer">
-                    <?php esc_html_e('Télécharger la dernière archive', 'theme-export-jlg'); ?>
-                </a>
-            <?php endif; ?>
-            <?php if ('' !== $latest_export_summary_url) : ?>
-                <a class="tejlg-export-banner__link" href="<?php echo esc_url($latest_export_summary_url); ?>" target="_blank" rel="noopener noreferrer">
-                    <?php esc_html_e('Télécharger le résumé JSON', 'theme-export-jlg'); ?>
-                </a>
-            <?php endif; ?>
+            <span
+                class="tejlg-export-banner__meta"
+                data-banner-latest-counts
+                <?php echo '' === $latest_export_summary_counts ? ' hidden' : ''; ?>
+            ><?php echo esc_html($latest_export_summary_counts); ?></span>
+            <span
+                class="tejlg-export-banner__meta tejlg-export-banner__meta--warning"
+                data-banner-latest-warnings
+                <?php echo '' === $latest_export_summary_warnings ? ' hidden' : ''; ?>
+            ><?php echo esc_html($latest_export_summary_warnings); ?></span>
+            <a
+                class="tejlg-export-banner__link"
+                data-banner-latest-download
+                <?php if ('' !== $latest_export_download_url) : ?>
+                    href="<?php echo esc_url($latest_export_download_url); ?>"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                <?php else : ?>
+                    hidden
+                <?php endif; ?>
+            >
+                <?php esc_html_e('Télécharger la dernière archive', 'theme-export-jlg'); ?>
+            </a>
+            <a
+                class="tejlg-export-banner__link"
+                data-banner-latest-summary
+                <?php if ('' !== $latest_export_summary_url) : ?>
+                    href="<?php echo esc_url($latest_export_summary_url); ?>"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                <?php else : ?>
+                    hidden
+                <?php endif; ?>
+            >
+                <?php esc_html_e('Télécharger le résumé JSON', 'theme-export-jlg'); ?>
+            </a>
         </div>
         <div class="tejlg-export-banner__item" data-status-variant="<?php echo esc_attr($schedule_status_variant); ?>">
             <span class="tejlg-export-banner__label"><?php esc_html_e('Prochain export', 'theme-export-jlg'); ?></span>
