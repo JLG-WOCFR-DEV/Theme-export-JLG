@@ -83,9 +83,43 @@
                 ? localization.metrics
                 : {};
 
-            const locale = typeof metricsLocalization.locale === 'string' && metricsLocalization.locale
-                ? metricsLocalization.locale
-                : undefined;
+            const normalizeLocale = function(rawLocale) {
+                if (typeof window.Intl !== 'object' || typeof window.Intl.NumberFormat !== 'function') {
+                    return undefined;
+                }
+
+                if (typeof rawLocale !== 'string') {
+                    return undefined;
+                }
+
+                const trimmed = rawLocale.trim();
+
+                if (!trimmed) {
+                    return undefined;
+                }
+
+                const candidates = [trimmed.replace(/_/g, '-'), trimmed, trimmed.split(/[_-]/)[0]];
+
+                for (let i = 0; i < candidates.length; i += 1) {
+                    const candidate = candidates[i];
+
+                    if (!candidate) {
+                        continue;
+                    }
+
+                    try {
+                        // Validate locale without keeping the formatter instance.
+                        new window.Intl.NumberFormat(candidate);
+                        return candidate;
+                    } catch (error) {
+                        // Try next candidate.
+                    }
+                }
+
+                return undefined;
+            };
+
+            const locale = normalizeLocale(metricsLocalization.locale);
 
             const fpsUnit = typeof metricsLocalization.fpsUnit === 'string' && metricsLocalization.fpsUnit.trim() !== ''
                 ? metricsLocalization.fpsUnit
