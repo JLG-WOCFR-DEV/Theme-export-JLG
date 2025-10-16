@@ -717,7 +717,13 @@ class TEJLG_Export_Connectors {
             return false;
         }
 
-        return $host === $bucket || str_starts_with($host, $bucket . '.');
+        if ($host === $bucket) {
+            return true;
+        }
+
+        $prefix = $bucket . '.';
+
+        return 0 === strpos($host, $prefix);
     }
 
     /**
