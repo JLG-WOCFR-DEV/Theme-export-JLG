@@ -25,26 +25,36 @@ class TEJLG_Export_Connectors {
         unset($payload, $sent); // Not used but kept for signature parity with the action.
 
         if (!is_array($event) || empty($event['job_id'])) {
+            self::record_skip('invalid_event_payload', [], ['payload_type' => gettype($event)]);
+
             return;
         }
 
         if (!class_exists('TEJLG_Export_History')) {
+            self::record_skip('missing_history_dependency', $event);
+
             return;
         }
 
         if (!isset($event['result']) || TEJLG_Export_History::RESULT_SUCCESS !== $event['result']) {
+            self::record_skip('non_successful_event', $event, ['result' => isset($event['result']) ? $event['result'] : null]);
+
             return;
         }
 
         $persistent_path = isset($event['persistent_path']) ? (string) $event['persistent_path'] : '';
 
         if ('' === $persistent_path || !file_exists($persistent_path) || !is_readable($persistent_path)) {
+            self::record_skip('missing_archive', $event, ['path' => $persistent_path]);
+
             return;
         }
 
         $connectors = self::get_connectors($event, $entry, $job, $context);
 
         if (empty($connectors)) {
+            self::record_skip('no_connectors_enabled', $event);
+
             return;
         }
 
@@ -61,6 +71,8 @@ class TEJLG_Export_Connectors {
         }
 
         if (empty($results)) {
+            self::record_skip('connectors_all_skipped', $event);
+
             return;
         }
 
@@ -307,31 +319,20 @@ class TEJLG_Export_Connectors {
         $object_key = ltrim($object_key, '/');
         $encoded_key = self::encode_s3_key($object_key);
 
-        if ('' === $endpoint) {
-            if ($force_path_style) {
-                $host = sprintf('s3.%s.amazonaws.com', $region);
-                $uri  = '/' . rawurlencode($bucket) . '/' . $encoded_key;
-            } else {
-                $host = sprintf('%s.s3.%s.amazonaws.com', $bucket, $region);
-                $uri  = '/' . $encoded_key;
-            }
+        $target = self::build_s3_request_target($endpoint, $region, $bucket, $encoded_key, $force_path_style);
 
-            $url = 'https://' . $host . $uri;
-        } else {
-            $endpoint = rtrim($endpoint, '/');
-            $host     = parse_url($endpoint, PHP_URL_HOST);
+        if (is_wp_error($target)) {
+            return $target;
+        }
 
-            if (!is_string($host) || '' === $host) {
-                return new WP_Error('tejlg_remote_connector_s3_endpoint', __('Endpoint S3 invalide.', 'theme-export-jlg'));
-            }
+        $host = $target['host'];
+        $uri  = $target['uri'];
+        $url  = $target['url'];
 
-            if ($force_path_style) {
-                $uri = '/' . rawurlencode($bucket) . '/' . $encoded_key;
-                $url = $endpoint . $uri;
-            } else {
-                $uri = '/' . $encoded_key;
-                $url = $endpoint . $uri;
-            }
+        $file_size = filesize($file_path);
+
+        if (false === $file_size) {
+            return new WP_Error('tejlg_remote_connector_s3_filesize', __('Taille du fichier introuvable pour l’upload S3.', 'theme-export-jlg'));
         }
 
         $payload_hash = hash_file('sha256', $file_path);
@@ -349,6 +350,7 @@ class TEJLG_Export_Connectors {
             'x-amz-content-sha256' => $payload_hash,
             'x-amz-date'        => $amz_date,
             'Content-Type'      => $content_type,
+            'Content-Length'    => (string) $file_size,
         ];
 
         if ('' !== $acl) {
@@ -404,27 +406,13 @@ class TEJLG_Export_Connectors {
             $signature
         );
 
-        $body = file_get_contents($file_path);
-
-        if (false === $body) {
-            return new WP_Error('tejlg_remote_connector_s3_body', __('Lecture du fichier impossible pour l’upload S3.', 'theme-export-jlg'));
-        }
-
-        $response = wp_remote_request(
-            $url,
-            [
-                'method'  => 'PUT',
-                'headers' => $headers,
-                'body'    => $body,
-                'timeout' => max(5, $timeout),
-            ]
-        );
+        $response = self::stream_s3_upload($url, $headers, $file_path, (int) $file_size, max(5, $timeout));
 
         if (is_wp_error($response)) {
             return $response;
         }
 
-        $code = wp_remote_retrieve_response_code($response);
+        $code = isset($response['code']) ? (int) $response['code'] : 0;
 
         if ($code < 200 || $code >= 300) {
             return new WP_Error(
@@ -523,17 +511,17 @@ class TEJLG_Export_Connectors {
             return new WP_Error('tejlg_remote_connector_sftp_directory', __('Impossible de créer le répertoire distant.', 'theme-export-jlg'));
         }
 
-        $stream = @fopen('ssh2.sftp://' . intval($sftp) . $remotePath, 'w');
-
-        if (false === $stream) {
-            return new WP_Error('tejlg_remote_connector_sftp_stream', __('Ouverture du flux SFTP impossible.', 'theme-export-jlg'));
-        }
-
         $context = stream_context_create([
             'ssh2' => [
                 'session' => $connection,
             ],
         ]);
+
+        $stream = @fopen('ssh2.sftp://' . intval($sftp) . $remotePath, 'w', false, $context);
+
+        if (false === $stream) {
+            return new WP_Error('tejlg_remote_connector_sftp_stream', __('Ouverture du flux SFTP impossible.', 'theme-export-jlg'));
+        }
 
         stream_set_timeout($stream, $timeout);
 
@@ -603,6 +591,216 @@ class TEJLG_Export_Connectors {
         }
 
         return true;
+    }
+
+    /**
+     * Records a skip reason for observability and debugging.
+     *
+     * @param string               $reason  Machine-readable reason identifier.
+     * @param array<string,mixed>  $event   Related event payload (if available).
+     * @param array<string,mixed>  $context Additional metadata about the skip.
+     */
+    private static function record_skip($reason, $event = [], array $context = []) {
+        $event = is_array($event) ? $event : [];
+
+        $payload = [
+            'reason'  => sanitize_key((string) $reason),
+            'job_id'  => isset($event['job_id']) ? (string) $event['job_id'] : '',
+            'context' => $context,
+        ];
+
+        /**
+         * Fires when the remote connector dispatcher skips execution.
+         *
+         * @param array<string,mixed> $payload Structured skip details.
+         * @param array<string,mixed> $event   Related event payload.
+         */
+        do_action('tejlg_export_remote_connector_skipped', $payload, $event);
+
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $message = '[theme-export-jlg] Remote connector skipped: ' . (function_exists('wp_json_encode')
+                ? wp_json_encode($payload)
+                : $payload['reason']);
+
+            error_log($message); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+        }
+    }
+
+    /**
+     * Prepares the host, URI and URL for an S3 request.
+     *
+     * @param string $endpoint
+     * @param string $region
+     * @param string $bucket
+     * @param string $encoded_key
+     * @param bool   $force_path_style
+     *
+     * @return array<string,string>|WP_Error
+     */
+    private static function build_s3_request_target($endpoint, $region, $bucket, $encoded_key, $force_path_style) {
+        $encoded_key = ltrim((string) $encoded_key, '/');
+
+        if ('' === $endpoint) {
+            if ($force_path_style) {
+                $host = sprintf('s3.%s.amazonaws.com', $region);
+                $uri  = '/' . rawurlencode($bucket) . '/' . $encoded_key;
+            } else {
+                $host = sprintf('%s.s3.%s.amazonaws.com', $bucket, $region);
+                $uri  = '/' . $encoded_key;
+            }
+
+            return [
+                'host' => $host,
+                'uri'  => $uri,
+                'url'  => 'https://' . $host . $uri,
+            ];
+        }
+
+        $parts = function_exists('wp_parse_url') ? wp_parse_url($endpoint) : parse_url($endpoint);
+
+        if (!is_array($parts) || empty($parts['host'])) {
+            return new WP_Error('tejlg_remote_connector_s3_endpoint', __('Endpoint S3 invalide.', 'theme-export-jlg'));
+        }
+
+        $scheme = isset($parts['scheme']) && '' !== $parts['scheme'] ? $parts['scheme'] : 'https';
+        $host   = $parts['host'];
+        $port   = isset($parts['port']) ? (int) $parts['port'] : null;
+        $path   = isset($parts['path']) ? trim((string) $parts['path'], '/') : '';
+        $query  = isset($parts['query']) ? (string) $parts['query'] : '';
+
+        if ($force_path_style) {
+            $segments = array_filter([$path, rawurlencode($bucket), $encoded_key], 'strlen');
+        } else {
+            if (!self::host_contains_bucket($host, $bucket)) {
+                $host = $bucket . '.' . $host;
+            }
+
+            $segments = array_filter([$path, $encoded_key], 'strlen');
+        }
+
+        $uri_segments = array_map(
+            static function ($segment) {
+                return trim((string) $segment, '/');
+            },
+            $segments
+        );
+
+        $uri = '/' . implode('/', $uri_segments);
+
+        $authority = $host . (null !== $port ? ':' . $port : '');
+        $url       = $scheme . '://' . $authority . $uri;
+
+        if ('' !== $query) {
+            $url .= '?' . $query;
+        }
+
+        return [
+            'host' => $authority,
+            'uri'  => $uri,
+            'url'  => $url,
+        ];
+    }
+
+    /**
+     * Determines whether the provided host already includes the bucket segment.
+     *
+     * @param string $host
+     * @param string $bucket
+     *
+     * @return bool
+     */
+    private static function host_contains_bucket($host, $bucket) {
+        $host   = strtolower((string) $host);
+        $bucket = strtolower((string) $bucket);
+
+        if ('' === $host || '' === $bucket) {
+            return false;
+        }
+
+        return $host === $bucket || str_starts_with($host, $bucket . '.');
+    }
+
+    /**
+     * Streams the archive to S3 using cURL without loading it entirely in memory.
+     *
+     * @param string $url
+     * @param array<string,string> $headers
+     * @param string $file_path
+     * @param int    $file_size
+     * @param int    $timeout
+     *
+     * @return array<string,mixed>|WP_Error
+     */
+    private static function stream_s3_upload($url, array $headers, $file_path, $file_size, $timeout) {
+        if (!function_exists('curl_init')) {
+            return new WP_Error('tejlg_remote_connector_s3_streaming', __('Extension cURL requise pour le streaming S3.', 'theme-export-jlg'));
+        }
+
+        $handle = @fopen($file_path, 'rb');
+
+        if (false === $handle) {
+            return new WP_Error('tejlg_remote_connector_s3_body', __('Lecture du fichier impossible pour l’upload S3.', 'theme-export-jlg'));
+        }
+
+        try {
+            $curl = curl_init($url);
+
+            if (false === $curl) {
+                return new WP_Error('tejlg_remote_connector_s3_curl', __('Initialisation cURL impossible pour l’upload S3.', 'theme-export-jlg'));
+            }
+
+            $header_lines = [];
+
+            foreach ($headers as $name => $value) {
+                $header_lines[] = $name . ': ' . $value;
+            }
+
+            curl_setopt($curl, CURLOPT_UPLOAD, true);
+            curl_setopt($curl, CURLOPT_INFILE, $handle);
+            curl_setopt($curl, CURLOPT_INFILESIZE, $file_size);
+            curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'PUT');
+            curl_setopt($curl, CURLOPT_HTTPHEADER, $header_lines);
+            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($curl, CURLOPT_HEADER, true);
+            curl_setopt($curl, CURLOPT_TIMEOUT, max(5, (int) $timeout));
+
+            if (defined('CURL_HTTP_VERSION_1_1')) {
+                curl_setopt($curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+            }
+
+            $raw = curl_exec($curl);
+
+            if (false === $raw) {
+                $error = curl_error($curl);
+                $errno = curl_errno($curl);
+                curl_close($curl);
+
+                return new WP_Error(
+                    'tejlg_remote_connector_s3_curl',
+                    sprintf(
+                        /* translators: 1: cURL error code, 2: error message. */
+                        __('Erreur cURL (%1$d) pendant l’upload S3 : %2$s', 'theme-export-jlg'),
+                        (int) $errno,
+                        $error
+                    )
+                );
+            }
+
+            $status      = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+            $header_size = curl_getinfo($curl, CURLINFO_HEADER_SIZE);
+            $headers_raw = substr($raw, 0, $header_size);
+            $body        = substr($raw, $header_size);
+
+            curl_close($curl);
+
+            return [
+                'code'    => (int) $status,
+                'headers' => $headers_raw,
+                'body'    => $body,
+            ];
+        } finally {
+            fclose($handle);
+        }
     }
 
     /**
