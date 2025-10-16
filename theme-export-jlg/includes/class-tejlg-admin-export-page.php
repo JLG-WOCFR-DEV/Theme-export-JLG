@@ -19,6 +19,9 @@ if (!class_exists('TEJLG_Redirect_Exception')) {
 class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
     const EXCLUSION_PATTERNS_OPTION = 'tejlg_export_exclusion_patterns';
     const PORTABLE_MODE_OPTION      = 'tejlg_export_portable_mode';
+    const INTERFACE_MODE_META_KEY   = 'tejlg_interface_mode';
+    const INTERFACE_MODE_OPTION     = 'tejlg_interface_mode_default';
+    const INTERFACE_MODE_NONCE_ACTION = 'tejlg_interface_mode';
     const HISTORY_EXPORT_DEFAULT_LIMIT = 200;
     const HISTORY_EXPORT_MAX_LIMIT = 5000;
 
@@ -45,6 +48,10 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
 
     public function handle_request() {
         if ($this->handle_history_download_request()) {
+            return;
+        }
+
+        if ($this->handle_interface_mode_submission()) {
             return;
         }
 
@@ -304,6 +311,56 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
             esc_html__('Les réglages de planification ont été enregistrés.', 'theme-export-jlg'),
             'updated'
         );
+    }
+
+    private function handle_interface_mode_submission() {
+        if (!isset($_POST['tejlg_interface_mode_nonce']) || !wp_verify_nonce($_POST['tejlg_interface_mode_nonce'], self::INTERFACE_MODE_NONCE_ACTION)) {
+            return false;
+        }
+
+        if (!TEJLG_Capabilities::current_user_can('exports')) {
+            add_settings_error(
+                'tejlg_admin_messages',
+                'interface_mode_permissions',
+                esc_html__("Erreur : vous n'avez pas l'autorisation de modifier l'affichage des options.", 'theme-export-jlg'),
+                'error'
+            );
+
+            return false;
+        }
+
+        $mode = isset($_POST['tejlg_interface_mode']) ? sanitize_key((string) $_POST['tejlg_interface_mode']) : '';
+
+        if (!in_array($mode, ['simple', 'expert'], true)) {
+            $mode = 'simple';
+        }
+
+        $this->store_interface_mode_preference($mode);
+
+        $redirect_url = '';
+
+        if (isset($_POST['tejlg_interface_mode_redirect'])) {
+            $raw_redirect = wp_unslash((string) $_POST['tejlg_interface_mode_redirect']);
+            $redirect_url = esc_url_raw($raw_redirect);
+        }
+
+        if ('' === $redirect_url) {
+            $redirect_url = add_query_arg(
+                [
+                    'page' => $this->page_slug,
+                    'tab'  => 'export',
+                ],
+                admin_url('admin.php')
+            );
+        }
+
+        if ('' === $redirect_url) {
+            $redirect_url = admin_url('admin.php');
+        }
+
+        $this->safe_redirect($redirect_url);
+
+        return true;
     }
 
     private function handle_history_export_request() {
@@ -1624,6 +1681,42 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         return $sanitized;
     }
 
+    private function store_interface_mode_preference($mode) {
+        $mode = in_array($mode, ['simple', 'expert'], true) ? $mode : 'simple';
+
+        $user_id = get_current_user_id();
+
+        if ($user_id > 0) {
+            update_user_meta($user_id, self::INTERFACE_MODE_META_KEY, $mode);
+            return;
+        }
+
+        update_option(self::INTERFACE_MODE_OPTION, $mode, false);
+    }
+
+    private function get_interface_mode() {
+        $default_mode = apply_filters('tejlg_default_interface_mode', 'simple');
+        $default_mode = in_array($default_mode, ['simple', 'expert'], true) ? $default_mode : 'simple';
+
+        $user_id = get_current_user_id();
+
+        if ($user_id > 0) {
+            $stored = get_user_meta($user_id, self::INTERFACE_MODE_META_KEY, true);
+
+            if (is_string($stored) && in_array($stored, ['simple', 'expert'], true)) {
+                return $stored;
+            }
+        }
+
+        $fallback = get_option(self::INTERFACE_MODE_OPTION, $default_mode);
+
+        if (is_string($fallback) && in_array($fallback, ['simple', 'expert'], true)) {
+            return $fallback;
+        }
+
+        return $default_mode;
+    }
+
     private function store_portable_mode_preference($is_portable) {
         update_option(self::PORTABLE_MODE_OPTION, $is_portable ? '1' : '0');
     }
@@ -1636,6 +1729,16 @@ class TEJLG_Admin_Export_Page extends TEJLG_Admin_Page {
         }
 
         return '1' === (string) $stored;
+    }
+
+    private function safe_redirect($redirect_url) {
+        wp_safe_redirect($redirect_url);
+
+        if (defined('TEJLG_BYPASS_REDIRECT_EXIT') && TEJLG_BYPASS_REDIRECT_EXIT) {
+            throw new TEJLG_Redirect_Exception($redirect_url);
+        }
+
+        exit;
     }
 
     private function notify_and_redirect($type, $code, $message) {
