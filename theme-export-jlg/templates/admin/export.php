@@ -263,23 +263,6 @@ if (is_array($latest_export)) {
     }
 }
 
-$schedule_status_variant = $schedule_is_active ? 'success' : 'warning';
-$schedule_status_badge = $schedule_is_active
-    ? __('Automatisation active', 'theme-export-jlg')
-    : __('Planification inactive', 'theme-export-jlg');
-
-$history_status_variant = $history_total_all > 0 ? 'success' : 'info';
-$history_status_badge = $history_total_all > 0
-    ? __('Suivi en cours', 'theme-export-jlg')
-    : __('Aucun export archivé', 'theme-export-jlg');
-
-$monitoring_status_variant = $monitoring_total_recent > 0
-    ? 'success'
-    : ($schedule_is_active ? 'warning' : 'info');
-$monitoring_status_badge = $monitoring_total_recent > 0
-    ? __('Surveillance active', 'theme-export-jlg')
-    : ($schedule_is_active ? __('Aucune alerte récente', 'theme-export-jlg') : __('Surveillance désactivée', 'theme-export-jlg'));
-
 $monitoring_counts = [
     'success' => 0,
     'warning' => 0,
@@ -457,6 +440,23 @@ if (is_array($schedule_exclusions_list)) {
         }
     }
 }
+
+$schedule_status_variant = $schedule_is_active ? 'success' : 'warning';
+$schedule_status_badge = $schedule_is_active
+    ? __('Automatisation active', 'theme-export-jlg')
+    : __('Planification inactive', 'theme-export-jlg');
+
+$history_status_variant = $history_total_all > 0 ? 'success' : 'info';
+$history_status_badge = $history_total_all > 0
+    ? __('Suivi en cours', 'theme-export-jlg')
+    : __('Aucun export archivé', 'theme-export-jlg');
+
+$monitoring_status_variant = $monitoring_total_recent > 0
+    ? 'success'
+    : ($schedule_is_active ? 'warning' : 'info');
+$monitoring_status_badge = $monitoring_total_recent > 0
+    ? __('Surveillance active', 'theme-export-jlg')
+    : ($schedule_is_active ? __('Aucune alerte récente', 'theme-export-jlg') : __('Surveillance désactivée', 'theme-export-jlg'));
 
 $schedule_exclusion_badge = $schedule_exclusion_count > 0
     ? sprintf(

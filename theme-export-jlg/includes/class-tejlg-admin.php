@@ -50,6 +50,40 @@ class TEJLG_Admin {
         add_filter('admin_body_class', [ $this, 'filter_admin_body_class' ]);
         add_action('admin_post_tejlg_profiles_export', [ $this, 'handle_profiles_export_action' ]);
         add_action('admin_post_tejlg_profiles_import', [ $this, 'handle_profiles_import_action' ]);
+        add_filter('admin_footer_text', [ $this, 'filter_admin_footer_text' ], 999);
+        add_filter('update_footer', [ $this, 'filter_update_footer_text' ], 999);
+    }
+
+    /**
+     * Removes the default footer text on the plugin admin screens.
+     */
+    public function filter_admin_footer_text($footer_text) {
+        if (!$this->is_plugin_admin_screen()) {
+            return $footer_text;
+        }
+
+        return '';
+    }
+
+    /**
+     * Removes the default update footer text on the plugin admin screens.
+     */
+    public function filter_update_footer_text($footer_text) {
+        if (!$this->is_plugin_admin_screen()) {
+            return $footer_text;
+        }
+
+        return '';
+    }
+
+    private function is_plugin_admin_screen() {
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+
+        if (null === $screen) {
+            return false;
+        }
+
+        return $screen->id === 'toplevel_page_' . $this->page_slug;
     }
 
     public function add_menu_page() {
@@ -183,8 +217,8 @@ class TEJLG_Admin {
                             'inProgress'      => esc_html__('Fichiers traités : %1$d / %2$d', 'theme-export-jlg'),
                             'progressValue'   => esc_html__('Progression : %1$d%%', 'theme-export-jlg'),
                             'completed'       => esc_html__('Export terminé !', 'theme-export-jlg'),
-                            'failed'          => esc_html__("Échec de l'export : %1$s", 'theme-export-jlg'),
-                            'failedWithId'    => esc_html__("Échec de l'export (ID %2$s) : %1$s", 'theme-export-jlg'),
+                            'failed'          => esc_html__('Échec de l\'export : %1$s', 'theme-export-jlg'),
+                            'failedWithId'    => esc_html__('Échec de l\'export (ID %2$s) : %1$s', 'theme-export-jlg'),
                             'downloadLabel'   => esc_html__("Télécharger l'archive ZIP", 'theme-export-jlg'),
                             'summaryLabel'    => esc_html__('Télécharger le résumé JSON', 'theme-export-jlg'),
                             'summaryHint'     => esc_html__('%1$d fichier(s) inclus · %2$d exclu(s)', 'theme-export-jlg'),
@@ -500,44 +534,6 @@ class TEJLG_Admin {
                     </div>
                 </div>
             </div>
-            <?php
-            $summary_items = [];
-
-            foreach ($summary_targets as $summary_slug => $anchor) {
-                if (!isset($tabs[$summary_slug])) {
-                    continue;
-                }
-
-                $target_url = add_query_arg([
-                    'page' => $this->page_slug,
-                    'tab'  => $summary_slug,
-                ], admin_url('admin.php')) . $anchor;
-
-                $summary_items[] = [
-                    'label'     => $tabs[$summary_slug]['label'],
-                    'url'       => $target_url,
-                    'is_active' => ($active_tab === $summary_slug),
-                ];
-            }
-
-            if (!empty($summary_items)) :
-            ?>
-                <nav class="tejlg-section-summary" aria-label="<?php esc_attr_e('Sommaire des sections', 'theme-export-jlg'); ?>">
-                    <ul class="tejlg-section-summary__list">
-                        <?php foreach ($summary_items as $item) : ?>
-                            <li class="tejlg-section-summary__item">
-                                <a
-                                    class="tejlg-section-summary__link<?php echo $item['is_active'] ? ' is-active' : ''; ?>"
-                                    href="<?php echo esc_url($item['url']); ?>"
-                                    <?php echo $item['is_active'] ? 'aria-current="page"' : ''; ?>
-                                >
-                                    <?php echo esc_html($item['label']); ?>
-                                </a>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                </nav>
-            <?php endif; ?>
             <?php
             $active_tab_config = $tabs[$active_tab];
 
