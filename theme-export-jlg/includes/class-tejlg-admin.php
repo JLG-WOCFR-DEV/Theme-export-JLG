@@ -47,6 +47,40 @@ class TEJLG_Admin {
         add_filter('admin_body_class', [ $this, 'filter_admin_body_class' ]);
         add_action('admin_post_tejlg_profiles_export', [ $this, 'handle_profiles_export_action' ]);
         add_action('admin_post_tejlg_profiles_import', [ $this, 'handle_profiles_import_action' ]);
+        add_filter('admin_footer_text', [ $this, 'filter_admin_footer_text' ], 999);
+        add_filter('update_footer', [ $this, 'filter_update_footer_text' ], 999);
+    }
+
+    /**
+     * Removes the default footer text on the plugin admin screens.
+     */
+    public function filter_admin_footer_text($footer_text) {
+        if (!$this->is_plugin_admin_screen()) {
+            return $footer_text;
+        }
+
+        return '';
+    }
+
+    /**
+     * Removes the default update footer text on the plugin admin screens.
+     */
+    public function filter_update_footer_text($footer_text) {
+        if (!$this->is_plugin_admin_screen()) {
+            return $footer_text;
+        }
+
+        return '';
+    }
+
+    private function is_plugin_admin_screen() {
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+
+        if (null === $screen) {
+            return false;
+        }
+
+        return $screen->id === 'toplevel_page_' . $this->page_slug;
     }
 
     public function add_menu_page() {
