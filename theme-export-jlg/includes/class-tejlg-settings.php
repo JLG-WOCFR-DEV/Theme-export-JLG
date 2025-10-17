@@ -10,7 +10,9 @@ require_once __DIR__ . '/class-tejlg-admin-debug-page.php';
 class TEJLG_Settings {
     const EXPORT_SCHEMA   = 'theme-export-jlg/settings';
     const EXPORT_VERSION  = 1;
-    const SIGNATURE_ALG   = 'sha256';
+    const SIGNATURE_ALG         = 'sha256';
+    const SIGNATURE_VERSION     = 2;
+    const SIGNATURE_SECRET_OPTION = 'tejlg_settings_signature_secret';
 
     /**
      * Returns a normalized snapshot of the plugin settings.
@@ -114,27 +116,54 @@ class TEJLG_Settings {
      *     @type string $algorithm     Hashing algorithm used.
      *     @type string $expected_hash Hash calculated from the settings.
      *     @type string $actual_hash   Hash read from the package.
+     *     @type int    $version       Signature format version.
+     *     @type bool   $legacy_valid  True when a legacy checksum matches the payload.
+     *     @type string $reason        Optional machine readable reason when validation fails.
      * }
      */
     public static function verify_signature(array $package) {
         $settings  = isset($package['settings']) && is_array($package['settings']) ? $package['settings'] : [];
         $signature = isset($package['signature']) && is_array($package['signature']) ? $package['signature'] : [];
 
-        $algorithm = isset($signature['algorithm']) ? strtolower((string) $signature['algorithm']) : self::SIGNATURE_ALG;
+        $algorithm = isset($signature['algorithm']) ? (string) $signature['algorithm'] : self::SIGNATURE_ALG;
+        $algorithm = self::normalize_signature_algorithm($algorithm);
         $actual    = isset($signature['hash']) ? (string) $signature['hash'] : '';
+        $version   = isset($signature['version']) ? (int) $signature['version'] : 1;
 
-        if (!in_array($algorithm, hash_algos(), true)) {
-            $algorithm = self::SIGNATURE_ALG;
+        $valid        = false;
+        $legacy_valid = false;
+        $reason       = '';
+        $expected     = '';
+
+        if ($version >= self::SIGNATURE_VERSION) {
+            $expected = self::calculate_signature_hmac($settings, $algorithm);
+            $valid    = ('' !== $actual) ? hash_equals($expected, $actual) : false;
+        } else {
+            $legacy_expected = self::calculate_legacy_signature_hash($settings, $algorithm);
+            $legacy_valid    = ('' !== $actual) ? hash_equals($legacy_expected, $actual) : false;
+
+            if ($legacy_valid) {
+                $reason   = 'legacy_signature';
+                $expected = self::calculate_signature_hmac($settings, $algorithm);
+            } else {
+                $expected = $legacy_expected;
+            }
         }
 
-        $expected = self::hash_settings($settings, $algorithm);
-
-        return [
-            'valid'         => hash_equals($expected, $actual),
+        $response = [
+            'valid'         => $valid,
             'algorithm'     => $algorithm,
             'expected_hash' => $expected,
             'actual_hash'   => $actual,
+            'version'       => $version,
+            'legacy_valid'  => $legacy_valid,
         ];
+
+        if ('' !== $reason) {
+            $response['reason'] = $reason;
+        }
+
+        return $response;
     }
 
     /**
@@ -245,34 +274,77 @@ class TEJLG_Settings {
         $algorithm = self::SIGNATURE_ALG;
 
         return [
+            'version'          => self::SIGNATURE_VERSION,
+            'type'             => 'hmac',
             'algorithm'        => $algorithm,
-            'hash'             => self::hash_settings($settings, $algorithm),
+            'hash'             => self::calculate_signature_hmac($settings, $algorithm),
             'generated_at_gmt' => (string) $generated_at_gmt,
         ];
     }
 
     /**
-     * Calculates the hash for a snapshot using the provided algorithm.
+     * Calculates the hash for a snapshot using the legacy algorithm.
      *
      * @param array<string,mixed> $settings  Snapshot to hash.
      * @param string              $algorithm Hash algorithm supported by hash_algos().
      *
      * @return string
      */
-    private static function hash_settings(array $settings, $algorithm) {
-        $algorithm = strtolower((string) $algorithm);
+    private static function calculate_legacy_signature_hash(array $settings, $algorithm) {
+        $algorithm = self::normalize_signature_algorithm($algorithm);
+        $json      = self::encode_settings_for_signature($settings);
 
-        if (!in_array($algorithm, hash_algos(), true)) {
-            $algorithm = self::SIGNATURE_ALG;
+        return hash($algorithm, $json);
+    }
+
+    private static function calculate_signature_hmac(array $settings, $algorithm) {
+        $algorithm = self::normalize_signature_algorithm($algorithm);
+        $json      = self::encode_settings_for_signature($settings);
+        $secret    = self::get_signature_secret();
+
+        if (function_exists('hash_hmac')) {
+            return hash_hmac($algorithm, $json, $secret);
         }
 
+        return hash($algorithm, $json . $secret);
+    }
+
+    private static function encode_settings_for_signature(array $settings) {
         $json = wp_json_encode($settings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         if (false === $json) {
             $json = '';
         }
 
-        return hash($algorithm, $json);
+        return $json;
+    }
+
+    private static function normalize_signature_algorithm($algorithm) {
+        $algorithm = strtolower((string) $algorithm);
+
+        if (!in_array($algorithm, hash_algos(), true)) {
+            $algorithm = self::SIGNATURE_ALG;
+        }
+
+        return $algorithm;
+    }
+
+    private static function get_signature_secret() {
+        $secret = get_option(self::SIGNATURE_SECRET_OPTION, '');
+
+        if (!is_string($secret) || '' === $secret) {
+            try {
+                $secret = base64_encode(random_bytes(32));
+            } catch (Exception $exception) {
+                $secret = wp_generate_password(64, true, true);
+            }
+
+            $secret = (string) $secret;
+
+            update_option(self::SIGNATURE_SECRET_OPTION, $secret, false);
+        }
+
+        return $secret;
     }
 
     /**

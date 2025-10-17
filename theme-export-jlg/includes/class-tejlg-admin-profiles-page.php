@@ -104,7 +104,50 @@ class TEJLG_Admin_Profiles_Page extends TEJLG_Admin_Page {
             return new WP_Error('tejlg_profiles_import_missing_file', $message);
         }
 
-        $contents = file_get_contents($tmp_name);
+        $max_bytes = (int) apply_filters('tejlg_profiles_import_max_bytes', 1024 * 1024);
+
+        if ($max_bytes > 0) {
+            $file_size = @filesize($tmp_name);
+
+            if (false !== $file_size && $file_size > $max_bytes) {
+                @unlink($tmp_name);
+
+                $message = sprintf(
+                    esc_html__("Erreur : le fichier téléchargé dépasse la taille autorisée (%s maximum).", 'theme-export-jlg'),
+                    size_format($max_bytes)
+                );
+
+                add_settings_error(
+                    'tejlg_profiles_messages',
+                    'profiles_import_size_limit',
+                    $message,
+                    'error'
+                );
+
+                return new WP_Error('tejlg_profiles_import_size_limit', $message);
+            }
+        }
+
+        $handle = fopen($tmp_name, 'rb');
+
+        if (false === $handle) {
+            @unlink($tmp_name);
+
+            $message = esc_html__("Erreur : le fichier téléchargé n'a pas pu être lu.", 'theme-export-jlg');
+
+            add_settings_error(
+                'tejlg_profiles_messages',
+                'profiles_import_read_error',
+                $message,
+                'error'
+            );
+
+            return new WP_Error('tejlg_profiles_import_read_error', $message);
+        }
+
+        $length   = ($max_bytes > 0) ? $max_bytes + 1 : -1;
+        $contents = stream_get_contents($handle, $length);
+        fclose($handle);
         @unlink($tmp_name);
 
         if (false === $contents) {
@@ -118,6 +161,22 @@ class TEJLG_Admin_Profiles_Page extends TEJLG_Admin_Page {
             );
 
             return new WP_Error('tejlg_profiles_import_read_error', $message);
+        }
+
+        if ($max_bytes > 0 && strlen($contents) > $max_bytes) {
+            $message = sprintf(
+                esc_html__("Erreur : le fichier téléchargé dépasse la taille autorisée (%s maximum).", 'theme-export-jlg'),
+                size_format($max_bytes)
+            );
+
+            add_settings_error(
+                'tejlg_profiles_messages',
+                'profiles_import_size_limit',
+                $message,
+                'error'
+            );
+
+            return new WP_Error('tejlg_profiles_import_size_limit', $message);
         }
 
         $decoded = json_decode($contents, true);
@@ -152,6 +211,19 @@ class TEJLG_Admin_Profiles_Page extends TEJLG_Admin_Page {
         $signature = TEJLG_Settings::verify_signature($decoded);
 
         if (empty($signature['valid'])) {
+            if (!empty($signature['legacy_valid'])) {
+                $message = esc_html__("Erreur : ce profil provient d'une ancienne version et doit être réexporté avant import.", 'theme-export-jlg');
+
+                add_settings_error(
+                    'tejlg_profiles_messages',
+                    'profiles_import_legacy_signature',
+                    $message,
+                    'error'
+                );
+
+                return new WP_Error('tejlg_profiles_import_legacy_signature', $message);
+            }
+
             $message = esc_html__("Erreur : la signature du profil est invalide.", 'theme-export-jlg');
 
             add_settings_error(
