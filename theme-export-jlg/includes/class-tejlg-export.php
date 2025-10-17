@@ -1265,7 +1265,7 @@ class TEJLG_Export {
         return sanitize_file_name($candidate);
     }
 
-    private static function persist_export_summary_for_job(array &$job, $target_directory, $base_url) {
+    private static function persist_export_summary_for_job(array &$job, $target_directory) {
         $result = [
             'path'     => '',
             'url'      => '',
@@ -1281,7 +1281,6 @@ class TEJLG_Export {
         }
 
         $target_directory = trailingslashit($target_directory);
-        $base_url         = trailingslashit($base_url);
 
         $temp_path         = isset($job['summary_temp_path']) ? (string) $job['summary_temp_path'] : '';
         $created_temp_file = false;
@@ -1329,7 +1328,21 @@ class TEJLG_Export {
 
         $result['path']     = $destination;
         $result['filename'] = $unique_filename;
-        $result['url']      = $base_url . rawurlencode($unique_filename);
+
+        TEJLG_Export_Downloads::forget_tokens_for_path($destination);
+
+        $token = TEJLG_Export_Downloads::create_token(
+            $destination,
+            [
+                'filename'  => $unique_filename,
+                'mime_type' => 'application/json',
+                'type'      => 'summary',
+            ]
+        );
+
+        if (!empty($token['url'])) {
+            $result['url'] = $token['url'];
+        }
 
         $job['summary_persistent_path'] = $destination;
         $job['summary_persistent_url']  = $result['url'];
@@ -1868,6 +1881,24 @@ class TEJLG_Export {
             TEJLG_Export_History::record_job($job, $context);
         }
 
+        $paths_to_forget = [];
+
+        if (isset($context['persistent_path']) && is_string($context['persistent_path']) && '' !== $context['persistent_path']) {
+            $paths_to_forget[] = $context['persistent_path'];
+        } elseif (null !== $job && isset($job['persistent_path']) && is_string($job['persistent_path'])) {
+            $paths_to_forget[] = $job['persistent_path'];
+        }
+
+        if (isset($context['summary_path']) && is_string($context['summary_path']) && '' !== $context['summary_path']) {
+            $paths_to_forget[] = $context['summary_path'];
+        } elseif (null !== $job && isset($job['summary_persistent_path']) && is_string($job['summary_persistent_path'])) {
+            $paths_to_forget[] = $job['summary_persistent_path'];
+        }
+
+        foreach ($paths_to_forget as $forget_path) {
+            TEJLG_Export_Downloads::forget_tokens_for_path($forget_path);
+        }
+
         if (null !== $job && !empty($job['zip_path']) && file_exists($job['zip_path'])) {
             $zip_path         = (string) $job['zip_path'];
             $persistent_path  = isset($job['persistent_path']) ? (string) $job['persistent_path'] : '';
@@ -1921,9 +1952,9 @@ class TEJLG_Export {
             return;
         }
 
-        $target_directory = trailingslashit($base_dir) . 'theme-export-jlg/';
+        $root_directory = trailingslashit($base_dir) . 'theme-export-jlg/';
 
-        if (!is_dir($target_directory)) {
+        if (!is_dir($root_directory)) {
             return;
         }
 
@@ -1933,42 +1964,75 @@ class TEJLG_Export {
             return;
         }
 
+        TEJLG_Export_Downloads::cleanup_expired_tokens();
+
         try {
-            $iterator = new DirectoryIterator($target_directory);
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($root_directory, FilesystemIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::CHILD_FIRST
+            );
         } catch (UnexpectedValueException $exception) {
             return;
         }
 
-        $guard_files = array_keys(self::get_persistence_guard_files());
+        $guard_files      = array_keys(self::get_persistence_guard_files());
+        $normalized_root  = wp_normalize_path($root_directory);
+        $root_guard_paths = array_map(
+            static function ($filename) use ($normalized_root) {
+                return wp_normalize_path(trailingslashit($normalized_root) . $filename);
+            },
+            $guard_files
+        );
 
         foreach ($iterator as $fileinfo) {
-            if ($fileinfo->isDot() || !$fileinfo->isFile()) {
+            $path = $fileinfo->getPathname();
+
+            if (!is_string($path) || '' === $path) {
                 continue;
             }
 
-            if (in_array($fileinfo->getFilename(), $guard_files, true)) {
+            $normalized_path = wp_normalize_path($path);
+
+            if ($fileinfo->isDir()) {
+                if ($normalized_path === $normalized_root) {
+                    continue;
+                }
+
+                try {
+                    $dir_iterator = new FilesystemIterator($path);
+
+                    if (!$dir_iterator->valid()) {
+                        @rmdir($path); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+                    }
+                } catch (UnexpectedValueException $exception) {
+                    continue;
+                }
+
                 continue;
             }
 
-            $mtime = $fileinfo->getMTime();
+            if ($fileinfo->isFile()) {
+                if (in_array($normalized_path, $root_guard_paths, true)) {
+                    continue;
+                }
 
-            if ($mtime > 0 && $mtime <= $threshold) {
-                $path = $fileinfo->getPathname();
+                $mtime = $fileinfo->getMTime();
 
-                if (is_string($path) && '' !== $path) {
+                if ($mtime > 0 && $mtime <= $threshold) {
                     @unlink($path); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+                    TEJLG_Export_Downloads::forget_tokens_for_path($path);
                 }
             }
         }
 
         try {
-            $cleanup_iterator = new FilesystemIterator($target_directory);
+            $cleanup_iterator = new FilesystemIterator($root_directory);
         } catch (UnexpectedValueException $exception) {
             return;
         }
 
         if (!$cleanup_iterator->valid()) {
-            @rmdir($target_directory); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+            @rmdir($root_directory); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
         }
     }
 
@@ -2603,10 +2667,48 @@ class TEJLG_Export {
         }
 
         if ('' !== $existing_persistent && file_exists($existing_persistent)) {
-            return [
+            TEJLG_Export_Downloads::forget_tokens_for_path($existing_persistent);
+
+            $token = TEJLG_Export_Downloads::create_token(
+                $existing_persistent,
+                [
+                    'filename'  => '' !== $zip_file_name ? $zip_file_name : basename($existing_persistent),
+                    'mime_type' => 'application/zip',
+                    'type'      => 'archive',
+                ]
+            );
+
+            $result = [
                 'path' => $existing_persistent,
-                'url'  => $existing_persistent_url,
+                'url'  => !empty($token['url']) ? (string) $token['url'] : (string) $existing_persistent_url,
             ];
+
+            if (is_array($job)) {
+                $existing_summary = isset($job['summary_persistent_path']) ? (string) $job['summary_persistent_path'] : '';
+
+                if ('' !== $existing_summary && file_exists($existing_summary)) {
+                    TEJLG_Export_Downloads::forget_tokens_for_path($existing_summary);
+
+                    $summary_filename = isset($job['summary_file_name']) ? (string) $job['summary_file_name'] : basename($existing_summary);
+                    $summary_token    = TEJLG_Export_Downloads::create_token(
+                        $existing_summary,
+                        [
+                            'filename'  => $summary_filename,
+                            'mime_type' => 'application/json',
+                            'type'      => 'summary',
+                        ]
+                    );
+
+                    $result['summary_path'] = $existing_summary;
+                    $result['summary_url']  = !empty($summary_token['url']) ? (string) $summary_token['url'] : (isset($job['summary_persistent_url']) ? (string) $job['summary_persistent_url'] : '');
+
+                    if ('' !== $summary_filename) {
+                        $result['summary_filename'] = $summary_filename;
+                    }
+                }
+            }
+
+            return $result;
         }
 
         if ('' === $zip_path || !file_exists($zip_path)) {
@@ -2670,14 +2772,14 @@ class TEJLG_Export {
             ];
         }
 
-        $target_directory = trailingslashit($base_dir) . 'theme-export-jlg/';
+        $root_directory = trailingslashit($base_dir) . 'theme-export-jlg/';
 
-        if (!wp_mkdir_p($target_directory)) {
+        if (!wp_mkdir_p($root_directory)) {
             self::report_persist_archive_failure(
                 'mkdir_failed',
                 $job,
                 [
-                    'target_directory' => $target_directory,
+                    'target_directory' => $root_directory,
                     'zip_path'         => $zip_path,
                     'job_id'           => $job_id,
                 ]
@@ -2689,9 +2791,28 @@ class TEJLG_Export {
             ];
         }
 
-        self::ensure_persistence_guard_files($target_directory);
+        self::ensure_persistence_guard_files($root_directory);
 
-        $target_directory = trailingslashit($target_directory);
+        $subdirectory = self::prepare_persistence_subdirectory($root_directory, $base_url);
+
+        if (empty($subdirectory)) {
+            self::report_persist_archive_failure(
+                'subdirectory_creation_failed',
+                $job,
+                [
+                    'root_directory' => $root_directory,
+                    'zip_path'       => $zip_path,
+                    'job_id'         => $job_id,
+                ]
+            );
+
+            return [
+                'path' => '',
+                'url'  => '',
+            ];
+        }
+
+        $target_directory = trailingslashit($subdirectory['path']);
 
         $filename = $zip_file_name;
 
@@ -2701,8 +2822,6 @@ class TEJLG_Export {
 
         $filename = wp_unique_filename($target_directory, $filename);
         $destination = $target_directory . $filename;
-
-        $relative_base_url = trailingslashit($base_url) . 'theme-export-jlg/';
 
         if (self::normalize_path($zip_path) !== self::normalize_path($destination)) {
             if (!copy($zip_path, $destination)) {
@@ -2729,12 +2848,23 @@ class TEJLG_Export {
             }
         }
 
+        TEJLG_Export_Downloads::forget_tokens_for_path($destination);
+
+        $token = TEJLG_Export_Downloads::create_token(
+            $destination,
+            [
+                'filename'  => $filename,
+                'mime_type' => 'application/zip',
+                'type'      => 'archive',
+            ]
+        );
+
         $result = [
             'path' => $destination,
-            'url'  => $relative_base_url . rawurlencode($filename),
+            'url'  => isset($token['url']) ? (string) $token['url'] : '',
         ];
 
-        $summary_persistence = self::persist_export_summary_for_job($job, $target_directory, $relative_base_url);
+        $summary_persistence = self::persist_export_summary_for_job($job, $target_directory);
 
         if (!empty($summary_persistence['path'])) {
             $result['summary_path'] = $summary_persistence['path'];
@@ -2786,6 +2916,62 @@ class TEJLG_Export {
             '.htaccess'  => "# Prevent directory browsing and direct access\nOptions -Indexes\n<Files *>\n    Require all denied\n</Files>\n",
             'web.config' => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration>\n    <system.webServer>\n        <security>\n            <requestFiltering>\n                <fileExtensions>\n                    <add fileExtension=\".\" allowed=\"false\" />\n                </fileExtensions>\n            </requestFiltering>\n        </security>\n        <directoryBrowse enabled=\"false\" />\n    </system.webServer>\n</configuration>\n",
         ];
+    }
+
+    private static function prepare_persistence_subdirectory($root_directory, $base_url) {
+        $root_directory = trailingslashit($root_directory);
+
+        if (!is_dir($root_directory) && !wp_mkdir_p($root_directory)) {
+            return [];
+        }
+
+        $base_url = trailingslashit($base_url);
+        $base_url = trailingslashit($base_url . 'theme-export-jlg');
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $slug = self::generate_persistence_slug();
+
+            if ('' === $slug) {
+                continue;
+            }
+
+            $candidate_path = $root_directory . $slug . '/';
+
+            if (!wp_mkdir_p($candidate_path)) {
+                continue;
+            }
+
+            return [
+                'path' => $candidate_path,
+                'url'  => trailingslashit($base_url . $slug),
+            ];
+        }
+
+        return [];
+    }
+
+    private static function generate_persistence_slug() {
+        try {
+            $bytes = random_bytes(8);
+            $slug  = bin2hex($bytes);
+        } catch (Exception $exception) {
+            $fallback = wp_generate_password(16, false, false);
+            $slug     = preg_replace('/[^a-z0-9]/', '', strtolower((string) $fallback));
+        }
+
+        if (!is_string($slug)) {
+            $slug = '';
+        }
+
+        $slug = strtolower((string) $slug);
+        $slug = preg_replace('/[^a-z0-9]/', '', $slug);
+
+        if ('' === $slug) {
+            $slug = strtolower(wp_generate_password(12, false, false));
+            $slug = preg_replace('/[^a-z0-9]/', '', $slug);
+        }
+
+        return substr($slug, 0, 24);
     }
 
     /**
