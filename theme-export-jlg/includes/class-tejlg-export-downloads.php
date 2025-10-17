@@ -56,11 +56,11 @@ class TEJLG_Export_Downloads {
         $mime     = isset($args['mime_type']) ? (string) $args['mime_type'] : 'application/octet-stream';
         $type     = isset($args['type']) ? sanitize_key((string) $args['type']) : 'archive';
 
-        $ttl = isset($args['ttl']) ? (int) $args['ttl'] : WEEK_IN_SECONDS;
+        $ttl = isset($args['ttl']) ? (int) $args['ttl'] : self::get_default_token_ttl($args);
         $ttl = (int) apply_filters('tejlg_export_download_token_ttl', $ttl, $path, $args);
 
         if ($ttl <= 0) {
-            $ttl = WEEK_IN_SECONDS;
+            $ttl = self::get_default_token_ttl($args);
         }
 
         $expires_at = time() + $ttl;
@@ -80,6 +80,63 @@ class TEJLG_Export_Downloads {
             'token' => $token,
             'url'   => self::build_download_url($token, $type),
         ];
+    }
+
+    /**
+     * Calculates the default token TTL based on export retention settings.
+     *
+     * @param array $args Token creation context.
+     *
+     * @return int
+     */
+    private static function get_default_token_ttl(array $args) {
+        unset($args); // Unused but kept for parity with filter signature.
+
+        $retention_ttl = self::get_retention_ttl_seconds();
+
+        if ($retention_ttl > 0) {
+            return $retention_ttl;
+        }
+
+        return WEEK_IN_SECONDS;
+    }
+
+    /**
+     * Retrieves the current retention period in seconds.
+     *
+     * @return int
+     */
+    private static function get_retention_ttl_seconds() {
+        $retention_days = 0;
+        $settings       = [];
+
+        if (class_exists('TEJLG_Export') && method_exists('TEJLG_Export', 'get_schedule_settings')) {
+            $settings = TEJLG_Export::get_schedule_settings();
+
+            if (is_array($settings) && isset($settings['retention_days'])) {
+                $retention_days = (int) $settings['retention_days'];
+            }
+        }
+
+        /**
+         * Filters the number of days persisted export archives should be kept.
+         *
+         * @param int   $retention_days Retention period in days.
+         * @param array $settings       Export schedule settings.
+         */
+        $retention_days = (int) apply_filters('tejlg_export_retention_days', $retention_days, $settings);
+
+        if ($retention_days <= 0) {
+            return 0;
+        }
+
+        $retention_seconds = $retention_days * DAY_IN_SECONDS;
+
+        if ($retention_seconds <= 0) {
+            return 0;
+        }
+
+        return $retention_seconds;
     }
 
     /**
