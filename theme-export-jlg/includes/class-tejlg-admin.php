@@ -385,13 +385,6 @@ class TEJLG_Admin {
         $requested_tab = isset($_GET['tab']) ? sanitize_key((string) $_GET['tab']) : '';
         $active_tab    = isset($tabs[$requested_tab]) ? $requested_tab : key($tabs);
 
-        $summary_targets = [
-            'export'   => '#tejlg-section-export',
-            'import'   => '#tejlg-section-import',
-            'profiles' => '#tejlg-section-profiles',
-            'debug'    => '#tejlg-section-debug',
-        ];
-
         $quick_actions = $this->prepare_quick_actions($active_tab);
         $shared_context = [
             'quick_actions' => $quick_actions,
@@ -495,44 +488,6 @@ class TEJLG_Admin {
                     </div>
                 </div>
             </div>
-            <?php
-            $summary_items = [];
-
-            foreach ($summary_targets as $summary_slug => $anchor) {
-                if (!isset($tabs[$summary_slug])) {
-                    continue;
-                }
-
-                $target_url = add_query_arg([
-                    'page' => $this->page_slug,
-                    'tab'  => $summary_slug,
-                ], admin_url('admin.php')) . $anchor;
-
-                $summary_items[] = [
-                    'label'     => $tabs[$summary_slug]['label'],
-                    'url'       => $target_url,
-                    'is_active' => ($active_tab === $summary_slug),
-                ];
-            }
-
-            if (!empty($summary_items)) :
-            ?>
-                <nav class="tejlg-section-summary" aria-label="<?php esc_attr_e('Sommaire des sections', 'theme-export-jlg'); ?>">
-                    <ul class="tejlg-section-summary__list">
-                        <?php foreach ($summary_items as $item) : ?>
-                            <li class="tejlg-section-summary__item">
-                                <a
-                                    class="tejlg-section-summary__link<?php echo $item['is_active'] ? ' is-active' : ''; ?>"
-                                    href="<?php echo esc_url($item['url']); ?>"
-                                    <?php echo $item['is_active'] ? 'aria-current="page"' : ''; ?>
-                                >
-                                    <?php echo esc_html($item['label']); ?>
-                                </a>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                </nav>
-            <?php endif; ?>
             <?php
             $active_tab_config = $tabs[$active_tab];
 
