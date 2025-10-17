@@ -5,6 +5,7 @@ require_once TEJLG_PATH . 'includes/class-tejlg-admin-export-page.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin-import-page.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin-debug-page.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin-profiles-page.php';
+require_once TEJLG_PATH . 'includes/class-tejlg-admin-quality-page.php';
 
 class TEJLG_Admin {
     /**
@@ -20,6 +21,7 @@ class TEJLG_Admin {
     private $import_page;
     private $debug_page;
     private $profiles_page;
+    private $quality_page;
 
     private $template_dir;
 
@@ -39,6 +41,7 @@ class TEJLG_Admin {
         $this->import_page   = new TEJLG_Admin_Import_Page($this->template_dir, $this->page_slug);
         $this->debug_page    = new TEJLG_Admin_Debug_Page($this->template_dir, $this->page_slug);
         $this->profiles_page = new TEJLG_Admin_Profiles_Page($this->template_dir, $this->page_slug);
+        $this->quality_page  = new TEJLG_Admin_Quality_Page($this->template_dir, $this->page_slug);
 
         add_action('admin_menu', [ $this, 'add_menu_page' ]);
         add_action('admin_enqueue_scripts', [ $this, 'enqueue_assets' ]);
@@ -389,6 +392,7 @@ class TEJLG_Admin {
             'export'   => '#tejlg-section-export',
             'import'   => '#tejlg-section-import',
             'profiles' => '#tejlg-section-profiles',
+            'quality'  => '#tejlg-section-quality',
             'debug'    => '#tejlg-section-debug',
         ];
 
@@ -403,6 +407,7 @@ class TEJLG_Admin {
 
         $this->export_page->set_shared_context($shared_context);
         $this->import_page->set_shared_context($shared_context);
+        $this->quality_page->set_shared_context($shared_context);
         $this->debug_page->set_shared_context($shared_context);
 
         ?>
@@ -561,12 +566,23 @@ class TEJLG_Admin {
             'tab'  => 'export',
         ], admin_url('admin.php'));
 
+        $quality_tab_url = add_query_arg([
+            'page' => $this->page_slug,
+            'tab'  => 'quality',
+        ], admin_url('admin.php'));
+
         $actions = [
             [
                 'id'         => 'export-now',
                 'label'      => __('Exporter maintenant', 'theme-export-jlg'),
                 'url'        => $export_tab_url . '#tejlg-theme-export-form',
                 'aria_label' => __('Aller au formulaire principal d’export.', 'theme-export-jlg'),
+            ],
+            [
+                'id'         => 'quality-benchmark',
+                'label'      => __('Comparaison pro', 'theme-export-jlg'),
+                'url'        => $quality_tab_url . '#tejlg-section-quality',
+                'aria_label' => __('Consulter la comparaison avec les extensions professionnelles.', 'theme-export-jlg'),
             ],
         ];
 
@@ -772,6 +788,11 @@ class TEJLG_Admin {
                 'label'    => __('Guide de Migration', 'theme-export-jlg'),
                 'cap'      => 'menu',
                 'callback' => [ $this, 'render_migration_guide_tab' ],
+            ],
+            'quality' => [
+                'label'    => __('Comparaison pro', 'theme-export-jlg'),
+                'cap'      => 'menu',
+                'callback' => [ $this->quality_page, 'render' ],
             ],
             'debug' => [
                 'label'    => __('Débogage', 'theme-export-jlg'),
