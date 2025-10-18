@@ -975,9 +975,15 @@ textarea.has-pattern-error {
     flex-direction: column;
     align-items: center;
     gap: 4px;
+    text-align: center;
 }
 
 .metrics-badge .metric-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--tejlg-metric-icon-size, 60px);
+    height: var(--tejlg-metric-icon-size, 60px);
     font-size: var(--tejlg-metric-icon-size, 60px);
     line-height: 1;
 }
@@ -994,6 +1000,12 @@ textarea.has-pattern-error {
     font-size: 16px;
     font-weight: 700;
     color: var(--tejlg-text-color);
+}
+
+@supports not (gap: 1rem) {
+    .metrics-badge .metric > * + * {
+        margin-block-start: 0.35rem;
+    }
 }
 
 /* Style pour l'aperçu des compositions */
@@ -2914,10 +2926,12 @@ body.rtl .tejlg-quick-actions {
 }
 
 .tejlg-quick-actions__panel {
-    --tejlg-quick-actions-radius: clamp(4.25rem, 12vw, 6rem);
+    --tejlg-quick-actions-diameter: clamp(11rem, 26vw, 13.5rem);
+    --tejlg-quick-actions-item-radius: 3.25rem;
+    --tejlg-quick-actions-radius: max(2.5rem, calc(var(--tejlg-quick-actions-diameter) / 2 - var(--tejlg-quick-actions-item-radius)));
     position: relative;
-    width: clamp(11rem, 26vw, 13.5rem);
-    height: clamp(11rem, 26vw, 13.5rem);
+    width: var(--tejlg-quick-actions-diameter);
+    height: var(--tejlg-quick-actions-diameter);
     border-radius: 50%;
     background: rgba(34, 113, 177, 0.14);
     backdrop-filter: blur(8px);
@@ -2972,8 +2986,9 @@ body.rtl .tejlg-quick-actions {
     flex-direction: column;
     align-items: center;
     gap: 0.25rem;
-    min-width: 6rem;
-    padding: 0.65rem 1rem;
+    min-width: 5.5rem;
+    max-width: 6.5rem;
+    padding: 0.65rem 0.95rem;
     text-decoration: none;
     text-align: center;
     font-size: 0.85rem;
@@ -3038,15 +3053,20 @@ body.rtl .tejlg-quick-actions {
     }
 
     .tejlg-quick-actions__panel {
-        width: 11rem;
-        height: 11rem;
-        --tejlg-quick-actions-radius: 4.5rem;
+        --tejlg-quick-actions-diameter: 11rem;
+        --tejlg-quick-actions-item-radius: 3rem;
     }
 
     .tejlg-quick-actions__toggle,
     .tejlg-quick-actions__restore {
         padding: 0.75rem 1.25rem;
         font-size: 0.88rem;
+    }
+
+    .tejlg-quick-actions__link {
+        min-width: 5rem;
+        max-width: 6rem;
+        padding: 0.6rem 0.85rem;
     }
 }
 
