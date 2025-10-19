@@ -717,7 +717,17 @@ class TEJLG_Export_Connectors {
             return false;
         }
 
-        return $host === $bucket || str_starts_with($host, $bucket . '.');
+        if ($host === $bucket) {
+            return true;
+        }
+
+        $prefix = $bucket . '.';
+
+        if (function_exists('str_starts_with')) {
+            return str_starts_with($host, $prefix);
+        }
+
+        return 0 === strpos($host, $prefix);
     }
 
     /**
@@ -848,6 +858,10 @@ class TEJLG_Export_Connectors {
 
         if ('' === $remotePath) {
             $remotePath = '/';
+        }
+
+        if ('/' !== substr($remotePath, 0, 1)) {
+            $remotePath = '/' . $remotePath;
         }
 
         if ('/' === substr($remotePath, -1)) {
