@@ -3077,6 +3077,14 @@ body.rtl .tejlg-quick-actions {
     .tejlg-quick-actions__restore {
         transition-duration: 0.01ms !important;
         transition-delay: 0ms !important;
+    }
+
+    .tejlg-quick-actions__panel {
+        transform: scale(1) !important;
+    }
+
+    .tejlg-quick-actions__toggle,
+    .tejlg-quick-actions__restore {
         transform: none !important;
     }
 }
