@@ -48,48 +48,38 @@ if (empty($actions)) {
     return;
 }
 
-$action_count = count($actions);
 $menu_id = 'tejlg-quick-actions-menu';
 $panel_label = __('Actions rapides', 'theme-export-jlg');
 $current_tab = isset($quick_actions_settings['current_tab'])
     ? (string) $quick_actions_settings['current_tab']
     : '';
-
-$angle_step = ($action_count > 1) ? 180 / ($action_count - 1) : 0;
-$angle_start = -90;
-
-$container_styles = sprintf('--tejlg-quick-actions-count:%d;', (int) $action_count);
 ?>
 <div
     class="tejlg-quick-actions"
     data-quick-actions
-    data-state="closed"
     data-dismissed="false"
     data-active-tab="<?php echo esc_attr($current_tab); ?>"
-    style="<?php echo esc_attr($container_styles); ?>"
 >
     <button
         type="button"
-        class="tejlg-quick-actions__toggle"
+        class="button button-primary wp-ui-primary"
         data-quick-actions-toggle
         aria-expanded="false"
         aria-controls="<?php echo esc_attr($menu_id); ?>"
     >
-        <span class="tejlg-quick-actions__toggle-visual" aria-hidden="true"></span>
         <span class="tejlg-quick-actions__toggle-label"><?php echo esc_html($panel_label); ?></span>
     </button>
     <div
         id="<?php echo esc_attr($menu_id); ?>"
-        class="tejlg-quick-actions__panel"
+        class="tejlg-quick-actions__dropdown"
         data-quick-actions-menu
         role="region"
         aria-label="<?php echo esc_attr($panel_label); ?>"
+        aria-hidden="true"
         hidden
     >
         <ul class="tejlg-quick-actions__list" role="list">
             <?php foreach ($actions as $index => $action) :
-                $angle = $angle_start + ($angle_step * $index);
-                $item_style = sprintf('--item-angle: %.2fdeg; --quick-actions-index: %d;', (float) $angle, (int) $index);
                 $action_id = isset($action['id']) ? sanitize_html_class((string) $action['id']) : 'quick-action-' . $index;
                 $type = isset($action['type']) ? (string) $action['type'] : 'link';
                 $type = in_array($type, ['link', 'button'], true) ? $type : 'link';
@@ -135,7 +125,6 @@ $container_styles = sprintf('--tejlg-quick-actions-count:%d;', (int) $action_cou
             ?>
                 <li
                     class="tejlg-quick-actions__item"
-                    style="<?php echo esc_attr($item_style); ?>"
                     data-quick-actions-item
                     data-quick-actions-item-id="<?php echo esc_attr($action_id); ?>"
                 >

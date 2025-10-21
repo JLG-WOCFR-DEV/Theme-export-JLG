@@ -2885,3 +2885,173 @@ textarea.has-pattern-error {
         justify-content: center;
     }
 }
+
+.tejlg-quick-actions {
+    position: fixed;
+    inset-block-end: clamp(1rem, 2.5vw, 2rem);
+    inset-inline-end: clamp(1rem, 2.5vw, 2rem);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+body.rtl .tejlg-quick-actions {
+    inset-inline-end: auto;
+    inset-inline-start: clamp(1rem, 2.5vw, 2rem);
+    align-items: flex-start;
+}
+
+.tejlg-quick-actions > * {
+    pointer-events: auto;
+}
+
+[data-quick-actions-toggle] {
+    white-space: nowrap;
+}
+
+[data-quick-actions-toggle]:focus-visible,
+.tejlg-quick-actions__restore:focus-visible,
+.tejlg-quick-actions__dismiss:focus-visible,
+.tejlg-quick-actions__link:focus-visible {
+    outline: 2px solid #72aee6;
+    outline-offset: 2px;
+}
+
+.tejlg-quick-actions__dropdown {
+    position: absolute;
+    inset-block-start: calc(100% + 0.75rem);
+    inset-inline-end: 0;
+    width: min(220px, 85vw);
+    background: var(--tejlg-surface-color, #fff);
+    border: 1px solid var(--tejlg-border-color, #c3c4c7);
+    border-radius: 8px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+    padding: 0.75rem 0;
+    opacity: 0;
+    transform: translateY(-0.5rem);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+    background-clip: padding-box;
+    overflow: hidden;
+}
+
+.tejlg-quick-actions.is-open .tejlg-quick-actions__dropdown {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.tejlg-quick-actions__dropdown[hidden] {
+    display: none !important;
+}
+
+.tejlg-quick-actions__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.tejlg-quick-actions__item + .tejlg-quick-actions__item {
+    border-top: 1px solid var(--tejlg-border-color, #dcdcde);
+}
+
+.tejlg-quick-actions__link {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    text-align: start;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--tejlg-text-color, #1d2327);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.tejlg-quick-actions__link:hover,
+.tejlg-quick-actions__link:focus-visible {
+    background: rgba(34, 113, 177, 0.08);
+    color: #0a4b78;
+}
+
+.tejlg-quick-actions__link:active {
+    background: rgba(34, 113, 177, 0.16);
+}
+
+.tejlg-quick-actions__description {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: rgba(29, 35, 39, 0.65);
+}
+
+.tejlg-quick-actions__dismiss {
+    width: 100%;
+    margin: 0;
+    border: none;
+    border-top: 1px solid var(--tejlg-border-color, #dcdcde);
+    background: transparent;
+    color: #0a4b78;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    text-align: center;
+}
+
+.tejlg-quick-actions__dismiss:hover {
+    background: rgba(34, 113, 177, 0.08);
+}
+
+.tejlg-quick-actions__restore {
+    display: none;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+}
+
+.tejlg-quick-actions__restore:not([hidden]) {
+    display: inline-flex;
+}
+
+.tejlg-quick-actions[data-dismissed="true"] [data-quick-actions-toggle],
+.tejlg-quick-actions[data-dismissed="true"] .tejlg-quick-actions__dropdown {
+    display: none;
+}
+
+.tejlg-quick-actions[data-dismissed="true"] .tejlg-quick-actions__restore {
+    display: inline-flex;
+}
+
+@media (max-width: 782px) {
+    .tejlg-quick-actions {
+        inset-block-end: 1rem;
+        inset-inline-end: 1rem;
+    }
+
+    body.rtl .tejlg-quick-actions {
+        inset-inline-start: 1rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tejlg-quick-actions__dropdown,
+    .tejlg-quick-actions__link,
+    .tejlg-quick-actions__dismiss {
+        transition-duration: 0.01ms !important;
+        transition-delay: 0ms !important;
+    }
+
+    .tejlg-quick-actions__dropdown {
+        transform: translateY(0) !important;
+    }
+}
