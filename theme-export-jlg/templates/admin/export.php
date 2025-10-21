@@ -184,6 +184,101 @@ $interface_mode = isset($interface_mode) ? (string) $interface_mode : 'simple';
 $interface_mode = in_array($interface_mode, ['simple', 'expert'], true) ? $interface_mode : 'simple';
 $is_simple_mode = ('simple' === $interface_mode);
 
+$toolbar_quick_actions = [];
+
+if (isset($quick_actions) && is_array($quick_actions)) {
+    foreach ($quick_actions as $action) {
+        if (!is_array($action)) {
+            continue;
+        }
+
+        $type = isset($action['type']) ? (string) $action['type'] : 'link';
+        $type = in_array($type, ['link', 'button'], true) ? $type : 'link';
+
+        $label = isset($action['label']) ? trim((string) $action['label']) : '';
+
+        if ('' === $label) {
+            continue;
+        }
+
+        $url = '';
+
+        if ('link' === $type) {
+            $url = isset($action['url']) ? trim((string) $action['url']) : '';
+
+            if ('' === $url) {
+                continue;
+            }
+        }
+
+        $aria_label  = isset($action['aria_label']) ? (string) $action['aria_label'] : '';
+        $description = isset($action['description']) ? (string) $action['description'] : '';
+        $rel         = isset($action['rel']) ? (string) $action['rel'] : '';
+        $target      = isset($action['target']) ? (string) $action['target'] : '';
+
+        $attribute_tokens = [];
+
+        if ('' !== $aria_label) {
+            $attribute_tokens[] = 'aria-label="' . esc_attr($aria_label) . '"';
+        }
+
+        if ('' !== $description) {
+            $attribute_tokens[] = 'title="' . esc_attr($description) . '"';
+        }
+
+        if ('link' === $type) {
+            if ('' !== $target) {
+                $attribute_tokens[] = 'target="' . esc_attr($target) . '"';
+            }
+
+            if ('' !== $rel) {
+                $attribute_tokens[] = 'rel="' . esc_attr($rel) . '"';
+            }
+        }
+
+        if (!empty($action['attributes']) && is_array($action['attributes'])) {
+            foreach ($action['attributes'] as $attr_name => $attr_value) {
+                $attr_name = sanitize_key((string) $attr_name);
+
+                if ('' === $attr_name) {
+                    continue;
+                }
+
+                if (is_bool($attr_value)) {
+                    if ($attr_value) {
+                        $attribute_tokens[] = esc_attr($attr_name);
+                    }
+
+                    continue;
+                }
+
+                if (is_array($attr_value)) {
+                    continue;
+                }
+
+                $attribute_tokens[] = sprintf(
+                    '%s="%s"',
+                    esc_attr($attr_name),
+                    esc_attr((string) $attr_value)
+                );
+            }
+        }
+
+        $attributes = '';
+
+        if (!empty($attribute_tokens)) {
+            $attributes = ' ' . implode(' ', array_unique($attribute_tokens));
+        }
+
+        $toolbar_quick_actions[] = [
+            'type'       => $type,
+            'label'      => $label,
+            'url'        => $url,
+            'attributes' => $attributes,
+        ];
+    }
+}
+
 $latest_export_status = __('Aucun export enregistré', 'theme-export-jlg');
 $latest_export_date = __('Lancez un premier export pour voir son statut ici.', 'theme-export-jlg');
 $latest_export_size = '—';
@@ -734,6 +829,21 @@ if ($is_simple_mode) {
                     <span class="tejlg-mode-summary__hint"><?php echo esc_html($notification_recipient_count_label); ?></span>
                 </div>
             </div>
+            <?php if (!empty($toolbar_quick_actions)) : ?>
+                <div class="tejlg-mode-toolbar__actions" role="group" aria-label="<?php echo esc_attr__('Actions rapides', 'theme-export-jlg'); ?>">
+                    <?php foreach ($toolbar_quick_actions as $action) : ?>
+                        <?php if ('button' === $action['type']) : ?>
+                            <button type="button" class="button-link"<?php echo $action['attributes']; ?>>
+                                <?php echo esc_html($action['label']); ?>
+                            </button>
+                        <?php else : ?>
+                            <a class="button button-secondary" href="<?php echo esc_url($action['url']); ?>"<?php echo $action['attributes']; ?>>
+                                <?php echo esc_html($action['label']); ?>
+                            </a>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
     <div class="tejlg-dashboard__grid">

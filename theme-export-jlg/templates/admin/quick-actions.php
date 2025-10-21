@@ -16,6 +16,14 @@ if (!isset($quick_actions) || !is_array($quick_actions)) {
     return;
 }
 
+$display_mode = isset($quick_actions_settings['display_mode'])
+    ? sanitize_key((string) $quick_actions_settings['display_mode'])
+    : 'floating';
+
+if ('toolbar' === $display_mode) {
+    return;
+}
+
 $actions = array_values(array_filter($quick_actions, static function ($action) {
     if (!is_array($action)) {
         return false;
