@@ -12,7 +12,8 @@ test.describe('Quick actions panel', () => {
 
     await visitExportTab(admin);
 
-    const toggle = page.locator('[data-quick-actions-toggle]');
+    const container = page.locator('[data-quick-actions]');
+    const toggle = page.locator('button.button.button-primary.wp-ui-primary[data-quick-actions-toggle]');
     const links = page.locator('[data-quick-actions-link]');
     const menu = page.locator('[data-quick-actions-menu]');
 
@@ -22,11 +23,12 @@ test.describe('Quick actions panel', () => {
     const linkCount = await links.count();
     expect(linkCount).toBeGreaterThanOrEqual(3);
 
-    await toggle.focus();
-    await page.keyboard.press('Enter');
+    await toggle.click();
 
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await expect(menu).not.toHaveAttribute('hidden', '');
+    await expect(menu).toBeVisible();
+    await expect(container).toHaveClass(/is-open/);
 
     const firstLink = links.first();
     await expect(firstLink).toBeFocused();
@@ -49,6 +51,7 @@ test.describe('Quick actions panel', () => {
     await page.keyboard.press('Escape');
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(menu).toHaveAttribute('hidden', '');
+    await expect(container).not.toHaveClass(/is-open/);
     await expect(toggle).toBeFocused();
 
     await toggle.click();

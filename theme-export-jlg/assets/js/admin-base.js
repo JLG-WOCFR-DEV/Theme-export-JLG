@@ -400,6 +400,10 @@
                 var isOpen = false;
                 var isDismissed = false;
 
+                if (!menu.hasAttribute('aria-hidden')) {
+                    menu.setAttribute('aria-hidden', 'true');
+                }
+
                 var getFocusableElements = function() {
                     var focusable = Array.prototype.slice.call(
                         container.querySelectorAll('[data-quick-actions-toggle], ' + actionSelector + ', [data-quick-actions-dismiss]')
@@ -436,8 +440,9 @@
                     }
 
                     isOpen = nextState;
-                    container.setAttribute('data-state', nextState ? 'open' : 'closed');
+                    container.classList.toggle('is-open', nextState);
                     toggle.setAttribute('aria-expanded', nextState ? 'true' : 'false');
+                    menu.setAttribute('aria-hidden', nextState ? 'false' : 'true');
 
                     if (nextState) {
                         menu.removeAttribute('hidden');
