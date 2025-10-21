@@ -431,11 +431,25 @@ class TEJLG_Admin {
         ];
 
         $quick_actions = $this->prepare_quick_actions($active_tab);
+        $quick_actions_display_mode = apply_filters(
+            'tejlg_quick_actions_display_mode',
+            'toolbar',
+            $active_tab,
+            $quick_actions
+        );
+
+        $quick_actions_display_mode = sanitize_key((string) $quick_actions_display_mode);
+
+        if (!in_array($quick_actions_display_mode, ['toolbar', 'floating'], true)) {
+            $quick_actions_display_mode = 'toolbar';
+        }
+
         $shared_context = [
             'quick_actions' => $quick_actions,
             'quick_actions_settings' => [
-                'current_tab' => $active_tab,
-                'page_slug'   => $this->page_slug,
+                'current_tab'  => $active_tab,
+                'page_slug'    => $this->page_slug,
+                'display_mode' => $quick_actions_display_mode,
             ],
         ];
 

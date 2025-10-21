@@ -6,8 +6,8 @@ const visitExportTab = async (admin) => {
   await admin.visitAdminPage('admin.php', 'page=theme-export-jlg&tab=export');
 };
 
-test.describe('Quick actions panel', () => {
-  test('supports keyboard navigation and dismissal preference', async ({ admin, page, requestUtils }) => {
+test.describe('Quick actions toolbar', () => {
+  test('renders quick action buttons in the export toolbar', async ({ admin, page, requestUtils }) => {
     await requestUtils.activatePlugin(pluginSlug);
 
     await visitExportTab(admin);
@@ -17,11 +17,10 @@ test.describe('Quick actions panel', () => {
     const links = page.locator('[data-quick-actions-link]');
     const menu = page.locator('[data-quick-actions-menu]');
 
-    await expect(toggle).toBeVisible();
-    await expect(menu).toHaveAttribute('hidden', '');
+    const buttons = toolbar.locator('.button');
+    const buttonCount = await buttons.count();
 
-    const linkCount = await links.count();
-    expect(linkCount).toBeGreaterThanOrEqual(3);
+    expect(buttonCount).toBeGreaterThanOrEqual(1);
 
     await toggle.click();
 

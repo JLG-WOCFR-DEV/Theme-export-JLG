@@ -325,7 +325,6 @@
             }
         }
 
-        var quickActionContainers = document.querySelectorAll('[data-quick-actions]');
 
         if (quickActionContainers.length) {
             var quickActionsStorageKey = 'tejlg:admin:quick-actions:dismissed';

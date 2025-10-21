@@ -1969,6 +1969,18 @@ textarea.has-pattern-error {
     margin-top: 1.25rem;
 }
 
+.tejlg-mode-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.tejlg-mode-toolbar__actions .button,
+.tejlg-mode-toolbar__actions .button-link {
+    margin: 0;
+}
+
 .tejlg-mode-toggle {
     display: flex;
     align-items: center;
@@ -2017,6 +2029,20 @@ textarea.has-pattern-error {
     display: grid;
     gap: 0.75rem;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+@media (min-width: 960px) {
+    .tejlg-mode-toolbar {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+    }
+
+    .tejlg-mode-toolbar__actions {
+        margin-inline-start: auto;
+        align-self: flex-start;
+    }
 }
 
 .tejlg-mode-summary__item {
