@@ -6,21 +6,25 @@ const visitExportTab = async (admin) => {
   await admin.visitAdminPage('admin.php', 'page=theme-export-jlg&tab=export');
 };
 
-test.describe('Quick actions toolbar', () => {
-  test('renders quick action buttons in the export toolbar', async ({ admin, page, requestUtils }) => {
+test.describe('Quick actions panel', () => {
+  test('opens the floating quick actions card', async ({ admin, page, requestUtils }) => {
     await requestUtils.activatePlugin(pluginSlug);
 
     await visitExportTab(admin);
 
-    const toolbar = page.locator('.tejlg-mode-toolbar__actions');
-    await expect(toolbar).toBeVisible();
+    const quickActions = page.locator('.tejlg-quick-actions');
+    await expect(quickActions).toBeVisible();
 
-    const buttons = toolbar.locator('.button');
-    const buttonCount = await buttons.count();
+    const toggle = quickActions.locator('[data-quick-actions-toggle]');
+    await toggle.click();
 
-    expect(buttonCount).toBeGreaterThanOrEqual(1);
+    await expect(quickActions).toHaveClass(/is-open/);
 
-    await expect(buttons.first()).toBeVisible();
-    await expect(buttons.first()).toHaveText(/\S/);
+    const panel = quickActions.locator('.tejlg-quick-actions__panel');
+    await expect(panel).toBeVisible();
+
+    const actionButtons = quickActions.locator('.tejlg-quick-actions__link');
+    await expect(actionButtons.first()).toBeVisible();
+    await actionButtons.first().click();
   });
 });

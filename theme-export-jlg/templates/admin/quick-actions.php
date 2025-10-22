@@ -48,17 +48,11 @@ if (empty($actions)) {
     return;
 }
 
-$action_count = count($actions);
 $menu_id = 'tejlg-quick-actions-menu';
 $panel_label = __('Actions rapides', 'theme-export-jlg');
 $current_tab = isset($quick_actions_settings['current_tab'])
     ? (string) $quick_actions_settings['current_tab']
     : '';
-
-$angle_step = ($action_count > 1) ? 180 / ($action_count - 1) : 0;
-$angle_start = -90;
-
-$container_styles = sprintf('--tejlg-quick-actions-count:%d;', (int) $action_count);
 ?>
 <div
     class="tejlg-quick-actions"
@@ -66,7 +60,6 @@ $container_styles = sprintf('--tejlg-quick-actions-count:%d;', (int) $action_cou
     data-state="closed"
     data-dismissed="false"
     data-active-tab="<?php echo esc_attr($current_tab); ?>"
-    style="<?php echo esc_attr($container_styles); ?>"
 >
     <button
         type="button"
@@ -78,7 +71,7 @@ $container_styles = sprintf('--tejlg-quick-actions-count:%d;', (int) $action_cou
         <span class="tejlg-quick-actions__toggle-visual" aria-hidden="true"></span>
         <span class="tejlg-quick-actions__toggle-label"><?php echo esc_html($panel_label); ?></span>
     </button>
-    <div
+    <section
         id="<?php echo esc_attr($menu_id); ?>"
         class="tejlg-quick-actions__panel"
         data-quick-actions-menu
@@ -86,10 +79,19 @@ $container_styles = sprintf('--tejlg-quick-actions-count:%d;', (int) $action_cou
         aria-label="<?php echo esc_attr($panel_label); ?>"
         hidden
     >
+        <header class="tejlg-quick-actions__header">
+            <h2 class="tejlg-quick-actions__title"><?php echo esc_html($panel_label); ?></h2>
+            <button
+                type="button"
+                class="tejlg-quick-actions__dismiss"
+                data-quick-actions-dismiss
+                aria-label="<?php esc_attr_e('Masquer ce menu', 'theme-export-jlg'); ?>"
+            >
+                <?php esc_html_e('Masquer', 'theme-export-jlg'); ?>
+            </button>
+        </header>
         <ul class="tejlg-quick-actions__list" role="list">
             <?php foreach ($actions as $index => $action) :
-                $angle = $angle_start + ($angle_step * $index);
-                $item_style = sprintf('--item-angle: %.2fdeg; --quick-actions-index: %d;', (float) $angle, (int) $index);
                 $action_id = isset($action['id']) ? sanitize_html_class((string) $action['id']) : 'quick-action-' . $index;
                 $type = isset($action['type']) ? (string) $action['type'] : 'link';
                 $type = in_array($type, ['link', 'button'], true) ? $type : 'link';
@@ -99,6 +101,17 @@ $container_styles = sprintf('--tejlg-quick-actions-count:%d;', (int) $action_cou
                 $rel = isset($action['rel']) ? (string) $action['rel'] : '';
                 $target = isset($action['target']) ? (string) $action['target'] : '';
                 $url = isset($action['url']) ? (string) $action['url'] : '';
+                $icon_markup = '';
+                $icon_markup_type = '';
+
+                if (isset($action['icon_html'])) {
+                    $icon_markup = (string) $action['icon_html'];
+                    $icon_markup_type = trim($icon_markup) !== '' ? 'html' : '';
+                } elseif (isset($action['icon'])) {
+                    $icon_markup = (string) $action['icon'];
+                    $icon_markup_type = trim($icon_markup) !== '' ? 'class' : '';
+                }
+
                 $extra_attributes = '';
 
                 if (!empty($action['attributes']) && is_array($action['attributes'])) {
@@ -135,12 +148,20 @@ $container_styles = sprintf('--tejlg-quick-actions-count:%d;', (int) $action_cou
             ?>
                 <li
                     class="tejlg-quick-actions__item"
-                    style="<?php echo esc_attr($item_style); ?>"
                     data-quick-actions-item
                     data-quick-actions-item-id="<?php echo esc_attr($action_id); ?>"
                 >
                     <?php if ('button' === $type) : ?>
                         <button type="button"<?php echo $common_attributes; ?>>
+                            <?php if ('html' === $icon_markup_type) : ?>
+                                <span class="tejlg-quick-actions__icon" aria-hidden="true"><?php echo wp_kses_post($icon_markup); ?></span>
+                            <?php elseif ('class' === $icon_markup_type) : ?>
+                                <?php
+                                    $icon_classes = array_filter(array_map('sanitize_html_class', preg_split('/\s+/', $icon_markup)));
+                                    $icon_class_attr = implode(' ', $icon_classes);
+                                ?>
+                                <span class="tejlg-quick-actions__icon<?php echo '' !== $icon_class_attr ? ' ' . esc_attr($icon_class_attr) : ''; ?>" aria-hidden="true"></span>
+                            <?php endif; ?>
                             <span class="tejlg-quick-actions__label"><?php echo esc_html($label); ?></span>
                             <?php if ('' !== $description) : ?>
                                 <span class="tejlg-quick-actions__description"><?php echo esc_html($description); ?></span>
@@ -148,6 +169,15 @@ $container_styles = sprintf('--tejlg-quick-actions-count:%d;', (int) $action_cou
                         </button>
                     <?php else : ?>
                         <a href="<?php echo esc_url($url); ?>"<?php echo $common_attributes; ?>>
+                            <?php if ('html' === $icon_markup_type) : ?>
+                                <span class="tejlg-quick-actions__icon" aria-hidden="true"><?php echo wp_kses_post($icon_markup); ?></span>
+                            <?php elseif ('class' === $icon_markup_type) : ?>
+                                <?php
+                                    $icon_classes = array_filter(array_map('sanitize_html_class', preg_split('/\s+/', $icon_markup)));
+                                    $icon_class_attr = implode(' ', $icon_classes);
+                                ?>
+                                <span class="tejlg-quick-actions__icon<?php echo '' !== $icon_class_attr ? ' ' . esc_attr($icon_class_attr) : ''; ?>" aria-hidden="true"></span>
+                            <?php endif; ?>
                             <span class="tejlg-quick-actions__label"><?php echo esc_html($label); ?></span>
                             <?php if ('' !== $description) : ?>
                                 <span class="tejlg-quick-actions__description"><?php echo esc_html($description); ?></span>
@@ -157,11 +187,7 @@ $container_styles = sprintf('--tejlg-quick-actions-count:%d;', (int) $action_cou
                 </li>
             <?php endforeach; ?>
         </ul>
-        <button type="button" class="tejlg-quick-actions__dismiss" data-quick-actions-dismiss>
-            <span class="tejlg-quick-actions__dismiss-icon" aria-hidden="true">&times;</span>
-            <span class="tejlg-quick-actions__dismiss-label"><?php esc_html_e('Masquer ce menu', 'theme-export-jlg'); ?></span>
-        </button>
-    </div>
+    </section>
     <button type="button" class="tejlg-quick-actions__restore" data-quick-actions-restore hidden>
         <?php esc_html_e('Afficher les actions rapides', 'theme-export-jlg'); ?>
     </button>
