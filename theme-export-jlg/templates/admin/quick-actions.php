@@ -57,26 +57,25 @@ $current_tab = isset($quick_actions_settings['current_tab'])
 <div
     class="tejlg-quick-actions"
     data-quick-actions
-    data-state="closed"
     data-dismissed="false"
     data-active-tab="<?php echo esc_attr($current_tab); ?>"
 >
     <button
         type="button"
-        class="tejlg-quick-actions__toggle"
+        class="button button-primary wp-ui-primary"
         data-quick-actions-toggle
         aria-expanded="false"
         aria-controls="<?php echo esc_attr($menu_id); ?>"
     >
-        <span class="tejlg-quick-actions__toggle-visual" aria-hidden="true"></span>
         <span class="tejlg-quick-actions__toggle-label"><?php echo esc_html($panel_label); ?></span>
     </button>
     <section
         id="<?php echo esc_attr($menu_id); ?>"
-        class="tejlg-quick-actions__panel"
+        class="tejlg-quick-actions__dropdown"
         data-quick-actions-menu
         role="region"
         aria-label="<?php echo esc_attr($panel_label); ?>"
+        aria-hidden="true"
         hidden
     >
         <header class="tejlg-quick-actions__header">

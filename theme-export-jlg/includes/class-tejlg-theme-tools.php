@@ -208,17 +208,18 @@ PHP;
             clean_site_details_cache();
         }
 
-        $themes_page_url = admin_url('themes.php');
+        $themes_page_url = admin_url( 'themes.php' );
         $success_message = sprintf(
-            /* translators: 1: Child theme name, 2: URL to the themes admin page. */
-            __("Le thème enfant \"%1$s\" a été créé avec succès ! Vous pouvez maintenant <a href=\"%2$s\">l'activer depuis la page des thèmes</a>.", 'theme-export-jlg'),
-            esc_html($sanitized_child_name),
-            esc_url($themes_page_url)
+            /* translators: 1: Child theme name, 2: Opening anchor tag to the themes admin page, 3: Closing anchor tag. */
+            __( "Le thème enfant \"%1$s\" a été créé avec succès ! Vous pouvez maintenant %2\$sl'activer depuis la page des thèmes%3\$s.", 'theme-export-jlg' ),
+            esc_html( $sanitized_child_name ),
+            '<a href="' . esc_url( $themes_page_url ) . '">',
+            '</a>'
         );
         add_settings_error(
             'tejlg_admin_messages',
             'child_theme_success',
-            wp_kses_post($success_message),
+            wp_kses_post( $success_message ),
             'success'
         );
     }
