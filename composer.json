@@ -12,5 +12,8 @@
         "classmap": [],
         "psr-4": {},
         "files": []
+    },
+    "scripts": {
+        "test": "phpunit"
     }
 }
