@@ -1,4 +1,8 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 class TEJLG_Import {
 
     private const IMPORT_FILE_TYPES = [

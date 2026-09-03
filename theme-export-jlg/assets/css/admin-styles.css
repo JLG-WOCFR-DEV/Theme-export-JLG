@@ -53,19 +53,16 @@ body.toplevel_page_theme-export-jlg.tejlg-contrast-enabled {
 }
 
 @supports not (color: color-mix(in srgb, #000 50%, #fff 50%)) {
-    body.toplevel_page_theme-export-jlg {
-        background: var(--tejlg-page-background);
-    }
-
     body.toplevel_page_theme-export-jlg .wrap {
         background: var(--tejlg-surface-color);
         border: 1px solid var(--tejlg-border-color);
         box-shadow: var(--tejlg-shadow-md);
     }
 
-    body.toplevel_page_theme-export-jlg .nav-tab-wrapper {
-        background: var(--tejlg-surface-alt-color);
-        border: 1px solid var(--tejlg-border-color);
+    body.toplevel_page_theme-export-jlg .wrap .nav-tab-wrapper {
+        background: transparent;
+        border: none;
+        border-bottom: 1px solid var(--tejlg-border-color);
     }
 
     body.toplevel_page_theme-export-jlg .components-card,
@@ -135,30 +132,15 @@ html.no-js [data-assistant-prev] {
     display: none;
 }
 
-body.toplevel_page_theme-export-jlg {
-    background: var(--tejlg-page-background);
-    font-family: var(--wp-components-font-family, "Inter", "Inter var", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-    color: var(--tejlg-text-color);
-}
-
-body.toplevel_page_theme-export-jlg #wpcontent,
-body.toplevel_page_theme-export-jlg #wpwrap {
-    background: transparent;
-}
-
 @media (prefers-reduced-motion: reduce) {
-    body.toplevel_page_theme-export-jlg *,
-    body.toplevel_page_theme-export-jlg *::before,
-    body.toplevel_page_theme-export-jlg *::after {
+    body.toplevel_page_theme-export-jlg .wrap *,
+    body.toplevel_page_theme-export-jlg .wrap *::before,
+    body.toplevel_page_theme-export-jlg .wrap *::after {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
-}
-
-body.toplevel_page_theme-export-jlg #wpbody-content {
-    padding-bottom: 40px;
 }
 
 body.toplevel_page_theme-export-jlg .wrap {
@@ -168,6 +150,8 @@ body.toplevel_page_theme-export-jlg .wrap {
     border-radius: var(--tejlg-radius-lg);
     border: 1px solid rgba(148, 163, 184, 0.28);
     box-shadow: var(--tejlg-shadow-md);
+    font-family: var(--wp-components-font-family, "Inter", "Inter var", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+    color: var(--tejlg-text-color);
 }
 
 body.toplevel_page_theme-export-jlg .wrap > h1 {
@@ -227,47 +211,50 @@ body.toplevel_page_theme-export-jlg .tejlg-compact-toggle .components-form-toggl
     margin-right: 0.75rem;
 }
 
-body.toplevel_page_theme-export-jlg .nav-tab-wrapper {
+body.toplevel_page_theme-export-jlg .wrap .nav-tab-wrapper {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    background: var(--tejlg-surface-alt-color);
-    border: 1px solid rgba(148, 163, 184, 0.4);
-    border-radius: 999px;
-    padding: 6px;
+    gap: 0;
+    align-items: flex-end;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--tejlg-border-color);
+    border-radius: 0;
+    padding: 0;
     margin-bottom: 2rem;
-    border-bottom: none;
     box-shadow: none;
 }
 
-body.toplevel_page_theme-export-jlg .nav-tab {
+body.toplevel_page_theme-export-jlg .wrap .nav-tab {
     position: relative;
-    border: none;
-    border-radius: 999px;
-    padding: 8px 18px;
+    border: 1px solid var(--tejlg-border-color);
+    border-bottom: none;
+    border-radius: 0;
+    margin: 0 4px -1px 0;
+    padding: 8px 14px;
     font-size: 14px;
     font-weight: 600;
     color: var(--tejlg-text-muted-color);
-    background: transparent;
+    background: var(--tejlg-surface-alt-color);
     transition: background-color 0.2s ease, color 0.2s ease;
     line-height: 1.3;
     box-shadow: none;
 }
 
-body.toplevel_page_theme-export-jlg .nav-tab:hover {
+body.toplevel_page_theme-export-jlg .wrap .nav-tab:hover {
     color: var(--tejlg-text-color);
     background: var(--tejlg-accent-color-soft);
 }
 
-body.toplevel_page_theme-export-jlg .nav-tab:focus-visible {
+body.toplevel_page_theme-export-jlg .wrap .nav-tab:focus-visible {
     outline: 2px solid var(--tejlg-accent-color);
     outline-offset: 2px;
 }
 
-body.toplevel_page_theme-export-jlg .nav-tab.nav-tab-active {
-    color: #fff;
-    background: var(--tejlg-accent-color-darker);
+body.toplevel_page_theme-export-jlg .wrap .nav-tab.nav-tab-active {
+    color: var(--tejlg-text-color);
+    background: var(--tejlg-surface-color);
+    border-bottom: 1px solid var(--tejlg-surface-color);
     box-shadow: none;
 }
 

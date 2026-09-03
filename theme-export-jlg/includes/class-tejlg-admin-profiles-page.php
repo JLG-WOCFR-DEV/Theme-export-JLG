@@ -1,4 +1,7 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class TEJLG_Admin_Profiles_Page extends TEJLG_Admin_Page {
     private $page_slug;

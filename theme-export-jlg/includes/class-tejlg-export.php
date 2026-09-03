@@ -1,4 +1,8 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 require_once __DIR__ . '/class-tejlg-exclusion-patterns-sanitizer.php';
 require_once __DIR__ . '/class-tejlg-export-history.php';
 require_once __DIR__ . '/class-tejlg-zip-writer.php';

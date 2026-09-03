@@ -1,4 +1,7 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class TEJLG_Admin_Debug_Page extends TEJLG_Admin_Page {
     const METRICS_ICON_OPTION  = 'tejlg_metrics_icon_size';

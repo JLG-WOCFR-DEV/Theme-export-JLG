@@ -1,4 +1,7 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class TEJLG_Site_Health {
     public static function init() {

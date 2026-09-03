@@ -1,4 +1,7 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
     private $page_slug;
@@ -62,14 +65,14 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
         $transient_id = (string) $transient_id;
 
         if ('' === $transient_id || 0 !== strpos($transient_id, 'tejlg_')) {
-            echo '<div class="error"><p>' . esc_html__("Erreur : L'identifiant de session est invalide. Veuillez téléverser à nouveau votre fichier.", 'theme-export-jlg') . '</p></div>';
+            echo '<div class="notice notice-error"><p>' . esc_html__("Erreur : L'identifiant de session est invalide. Veuillez téléverser à nouveau votre fichier.", 'theme-export-jlg') . '</p></div>';
             return;
         }
 
         $storage = get_transient($transient_id);
 
         if (false === $storage) {
-            echo '<div class="error"><p>' . esc_html__("La session d'importation a expiré ou est invalide. Veuillez téléverser à nouveau votre fichier.", 'theme-export-jlg') . '</p></div>';
+            echo '<div class="notice notice-error"><p>' . esc_html__("La session d'importation a expiré ou est invalide. Veuillez téléverser à nouveau votre fichier.", 'theme-export-jlg') . '</p></div>';
             return;
         }
 
@@ -77,7 +80,7 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
 
         if (!is_array($patterns) || empty($patterns)) {
             TEJLG_Import::delete_patterns_storage($transient_id, $storage);
-            echo '<div class="error"><p>' . esc_html__("Erreur : Aucune composition valide n'a pu être prévisualisée. Veuillez vérifier le fichier importé.", 'theme-export-jlg') . '</p></div>';
+            echo '<div class="notice notice-error"><p>' . esc_html__("Erreur : Aucune composition valide n'a pu être prévisualisée. Veuillez vérifier le fichier importé.", 'theme-export-jlg') . '</p></div>';
             echo '<p><a href="' . esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'import'], admin_url('admin.php'))) . '">&larr; ' . esc_html__("Retour au formulaire d'import", 'theme-export-jlg') . '</a></p>';
             return;
         }
@@ -440,7 +443,7 @@ class TEJLG_Admin_Import_Page extends TEJLG_Admin_Page {
 
         if (empty($prepared_patterns) || !$has_renderable_pattern) {
             TEJLG_Import::delete_patterns_storage($transient_id, $storage);
-            echo '<div class="error"><p>' . esc_html__("Erreur : Aucune composition valide n'a pu être prévisualisée. Veuillez vérifier le fichier importé.", 'theme-export-jlg') . '</p></div>';
+            echo '<div class="notice notice-error"><p>' . esc_html__("Erreur : Aucune composition valide n'a pu être prévisualisée. Veuillez vérifier le fichier importé.", 'theme-export-jlg') . '</p></div>';
             echo '<p><a href="' . esc_url(add_query_arg(['page' => $this->page_slug, 'tab' => 'import'], admin_url('admin.php'))) . '">&larr; ' . esc_html__("Retour au formulaire d'import", 'theme-export-jlg') . '</a></p>';
             return;
         }

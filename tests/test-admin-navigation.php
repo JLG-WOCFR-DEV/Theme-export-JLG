@@ -153,7 +153,9 @@ class Test_Admin_Navigation extends TestCase {
         $output = ob_get_clean();
 
         $this->assertIsString($output);
-        $this->assertStringContainsString('Guide de Migration', $output, 'Full navigation should expose every available tab.');
+        $this->assertStringContainsString('Exporter &amp; Outils', $output, 'Primary export tab should remain in the native navigation.');
+        $this->assertStringContainsString('nav-tab-wrapper', $output);
+        $this->assertStringNotContainsString('Guide de Migration', $output, 'Marketing documentation should stay out of the native tab bar.');
         $this->assertSame(1, substr_count($output, 'tejlg-admin-toolbar__nav'), 'Only one navigation toolbar should be rendered.');
         $this->assertStringNotContainsString('tejlg-section-summary', $output, 'Section summary navigation should not be rendered.');
     }

@@ -1,4 +1,8 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 class TEJLG_Theme_Tools {
 
     public static function create_child_theme( $child_name ) {
@@ -16,10 +20,7 @@ class TEJLG_Theme_Tools {
             return;
         }
 
-        if (
-            ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS ) ||
-            ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT )
-        ) {
+        if ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS ) {
             add_settings_error(
                 'tejlg_admin_messages',
                 'child_theme_error',

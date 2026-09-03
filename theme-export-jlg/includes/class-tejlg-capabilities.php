@@ -1,4 +1,7 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class TEJLG_Capabilities {
     const MANAGE_PLUGIN  = 'tejlg_manage_plugin';

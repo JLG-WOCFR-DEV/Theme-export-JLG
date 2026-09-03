@@ -1,4 +1,8 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 class TEJLG_Zip_Writer {
     const DRIVER_ZIPARCHIVE = 'ziparchive';
     const DRIVER_PCLZIP     = 'pclzip';

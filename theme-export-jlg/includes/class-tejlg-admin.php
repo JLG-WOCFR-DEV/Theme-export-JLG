@@ -1,4 +1,7 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 require_once TEJLG_PATH . 'includes/class-tejlg-admin-page.php';
 require_once TEJLG_PATH . 'includes/class-tejlg-admin-export-page.php';
@@ -422,6 +425,9 @@ class TEJLG_Admin {
         $requested_tab = isset($_GET['tab']) ? sanitize_key((string) $_GET['tab']) : '';
         $active_tab    = isset($tabs[$requested_tab]) ? $requested_tab : key($tabs);
 
+        $nav_tabs = $tabs;
+        unset($nav_tabs['migration_guide'], $nav_tabs['quality']);
+
         $summary_targets = [
             'export'   => '#tejlg-section-export',
             'import'   => '#tejlg-section-import',
@@ -464,7 +470,7 @@ class TEJLG_Admin {
             <div class="tejlg-admin-toolbar" role="toolbar" aria-label="<?php echo esc_attr__('Navigation principale de Theme Export', 'theme-export-jlg'); ?>">
                 <div class="tejlg-admin-toolbar__nav">
                     <h2 class="nav-tab-wrapper">
-                        <?php foreach ($tabs as $tab_slug => $tab_config) :
+                        <?php foreach ($nav_tabs as $tab_slug => $tab_config) :
                             $url = add_query_arg([
                                 'page' => $this->page_slug,
                                 'tab'  => $tab_slug,
@@ -481,7 +487,7 @@ class TEJLG_Admin {
                         <?php endforeach; ?>
                     </h2>
                     <div class="tejlg-mobile-accordion" data-tejlg-mobile-accordion>
-                        <?php foreach ($tabs as $tab_slug => $tab_config) :
+                        <?php foreach ($nav_tabs as $tab_slug => $tab_config) :
                             $url = add_query_arg([
                                 'page' => $this->page_slug,
                                 'tab'  => $tab_slug,

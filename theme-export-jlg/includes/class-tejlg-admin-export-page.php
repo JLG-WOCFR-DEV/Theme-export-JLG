@@ -1,4 +1,8 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 require_once __DIR__ . '/class-tejlg-export-history.php';
 
 if (!class_exists('TEJLG_Redirect_Exception')) {

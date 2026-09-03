@@ -1,6 +1,10 @@
 <?php
 use PHPUnit\Framework\TestCase;
 
+if (!defined('ABSPATH')) {
+    define('ABSPATH', dirname(__DIR__, 2) . '/');
+}
+
 if (!class_exists('WP_Error')) {
     class WP_Error {
         /** @var array<string,array<int,string>> */

@@ -1,4 +1,7 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class TEJLG_Exclusion_Patterns_Sanitizer {
     const DEFAULT_MAX_PATTERNS = 200;

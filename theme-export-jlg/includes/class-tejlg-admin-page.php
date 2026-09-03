@@ -1,4 +1,7 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 abstract class TEJLG_Admin_Page {
     protected $template_dir;
