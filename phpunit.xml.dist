@@ -8,6 +8,7 @@
             <file>tests/test-export-notifications.php</file>
             <file>tests/test-admin-navigation.php</file>
             <file>tests/phpunit/ProfilesPageTest.php</file>
+            <file>tests/test-export-connectors.php</file>
         </testsuite>
     </testsuites>
 </phpunit>
